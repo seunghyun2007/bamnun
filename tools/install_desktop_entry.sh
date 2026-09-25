@@ -37,7 +37,7 @@ Comment=Near-infrared drowsiness and distraction monitor
 Exec=$ROOT/tools/run_pi.sh
 Icon=$ROOT/assets/bamnun.png
 Terminal=true
-Categories=Utility;Science;
+Categories=Utility;
 StartupNotify=true
 Actions=Record;Headless;
 

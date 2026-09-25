@@ -113,8 +113,15 @@ calibration:
   # something. 20 rather than 12 degrees because solvePnP against a generic
   # head model carries a per-person bias of roughly this size; too tight a
   # gate rejects every frame and calibration never completes.
-  max_yaw_deg: 20.0
-  max_pitch_deg: 20.0
+  # 30 rather than 20. The gate exists only to be sure the driver is roughly
+  # forward while the zero is measured; the zero itself then absorbs whatever
+  # constant offset the mount imposes, so the gate does NOT need to be tight.
+  # At 20 a camera off eye level rejected a natural seated pose outright: the
+  # first run on the Pi reported median yaw -24, pitch -22 and never
+  # calibrated. A dash or mirror mount looks down at the driver by 15-25 deg
+  # before they have done anything wrong, and that is the intended geometry.
+  max_yaw_deg: 30.0
+  max_pitch_deg: 30.0
   save_path: runs/calibration.json
 
 state:

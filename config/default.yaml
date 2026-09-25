@@ -1,0 +1,218 @@
+# bamnun driver-state monitor: default configuration
+# Every tunable lives here so the poster can report exact parameter values.
+
+capture:
+  # source: picamera | webcam | video
+  source: webcam
+  device: 0                  # webcam index, or path for source=video
+  width: 1280
+  height: 720
+  fps: 30
+  flip_horizontal: false
+  grayscale_input: false     # NoIR feed is effectively monochrome; set true on Pi
+
+  picamera:
+    # IMX708 sensor modes (Pi 5 / picamera2):
+    #   1536x864   @ up to 120 fps   (2x2 binned)  <- use this for eye tracking
+    #   2304x1296  @ up to 56  fps
+    #   4608x2592  @ up to 14  fps
+    sensor_mode_size: [1536, 864]
+    # Lock everything. Auto-exposure hunting under IR illumination destroys
+    # frame-to-frame EAR stability, and autofocus hunting is worse.
+    lock_exposure: true
+    exposure_time_us: 8000     # 8 ms -> caps motion blur, needs decent IR power
+    analogue_gain: 4.0
+    lock_awb: true
+    colour_gains: [1.0, 1.0]   # neutral; IR scene has no meaningful white balance
+    manual_focus: true
+    lens_position: 4.5         # dioptres ~= 1/distance(m); 4.5 -> ~22 cm. TUNE.
+    noise_reduction: fast
+
+landmarks:
+  # Path is resolved relative to the repo root if not absolute.
+  model_path: models/face_landmarker.task
+  num_faces: 1
+  min_face_detection_confidence: 0.4   # lowered: IR faces score lower than RGB
+  min_face_presence_confidence: 0.4
+  min_tracking_confidence: 0.4
+  output_blendshapes: false            # costs ~2 ms; eyeBlink_* is a useful backup
+
+features:
+  # Eye Aspect Ratio closure threshold is expressed as a FRACTION of the
+  # driver's own calibrated open-eye EAR, not an absolute number. Absolute
+  # thresholds (the usual 0.21) fail on narrow eye shapes and on anyone
+  # wearing glasses.
+  ear_closed_fraction: 0.65
+  ear_reopen_fraction: 0.75        # hysteresis: must exceed this to count as open
+  ear_smoothing_alpha: 0.4         # EWMA on raw EAR, 1.0 = no smoothing
+
+  # PERCLOS-P80: proportion of time the eye opening is below 80% of baseline.
+  perclos_baseline_fraction: 0.80
+  perclos_window_s: 60.0
+
+  blink:
+    min_duration_s: 0.05           # below this is landmark noise, not a blink
+    max_normal_duration_s: 0.40    # above this the closure is a "long closure"
+    microsleep_duration_s: 0.50    # >= this is scored as a microsleep event
+    rate_window_s: 60.0
+
+  yawn:
+    mar_threshold: 0.60            # mouth aspect ratio
+    min_duration_s: 1.0
+    window_s: 300.0
+
+  head:
+    # Approximate on-road gaze cone. Outside it for longer than
+    # off_road_alert_s counts as distraction.
+    yaw_limit_deg: 25.0
+    pitch_limit_deg: 20.0
+    off_road_alert_s: 2.0          # NHTSA guideline: single glance > 2 s is risky
+    nod_window_s: 10.0
+    nod_pitch_std_deg: 6.0
+    # Head poses where a longer glance is a normal driving task rather than
+    # distraction. A 40 deg look toward the passenger mirror and a 40 deg look
+    # at a phone are the same angle; only the region tells them apart, so a
+    # named region buys extra dwell before the glance counts as off-road. A
+    # region can only ever LENGTHEN the dwell, never shorten off_road_alert_s.
+    #
+    # Angles are CALIBRATION-RELATIVE: they are offsets from this driver's own
+    # forward pose, not absolute camera angles, so they survive a change of
+    # mount position. Sign convention, measured not assumed (solve_head_pose):
+    #   yaw   < 0  driver turned toward their OWN LEFT
+    #   yaw   > 0  driver turned toward their OWN RIGHT
+    #   pitch > 0  looking DOWN
+    #
+    # THESE NUMBERS ARE PROVISIONAL. They are reasonable values for a
+    # left-hand-drive cabin and nothing more. Measure them in the actual rig
+    # with tools/measure_glance_zones.py and replace them before quoting any
+    # false-positive rate.
+    permitted_regions:
+      - {name: rearview,     yaw: [-8.0,  22.0], pitch: [-25.0,  6.0], dwell_s: 3.0}
+      - {name: left_mirror,  yaw: [-45.0, -10.0], pitch: [-18.0, 18.0], dwell_s: 3.0}
+      - {name: right_mirror, yaw: [22.0,  62.0], pitch: [-18.0, 22.0], dwell_s: 3.0}
+      # The instrument cluster overlaps the phone-in-lap pose, which is the
+      # case this system exists to catch, so it is left OFF until measured.
+      # - {name: cluster,    yaw: [-15.0, 10.0], pitch: [8.0, 26.0], dwell_s: 2.5}
+
+calibration:
+  # Driver looks straight ahead and blinks normally. 12 s at 25 fps is ~300
+  # frames containing 3-4 natural blinks, so the 75th-percentile open-eye EAR
+  # sits comfortably above the closed frames (a blink is ~0.2 s, so blinks are
+  # under 10% of the window).
+  #
+  # This runs ONCE per driver. The result is written to save_path and loaded
+  # automatically on later runs, so a repeat demo does not re-calibrate.
+  duration_s: 12.0
+  # Quality requirement, expressed as a FRACTION of the frames actually seen
+  # so it does not depend on frame rate. An absolute count here (it was 120)
+  # implicitly demands 10 usable frames per second over a 12 s window, and
+  # below that frame rate calibration can never finish at all.
+  min_tracking_fraction: 0.40
+  min_open_samples: 30             # absolute floor, for very slow streams
+  # Reject frames where the head is badly off-axis, so the pose zero means
+  # something. 20 rather than 12 degrees because solvePnP against a generic
+  # head model carries a per-person bias of roughly this size; too tight a
+  # gate rejects every frame and calibration never completes.
+  max_yaw_deg: 20.0
+  max_pitch_deg: 20.0
+  save_path: runs/calibration.json
+
+state:
+  # Weights for the fused drowsiness score (sum need not be 1; it is normalised).
+  weights:
+    perclos: 0.35
+    blink_duration: 0.20
+    microsleep: 0.25
+    yawn: 0.10
+    head_nod: 0.10
+  # Score -> level thresholds, with dwell time to avoid flapping.
+  levels:
+    - {name: alert,     min_score: 0.00, dwell_s: 0.0}
+    - {name: mild,      min_score: 0.35, dwell_s: 3.0}
+    - {name: drowsy,    min_score: 0.55, dwell_s: 2.0}
+    - {name: severe,    min_score: 0.75, dwell_s: 1.0}
+  recovery_hysteresis: 0.08        # must drop this far below to de-escalate
+  no_face_grace_s: 1.5             # eyes-not-visible tolerated this long
+  # MediaPipe loses the face past roughly 45-50 deg of yaw, so a blind-spot or
+  # far-mirror check ENDS in a lost face. Judged by no_face_grace_s alone that
+  # reported "driver not visible" after 1.5 s, which is shorter than an
+  # ordinary shoulder check. If the head was already past turn_away_yaw_deg
+  # when tracking dropped, the loss is scored as the tail of that glance and
+  # gets lost_glance_grace_s instead.
+  turn_away_yaw_deg: 35.0
+  lost_glance_grace_s: 4.0
+  # Iris offset (roughly -1..+1, 0 = centred) beyond which the eyes count as
+  # off-road with the head still facing forward. Deliberately coarse; this is
+  # not calibrated gaze. See docs/thresholds.md.
+  gaze_off_road_threshold: 0.55
+
+predictor:
+  # Blend of (a) measured drowsiness trend and (b) a simplified two-process
+  # alertness model (homeostatic + circadian, after Akerstedt & Folkard).
+  enabled: true
+  trend_window_s: 600.0            # 10 min of history for the slope fit
+  min_history_s: 120.0
+  unsafe_score: 0.55               # the "drowsy" level
+  unsafe_exposure_fraction: 0.20   # >20% of the window spent unsafe forces "rest now"
+  blend_measured_weight: 0.7
+  measured_decay_tau_s: 1800.0      # measured slope hands over to the prior at ~30 min
+  homeostatic_tau_h: 10.0          # decay constant of the wake process
+  circadian_amplitude: 0.12
+  circadian_peak_hour: 16.5        # alertness peak, local time
+  # Rest recommendation
+  min_rest_lead_time_s: 300.0      # do not bother suggesting a stop inside 5 min
+  rest_interval_cap_s: 7200.0      # never recommend driving longer than 2 h
+
+alerts:
+  enabled: true
+  # Graded escalation. Each stage lists the actuators fired on entry.
+  stages:
+    - name: none
+      actuators: []
+    - name: notify            # entered at level "mild"
+      actuators: [chime]
+      cooldown_s: 45.0
+    - name: rouse             # entered at level "drowsy"
+      actuators: [chime, scent]
+      cooldown_s: 90.0
+    - name: shock             # entered at level "severe"
+      actuators: [voice, scent, thermal]
+      cooldown_s: 30.0
+  actuators:
+    chime:
+      type: buzzer
+      gpio_pin: 18
+      pwm_hz: 2400
+      duration_s: 0.6
+      refractory_s: 8.0          # floor under the stage cooldowns
+    voice:
+      type: audio
+      file: assets/wake_up_ko.wav
+      volume: 1.0
+      refractory_s: 12.0         # do not talk over the previous prompt
+    scent:
+      type: atomizer
+      gpio_pin: 23
+      duration_s: 0.35
+      refractory_s: 120.0       # peppermint habituates fast; do not spam it
+      max_per_hour: 12
+    thermal:
+      type: peltier_fan
+      fan_gpio_pin: 24
+      peltier_gpio_pin: 25
+      precool_s: 20.0           # Peltier cold side needs lead time
+      burst_s: 4.0
+      refractory_s: 60.0
+
+logging:
+  dir: runs
+  csv_hz: 10.0                 # per-frame features are downsampled to this
+  log_events: true
+  log_video: false             # true writes an annotated mp4 (costly on the Pi)
+
+ui:
+  show_window: true
+  draw_mesh: false             # full 478-point mesh is pretty but slow
+  draw_eyes: true
+  draw_gauges: true
+  window_scale: 0.75

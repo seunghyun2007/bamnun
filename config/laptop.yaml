@@ -1,0 +1,18 @@
+# Laptop development overrides, merged over config/default.yaml:
+#
+#     python -m bamnun.app --config config/laptop.yaml
+#
+# Exists for one reason: on this MacBook Air, OpenCV index 0 is the OBS Virtual
+# Camera, which opens without error and streams 30 fps of pure black whenever
+# OBS is not running. The internal camera is index 1; index 2 is the iPhone over
+# Continuity Camera. Pointing at index 0 gives 0% face detection and a
+# calibration that never completes, with no error message anywhere.
+#
+# The green LED beside the MacBook camera is hardware-wired and cannot be
+# faked: if it is not lit during a run, the internal sensor is not the device
+# being read. Index ordering can shift when the iPhone connects or disconnects,
+# so if a run comes back all-black, re-probe rather than trusting this number.
+
+capture:
+  source: webcam
+  device: 1

@@ -1,0 +1,57 @@
+# ---------------------------------------------------------------------------
+# bamnun / driver state monitor
+#
+# Two install targets:
+#
+#   (A) Raspberry Pi 5, Raspberry Pi OS Bookworm (64-bit), Python 3.11
+#       picamera2 and libcamera come from apt, NOT pip. Create the venv with
+#       --system-site-packages so the apt packages stay visible:
+#
+#           sudo apt install -y python3-picamera2 python3-libcamera \
+#                              libgl1 libglib2.0-0
+#           python3 -m venv --system-site-packages .venv
+#           source .venv/bin/activate
+#           pip install -r requirements.txt
+#
+#   (B) Laptop (macOS / Linux / Windows) for development before the camera
+#       arrives. Same file works; picamera2 is simply absent and the webcam
+#       source is used instead.
+# ---------------------------------------------------------------------------
+
+# Core CV + numerics
+#
+# Verified working set: numpy 2.4.4 + opencv 4.13 + mediapipe 0.10.32 on
+# CPython 3.11. Older mediapipe releases (< 0.10.20) require numpy < 2, so do
+# not pin numpy down without also pinning mediapipe up.
+#
+# opencv-python, not -headless: the app opens a preview window, which IS the
+# demo at the exhibition. On a headless Pi run with --no-window; the GUI build
+# costs nothing extra there.
+numpy>=1.26
+opencv-python>=4.9,<5.0
+mediapipe>=0.10.20,<0.11           # aarch64 cp311 wheels exist
+#
+# NOTE: current mediapipe exposes ONLY the Tasks API. `mp.solutions.face_mesh`,
+# which nearly every tutorial online still uses, no longer exists in the
+# package. This project uses mediapipe.tasks.python.vision.FaceLandmarker and
+# requires the face_landmarker.task bundle (tools/download_models.py).
+
+# Config / CLI / logging
+PyYAML>=6.0
+rich>=13.7
+
+# Modelling for the rest-planning predictor
+scipy>=1.11
+scikit-learn>=1.4
+
+# Tests
+pytest>=8.0
+
+# ---------------------------------------------------------------------------
+# Raspberry Pi only (install manually on the Pi, they are no-ops elsewhere):
+#
+#   pip install gpiozero lgpio
+#
+# NOTE: RPi.GPIO does NOT work on the Pi 5 (new RP1 southbridge). Use
+# gpiozero with the lgpio pin factory, or the rpi-lgpio shim.
+# ---------------------------------------------------------------------------

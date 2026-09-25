@@ -1,0 +1,30 @@
+# Packaging exists for one reason: to put src/bamnun on the import path so the
+# documented `python -m bamnun.app` works from any directory, on the laptop and
+# on the Pi alike. Install with:
+#
+#     pip install -e .
+#
+# Runtime dependencies are deliberately NOT duplicated here. requirements.txt
+# is the single source of truth for them: it carries the version constraints
+# together with the reasons for each one (the numpy/mediapipe coupling, why
+# picamera2 must come from apt, why opencv-python rather than -headless), and a
+# second copy of that list would drift from it silently.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bamnun"
+version = "0.1.0"
+description = "Low-cost near-infrared driver state monitoring for the Raspberry Pi 5"
+requires-python = ">=3.10,<3.13"   # mediapipe publishes no wheels for 3.13+
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# tests/ import the package directly and also import sibling test modules
+# (test_viz pulls helpers from test_integration), so both roots are needed.
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]

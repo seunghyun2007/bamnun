@@ -28,8 +28,17 @@
 # demo at the exhibition. On a headless Pi run with --no-window; the GUI build
 # costs nothing extra there.
 numpy>=1.26
-opencv-python>=4.9,<5.0
-mediapipe>=0.10.20,<0.11           # aarch64 cp311 wheels exist
+opencv-python>=4.9
+#
+# mediapipe is split by interpreter, because the wheel matrix moved under us.
+# Raspberry Pi OS trixie ships ONLY Python 3.13, and picamera2 comes from apt
+# bound to that interpreter, so the Pi cannot simply use an older Python: the
+# venv must be 3.13 and mediapipe must therefore be 1.0.x, which does publish
+# aarch64 cp313 wheels. 0.10.x stops at cp312 and pins the laptop side.
+# Verified working: 0.10.35 on CPython 3.12 (macOS arm64), 1.0.1 on CPython
+# 3.13 (Pi 5, aarch64). Both expose the Tasks API this project uses.
+mediapipe>=0.10.20,<0.11 ; python_version < "3.13"
+mediapipe>=1.0 ; python_version >= "3.13"
 #
 # NOTE: current mediapipe exposes ONLY the Tasks API. `mp.solutions.face_mesh`,
 # which nearly every tutorial online still uses, no longer exists in the

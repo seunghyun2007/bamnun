@@ -18,7 +18,11 @@ build-backend = "setuptools.build_meta"
 name = "bamnun"
 version = "0.1.0"
 description = "Low-cost near-infrared driver state monitoring for the Raspberry Pi 5"
-requires-python = ">=3.10,<3.13"   # mediapipe publishes no wheels for 3.13+
+# Both interpreters in use are supported: 3.12 on the dev laptop (mediapipe
+# 0.10.x) and 3.13 on Raspberry Pi OS trixie (mediapipe 1.0.x, which does
+# publish aarch64 cp313 wheels). An earlier "<3.13" here was written from the
+# 0.10 wheel matrix and blocked `pip install -e .` on the Pi outright.
+requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 where = ["src"]

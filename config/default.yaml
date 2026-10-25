@@ -28,6 +28,14 @@ capture:
     lens_position: 4.5         # dioptres ~= 1/distance(m); 4.5 -> ~22 cm. TUNE.
     noise_reduction: fast
 
+  # 3 W IR LED with its own constant-current driver, switched by a MOSFET
+  # board on GPIO25. On only while a listed source is running; a webcam or a
+  # replayed file needs no IR. Without gpiozero it is a logging stub.
+  illuminator:
+    enabled: true
+    gpio_pin: 25
+    sources: [picamera]
+
 landmarks:
   # Path is resolved relative to the repo root if not absolute.
   model_path: models/face_landmarker.task
@@ -183,14 +191,17 @@ alerts:
       actuators: [chime, scent]
       cooldown_s: 90.0
     - name: shock             # entered at level "severe"
-      actuators: [voice, scent, thermal]
+      actuators: [voice, scent]
       cooldown_s: 30.0
+  # Pi pin map. GPIO18-21 are I2S (INMP441 mic, two MAX98357A amps) and must
+  # not be used here; GPIO2/3 are I2C (SCD41). GPIO24 drives the blue
+  # alertness LED, which is wired but not yet assigned to a stage.
   actuators:
     chime:
-      type: buzzer
-      gpio_pin: 18
-      pwm_hz: 2400
-      duration_s: 0.6
+      # Played through the speakers. The piezo buzzer it replaces sat on
+      # GPIO18, which is now the I2S bit clock.
+      type: audio
+      file: assets/chime.wav
       refractory_s: 8.0          # floor under the stage cooldowns
     voice:
       type: audio
@@ -199,17 +210,10 @@ alerts:
       refractory_s: 12.0         # do not talk over the previous prompt
     scent:
       type: atomizer
-      gpio_pin: 23
+      gpio_pin: 17
       duration_s: 0.35
       refractory_s: 120.0       # peppermint habituates fast; do not spam it
       max_per_hour: 12
-    thermal:
-      type: peltier_fan
-      fan_gpio_pin: 24
-      peltier_gpio_pin: 25
-      precool_s: 20.0           # Peltier cold side needs lead time
-      burst_s: 4.0
-      refractory_s: 60.0
 
 logging:
   dir: runs

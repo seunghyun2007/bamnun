@@ -22,7 +22,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from .alerts import EscalationPolicy
-from .capture import open_source
+from .capture import Illuminator, open_source
 from .features import Calibration, FeatureExtractor, FeatureFrame
 from .landmarks import FaceLandmarker
 from .predictor import RestPlanner
@@ -78,6 +78,8 @@ class Monitor:
             **({"realtime": not args.fast, "loop": args.loop}
                if self.cfg["capture"].get("source") == "video" else {}),
         )
+        self.illuminator = Illuminator(self.cfg["capture"].get("illuminator"),
+                                       str(self.cfg["capture"].get("source", "")))
         self.landmarker = FaceLandmarker(self.cfg["landmarks"], repo_root=self.root)
         self.features = FeatureExtractor(self.cfg["features"], self.cfg["calibration"])
         self.estimator = StateEstimator(self.cfg["state"])
@@ -155,6 +157,7 @@ class Monitor:
         t_start = None
         last = time.monotonic()
         alerts_on = True
+        self.illuminator.on()
 
         console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")
 
@@ -258,6 +261,7 @@ class Monitor:
         self.logger.log_event("shutdown", {"actuations": len(self.policy.history)})
         self.logger.close()
         self.policy.close()
+        self.illuminator.close()
         self.landmarker.close()
         self.source.close()
         try:
@@ -275,10 +279,17 @@ def main(argv=None) -> int:
         format="%(message)s",
         handlers=[RichHandler(console=console, rich_tracebacks=True, show_path=False)],
     )
+    monitor = None
     try:
-        return Monitor(args).run()
+        monitor = Monitor(args)
+        return monitor.run()
     except KeyboardInterrupt:
         return 130
+    finally:
+        # run() only reaches shutdown() on a clean exit. An exception in the
+        # loop would otherwise leave the IR LED lit with nothing watching it.
+        if monitor is not None:
+            monitor.illuminator.close()
 
 
 if __name__ == "__main__":

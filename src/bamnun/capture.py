@@ -12,6 +12,7 @@ That is what makes the recorded-session replay honest: identical code path.
 
 from __future__ import annotations
 
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
+
+log = logging.getLogger("bamnun.capture")
 
 # cv2 is imported lazily inside the backends that need it so that the pure
 # maths modules remain importable in a bare test environment.
@@ -365,3 +368,62 @@ def open_source(cfg: dict[str, Any], **kwargs) -> FrameSource:
     if kind == "video":
         return VideoFileSource(cfg, **kwargs)
     raise ValueError(f"unknown capture source {kind!r}")
+
+
+# --------------------------------------------------------------------------- #
+# IR illuminator
+# --------------------------------------------------------------------------- #
+
+class Illuminator:
+    """The IR LED that lights the driver for the NoIR sensor.
+
+    Part of capture rather than of the alert ladder: it is the sensor's light
+    source, not a stimulus, so it has no refractory period and no stages. It
+    is on for exactly as long as the camera is, and only for the sources
+    listed in config. A webcam or a replayed file does not need it, and
+    lighting the driver's eyes with IR for no reason is the one thing the eye
+    safety note in the README says not to do.
+
+    Like the actuators it degrades to a logging stub when gpiozero is absent,
+    so a laptop run is unchanged.
+    """
+
+    def __init__(self, cfg: Optional[dict[str, Any]], source_kind: str) -> None:
+        cfg = cfg or {}
+        self.pin = int(cfg.get("gpio_pin", 25))
+        sources = [str(s).lower() for s in cfg.get("sources", ["picamera"])]
+        self.enabled = bool(cfg.get("enabled", False)) and source_kind.lower() in sources
+        self.is_on = False
+        self._dev = None
+        if not self.enabled:
+            return
+        try:
+            from gpiozero import OutputDevice  # type: ignore
+        except Exception:  # noqa: BLE001 - absent on dev laptops
+            log.info("gpiozero absent, IR illuminator simulated")
+            return
+        try:
+            self._dev = OutputDevice(self.pin, active_high=True, initial_value=False)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("IR illuminator init failed on pin %s: %s", self.pin, exc)
+
+    def on(self) -> None:
+        if not self.enabled:
+            return
+        if self._dev is not None:
+            self._dev.on()
+        self.is_on = True
+        log.info("IR illuminator on (GPIO%d)", self.pin)
+
+    def close(self) -> None:
+        """Switch off and release the pin. Safe to call more than once."""
+        if self._dev is not None:
+            try:
+                self._dev.off()
+                self._dev.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self._dev = None
+        if self.is_on:
+            log.info("IR illuminator off")
+        self.is_on = False

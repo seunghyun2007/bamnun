@@ -16,15 +16,15 @@ Built for the 2026 연세-넥슨 √i RC창의플랫폼.
 |---|---|
 | Capture abstraction (Picamera2 / webcam / video) | done, Picamera2 path untested on hardware |
 | MediaPipe landmark wrapper | done, needs the model bundle downloaded |
-| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 113 tests passing |
+| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 178 tests passing |
 | State estimation (drowsiness + distraction) | done |
 | Rest planning (trend + two-process alertness prior) | done |
 | Graded alert policy | done, actuators run as logging stubs without GPIO |
-| Actuator hardware | not built |
-| Real IR validation | not started, blocked on the camera |
+| Actuator hardware | atomizer, speakers and IR LED wired (see the pin map below); thermal stage dropped; blue alertness LED wired, not yet staged |
+| Real IR validation | not started |
 
 ```
-python -m pytest tests/ -q          # 113 passed
+python -m pytest tests/ -q          # 178 passed
 python tools/simulate.py --minutes 45 --hours-awake 15
 ```
 
@@ -191,6 +191,31 @@ were both on your list of what distinguishes winning posters.
   gone. Only the Tasks API exists, which is what this code uses. Most
   tutorials online still use the old one.
 
+### Pi pin map (as built)
+
+| GPIO | Header pin | Connected to | Used by |
+|---|---|---|---|
+| 2 / 3 | 3 / 5 | SCD41 CO₂ sensor (I2C, 0x62) | not yet read by the app |
+| 17 | 11 | MOSFET board → ultrasonic mister (button bridged) | `alerts.actuators.scent` |
+| 18 | 12 | I2S BCLK: INMP441 SCK + both MAX98357A BCLK | sound card |
+| 19 | 35 | I2S LRCLK: INMP441 WS + both MAX98357A LRC | sound card |
+| 20 | 38 | I2S data in: INMP441 SD | sound card |
+| 21 | 40 | I2S data out: both MAX98357A DIN | sound card |
+| 24 | 18 | MOSFET board → blue alertness LED | wired, not yet in a stage |
+| 25 | 22 | MOSFET board → 3 W IR LED (built-in driver, 3–6 V, run at 5 V) | `capture.illuminator` |
+
+The sound card is `dtoverlay=googlevoicehat-soundcard` in
+`/boot/firmware/config.txt`, made the ALSA default in `/etc/asound.conf` so
+`aplay` with no device reaches the speakers. `chime` and `voice` both play
+through it; the piezo buzzer the chime was designed for would have sat on
+GPIO18, which I2S now owns. `tests/test_hardware_map.py` fails if an actuator
+is ever configured on an I2S or I2C pin.
+
+The actuator pins are held low from boot with
+`gpio=17,24,25=op,dl` in `config.txt`. Without it they float until the app
+claims them, and a floating MOSFET gate half-switches its load: the blue LED
+lit when a finger touched ground.
+
 ---
 
 ## Plan to the 27 September interim report
@@ -252,7 +277,8 @@ novelty — so the schedule should protect the evidence, not the feature list.
 | `python -m bamnun.app --source video --device clip.mp4 --fast` | re-score a recording at full speed |
 | `python tools/simulate.py --minutes 45` | synthetic 45-minute drive through the real decision stack |
 | `python tools/download_models.py` | fetch the MediaPipe bundle |
-| `python -m pytest tests/ -q` | 113 tests |
+| `python -m pytest tests/ -q` | 178 tests |
+| `python tools/make_chime.py` | regenerate `assets/chime.wav` |
 
 Session logs land in `runs/`: one CSV of per-frame features at 10 Hz, one JSONL
 of alert and closure events, one JSON of the exact config used. The CSV is the

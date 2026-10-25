@@ -32,4 +32,16 @@ export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 # image itself. Silenced so a real warning is visible.
 export QT_LOGGING_RULES="${QT_LOGGING_RULES:-qt.qpa.fonts=false}"
 
-exec .venv/bin/python -m bamnun.app --source picamera "$@"
+# Not exec: the pins need resetting after the app has gone. gpiozero releases
+# a pin as a floating input when it closes the device, and a floating MOSFET
+# gate half-switches its load, so after every run the mister and the IR LED
+# could sit partly on until the next reboot. Drive them low again, matching
+# the gpio= line in /boot/firmware/config.txt. The trap also covers Ctrl-C
+# and a crash.
+ACTUATOR_PINS="17,24,25"
+release_pins() {
+    command -v pinctrl >/dev/null 2>&1 && pinctrl set "$ACTUATOR_PINS" op dl || true
+}
+trap release_pins EXIT
+
+.venv/bin/python -m bamnun.app --source picamera "$@"

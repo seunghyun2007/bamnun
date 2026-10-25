@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot setup on a fresh Raspberry Pi OS Bookworm (64-bit) install.
+# One-shot setup on a fresh Raspberry Pi OS (64-bit) install, bookworm or trixie.
 #
 #   bash setup_pi.sh
 #
@@ -21,10 +21,17 @@ echo "   python $(python3 --version)"
 echo "== apt packages =="
 # picamera2 and libcamera are apt-only. libgl1/libglib are opencv's runtime
 # deps. lgpio backs gpiozero on the Pi 5, where RPi.GPIO does not work.
+#
+# trixie renamed libglib2.0-0 to libglib2.0-0t64 (the 64-bit time_t
+# transition) and dropped libatlas-base-dev; asking for either old name makes
+# apt fail the whole install. numpy's wheels bundle OpenBLAS, so ATLAS is not
+# needed on either release.
 sudo apt-get update
+GLIB=libglib2.0-0t64
+apt-cache show "$GLIB" >/dev/null 2>&1 || GLIB=libglib2.0-0   # bookworm
 sudo apt-get install -y \
   python3-picamera2 python3-libcamera python3-venv python3-dev \
-  libgl1 libglib2.0-0 libatlas-base-dev \
+  libgl1 "$GLIB" \
   python3-lgpio
 
 echo "== virtual environment =="

@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from bamnun.alerts import stage_entries  # noqa: E402
 from bamnun.capture import Illuminator  # noqa: E402
 from bamnun.session import load_config  # noqa: E402
 
@@ -48,7 +49,7 @@ def test_scent_is_on_the_mister_pin_and_chime_uses_the_speakers():
 def test_every_staged_actuator_is_configured():
     cfg = load_config()["alerts"]
     for stage in cfg["stages"]:
-        for name in stage.get("actuators", []):
+        for name, _ in stage_entries(stage):
             assert name in cfg["actuators"], f"stage {stage['name']} uses unknown {name}"
 
 

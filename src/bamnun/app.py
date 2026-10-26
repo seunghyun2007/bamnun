@@ -21,6 +21,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.logging import RichHandler
 
+from .air import CabinAir
 from .alerts import EscalationPolicy
 from .capture import Illuminator, open_source
 from .features import Calibration, FeatureExtractor, FeatureFrame
@@ -86,6 +87,8 @@ class Monitor:
         self.planner = RestPlanner(self.cfg["predictor"])
         self.planner.set_driver_context(args.hours_awake)
         self.policy = EscalationPolicy(self.cfg["alerts"])
+        self.air = CabinAir(self.cfg.get("air"))
+        self._air_seen_at = None
         self.logger = SessionLogger(self.cfg["logging"], tag=args.tag)
 
         self.show_window = bool(self.cfg["ui"].get("show_window", True)) and not args.no_window
@@ -128,6 +131,24 @@ class Monitor:
         )
         console.print(f"[green]calibration saved[/] {self._cal_path}")
 
+    def _voice(self, name: str, t: float) -> None:
+        """Play an optional spoken cue outside the alert ladder."""
+        a = self.policy.prompt(name, t)
+        if a is not None:
+            self.logger.log_event("prompt", a)
+
+    def _check_air(self, t: float, level: int) -> None:
+        air = self.air
+        if air.updated_at is not None and air.updated_at != self._air_seen_at:
+            self._air_seen_at = air.updated_at
+            self.logger.log_event("co2", {"t": t, "ppm": air.ppm,
+                                          "temp_c": air.temp_c, "rh": air.rh})
+        if air.should_prompt(level):
+            console.print(f"[bold yellow]CO2 {air.ppm:.0f} ppm[/]: open the window")
+            a = self.policy.prompt(air.actuator, t, "co2")
+            self.logger.log_event("co2_prompt", {"t": t, "ppm": air.ppm, "level": level,
+                                                 "fired": a is not None})
+
     def stop(self, *_a) -> None:
         self._running = False
 
@@ -153,6 +174,7 @@ class Monitor:
             first = self.source.read()
             if first is not None:
                 self.features.start_calibration(first.timestamp)
+                self._voice("calibrate_voice", first.timestamp)
 
         t_start = None
         last = time.monotonic()
@@ -193,6 +215,7 @@ class Monitor:
                         and not getattr(self, "_cal_announced", False):
                     self._save_calibration()
                     self._cal_announced = True
+                    self._voice("calibrated_voice", frame.timestamp)
                 state = self.estimator.update(
                     ff, calibrated=self.features.calibration.complete
                 )
@@ -200,6 +223,11 @@ class Monitor:
                 if frame.timestamp - self._last_plan_t > 15.0:
                     self._plan = self.planner.plan(frame.timestamp)
                     self._last_plan_t = frame.timestamp
+                    plan = self._plan
+                    if plan.valid and (plan.recommend_rest_now or (
+                            plan.rest_at_s is not None and plan.rest_at_s < 600.0)):
+                        self._voice("rest_voice", frame.timestamp)
+                self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
                 decision = self.policy.update(state) if alerts_on else None
                 if decision is not None and (decision.fired or decision.changed):
@@ -238,6 +266,7 @@ class Monitor:
                     break
                 if key == ord("c"):
                     self.features.start_calibration(frame.timestamp)
+                    self._voice("calibrate_voice", frame.timestamp)
                     self._cal_announced = False
                     console.print("[cyan]calibration restarted[/]")
                 if key == ord("s"):
@@ -261,6 +290,7 @@ class Monitor:
         self.logger.log_event("shutdown", {"actuations": len(self.policy.history)})
         self.logger.close()
         self.policy.close()
+        self.air.close()
         self.illuminator.close()
         self.landmarker.close()
         self.source.close()
@@ -287,9 +317,11 @@ def main(argv=None) -> int:
         return 130
     finally:
         # run() only reaches shutdown() on a clean exit. An exception in the
-        # loop would otherwise leave the IR LED lit with nothing watching it.
+        # loop would otherwise leave the IR LED, or a latched blue light, lit
+        # with nothing watching it.
         if monitor is not None:
             monitor.illuminator.close()
+            monitor.policy.close()
 
 
 if __name__ == "__main__":

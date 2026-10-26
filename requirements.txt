@@ -59,7 +59,9 @@ pytest>=8.0
 # ---------------------------------------------------------------------------
 # Raspberry Pi only (install manually on the Pi, they are no-ops elsewhere):
 #
-#   pip install gpiozero lgpio
+#   pip install gpiozero lgpio smbus2
+#
+# smbus2 reads the SCD41 CO2 sensor; without it CO2 monitoring is off.
 #
 # NOTE: RPi.GPIO does NOT work on the Pi 5 (new RP1 southbridge). Use
 # gpiozero with the lgpio pin factory, or the rpi-lgpio shim.

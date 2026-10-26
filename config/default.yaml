@@ -54,8 +54,19 @@ features:
   ear_reopen_fraction: 0.75        # hysteresis: must exceed this to count as open
   ear_smoothing_alpha: 0.4         # EWMA on raw EAR, 1.0 = no smoothing
 
-  # PERCLOS-P80: proportion of time the eye opening is below 80% of baseline.
-  perclos_baseline_fraction: 0.80
+  # PERCLOS: proportion of time the eye opening is below this fraction of the
+  # driver's calibrated open-eye EAR.
+  #
+  # 0.50, not 0.80. P80 means "eyelids MORE than 80% closed", but EAR never
+  # reaches zero on a shut eye (closed EAR is roughly a third of open), so
+  # ear_norm < 0.80 counted an eye only ~30% closed. On the two 40-minute
+  # bench sessions in runs/ that put the median rolling-60 s PERCLOS at 9-10%,
+  # i.e. the literature's "drowsy" band during ordinary sitting, and would
+  # have held the 5% stage-1 gate open ~85% of the time. At 0.50 (about 70%
+  # closed) the same sessions sit at a 1-2% median, inside the 0-5% alert
+  # baseline the four-stage scheme assumes. Measure closed EAR per driver
+  # before quoting this as true P80.
+  perclos_baseline_fraction: 0.50
   perclos_window_s: 60.0
 
   blink:
@@ -140,13 +151,19 @@ state:
     microsleep: 0.25
     yawn: 0.10
     head_nod: 0.10
-  # Score -> level thresholds, with dwell time to avoid flapping.
+  # Four drowsiness stages after the KSS/PERCLOS stratification in the team
+  # research doc: KSS 6 / 7 / 8 / 9 at PERCLOS 5 / 10 / 15 / 20 %. A level is
+  # entered on EITHER the fused score or PERCLOS alone (min_perclos), with a
+  # dwell to avoid flapping. Microsleeps (>= 0.5 s closure) jump straight to
+  # the top level regardless.
   levels:
     - {name: alert,     min_score: 0.00, dwell_s: 0.0}
-    - {name: mild,      min_score: 0.35, dwell_s: 3.0}
-    - {name: drowsy,    min_score: 0.55, dwell_s: 2.0}
-    - {name: severe,    min_score: 0.75, dwell_s: 1.0}
+    - {name: a_bit,     min_score: 0.30, min_perclos: 0.05, dwell_s: 10.0}
+    - {name: drowsy,    min_score: 0.45, min_perclos: 0.10, dwell_s: 3.0}
+    - {name: very,      min_score: 0.60, min_perclos: 0.15, dwell_s: 2.0}
+    - {name: extreme,   min_score: 0.75, min_perclos: 0.20, dwell_s: 1.0}
   recovery_hysteresis: 0.08        # must drop this far below to de-escalate
+  perclos_hysteresis: 0.02         # same, for the PERCLOS route
   no_face_grace_s: 1.5             # eyes-not-visible tolerated this long
   # MediaPipe loses the face past roughly 45-50 deg of yaw, so a blind-spot or
   # far-mirror check ENDS in a lost face. Judged by no_face_grace_s alone that
@@ -180,40 +197,92 @@ predictor:
 
 alerts:
   enabled: true
-  # Graded escalation. Each stage lists the actuators fired on entry.
+  # Graded escalation, one stage per drowsiness level. Each stage lists the
+  # actuators fired on entry; an entry can carry per-stage overrides, e.g.
+  # {scent: {duration_s: 20}}. The ladder is paced by cooldown_s: a gradual
+  # slide climbs one stage per cooldown, a microsleep jumps to the top.
+  #
+  #   1 a bit drowsy  blue light, dim, held 30 min    (ipRGC / melatonin)
+  #   2 drowsy        + mint burst                    (trigeminal TRPM8)
+  #   3 very drowsy   slow 1 Hz chime + voice + mint  (conscious advisory)
+  #   4 extreme       looming 3 Hz beeps + voice + long mint burst
   stages:
     - name: none
       actuators: []
-    - name: notify            # entered at level "mild"
-      actuators: [chime]
-      cooldown_s: 45.0
-    - name: rouse             # entered at level "drowsy"
-      actuators: [chime, scent]
+    - name: light
+      actuators: [blue_light]
+      cooldown_s: 60.0
+    - name: scent
+      actuators: [blue_light, scent]
       cooldown_s: 90.0
-    - name: shock             # entered at level "severe"
-      actuators: [voice, scent]
-      cooldown_s: 30.0
+    - name: chime
+      actuators: [blue_light, warn, scent]
+      cooldown_s: 45.0
+    - name: emergency
+      actuators: [blue_light, alarm, {scent: {duration_s: 20.0}}]
+      cooldown_s: 20.0
+  # A glance away gets its own short nudge and leaves the ladder alone.
+  distraction:
+    actuators: [chime]
+    cooldown_s: 10.0
   # Pi pin map. GPIO18-21 are I2S (INMP441 mic, two MAX98357A amps) and must
-  # not be used here; GPIO2/3 are I2C (SCD41). GPIO24 drives the blue
-  # alertness LED, which is wired but not yet assigned to a stage.
+  # not be used here; GPIO2/3 are I2C (SCD41); GPIO25 is the IR illuminator.
   actuators:
+    blue_light:
+      type: light
+      gpio_pin: 24
+      hold_s: 1800.0             # 30 min; firing again restarts the clock
+      # PWM duty. The target is ~1 lux at the eye from the periphery, and the
+      # 3 W LED at full duty is far brighter; it also changes the NoIR
+      # camera's exposure. Tune with the camera running.
+      brightness: 0.2
     chime:
-      # Played through the speakers. The piezo buzzer it replaces sat on
-      # GPIO18, which is now the I2S bit clock.
+      # The piezo buzzer this replaces sat on GPIO18, now the I2S bit clock.
       type: audio
       file: assets/chime.wav
-      refractory_s: 8.0          # floor under the stage cooldowns
-    voice:
+      refractory_s: 8.0
+    warn:
       type: audio
-      file: assets/wake_up_ko.wav
-      volume: 1.0
-      refractory_s: 12.0         # do not talk over the previous prompt
+      files: [assets/chime_slow.wav, assets/voice/stage3.wav]
+      refractory_s: 12.0
+    alarm:
+      type: audio
+      files: [assets/looming.wav, assets/voice/stage4.wav]
+      refractory_s: 8.0
     scent:
       type: atomizer
       gpio_pin: 17
-      duration_s: 0.35
+      # The research doc cites a 30 s burst; that figure comes from studies
+      # with direct delivery, not an ultrasonic mister into a cabin. Start at
+      # 10 s and test on a person before going longer.
+      duration_s: 10.0
       refractory_s: 120.0       # peppermint habituates fast; do not spam it
       max_per_hour: 12
+    # Spoken cues outside the ladder. Missing recordings are skipped.
+    open_window:
+      type: audio
+      file: assets/voice/open_window.wav
+      refractory_s: 300.0
+    rest_voice:
+      type: audio
+      file: assets/voice/rest_soon.wav
+      refractory_s: 900.0
+    calibrate_voice:
+      type: audio
+      file: assets/voice/calibrate.wav
+    calibrated_voice:
+      type: audio
+      file: assets/voice/calibrated.wav
+
+# Cabin CO2 (SCD41 on I2C). Fires the open_window prompt once per excursion.
+air:
+  enabled: true
+  i2c_bus: 1
+  prompt_ppm: 1500             # stale-cabin level
+  drowsy_prompt_ppm: 1000      # lower bar once the driver is at drowsy_level
+  drowsy_level: 2
+  rearm_drop_ppm: 200
+  actuator: open_window
 
 logging:
   dir: runs

@@ -45,6 +45,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Optional
 
+from .session import repo_root
+
 log = logging.getLogger("bamnun.alerts")
 
 try:  # pragma: no cover - hardware only
@@ -93,22 +95,32 @@ class Actuator(ABC):
                 return (False, "hourly budget exhausted")
         return (True, "")
 
-    def fire(self, t: float, stage: str) -> Optional[Actuation]:
+    def fire(self, t: float, stage: str,
+             params: Optional[dict[str, Any]] = None) -> Optional[Actuation]:
+        """Fire once. ``params`` are per-stage overrides, e.g. a longer burst.
+
+        Overrides live on the stage rather than on a second actuator because
+        two actuators on one pin would each claim the GPIO, and would each
+        keep their own refractory clock for what is physically one device.
+        """
         ok, why = self.can_fire(t)
         if not ok:
             log.debug("%s suppressed: %s", self.name, why)
             return None
         self._last_fired = t
         self._history.append(t)
-        detail = self._do_fire()
+        detail = self._do_fire(t, **(params or {}))
         log.info("actuator %s fired (stage=%s) %s", self.name, stage, detail)
         return Actuation(t=t, actuator=self.name, stage=stage, detail=detail)
 
     @abstractmethod
-    def _do_fire(self) -> str: ...
+    def _do_fire(self, t: float, **params: Any) -> str: ...
 
     def prepare(self, t: float) -> None:
         """Optional pre-arming hook. Used by the thermal actuator."""
+
+    def tick(self, t: float) -> None:
+        """Called on every policy update. Used by actuators that stay on."""
 
     def close(self) -> None: ...
 
@@ -116,7 +128,7 @@ class Actuator(ABC):
 class NullActuator(Actuator):
     """Logging stub used when the hardware is absent. Keeps timing identical."""
 
-    def _do_fire(self) -> str:
+    def _do_fire(self, t: float, **params: Any) -> str:
         return "(simulated)"
 
 
@@ -138,7 +150,7 @@ class BuzzerActuator(Actuator):
         else:
             log.info("gpiozero absent, buzzer %s simulated", name)
 
-    def _do_fire(self) -> str:
+    def _do_fire(self, t: float, **params: Any) -> str:
         if self._dev is None:
             return "(simulated buzz)"
 
@@ -162,32 +174,64 @@ class BuzzerActuator(Actuator):
 
 
 class AudioActuator(Actuator):
-    """Spoken warning through the Pi's audio output."""
+    """Sound through the Pi's speakers: a tone, a recorded voice, or both.
+
+    ``files`` plays a list back to back, so a stage can be "chime, then the
+    driver's own voice" without the two overlapping, which firing two audio
+    actuators at once would do. A file that does not exist yet is skipped,
+    not fatal: the voice prompts are recorded per team member and the tones
+    still have to work before anyone has recorded anything.
+    """
 
     def __init__(self, name: str, cfg: dict[str, Any]) -> None:
         super().__init__(name, cfg)
-        self.path = Path(str(cfg.get("file", "")))
+        files = cfg.get("files")
+        if files is None:
+            files = [cfg.get("file", "")]
+        # Relative paths are relative to the repo, not to wherever the app
+        # happened to be started from.
+        root = repo_root()
+        self.paths = [p if p.is_absolute() else root / p
+                      for p in (Path(str(f)) for f in files if f)]
         self._player = None
         for candidate in ("aplay", "paplay", "afplay", "ffplay"):
             if shutil.which(candidate):
                 self._player = candidate
                 break
-        if self._player is None or not self.path.exists():
-            log.info("audio actuator %s simulated (player=%s, file exists=%s)",
-                     name, self._player, self.path.exists())
+        if self._player is None or not self.present:
+            log.info("audio actuator %s simulated (player=%s, files present=%s)",
+                     name, self._player, [p.name for p in self.present])
 
-    def _do_fire(self) -> str:
-        if self._player is None or not self.path.exists():
-            return "(simulated voice prompt)"
+    @property
+    def path(self) -> Path:
+        return self.paths[0] if self.paths else Path("")
+
+    @property
+    def present(self) -> list[Path]:
+        return [p for p in self.paths if p.exists()]
+
+    def _cmd(self, path: Path) -> list[str]:
         cmd = [self._player]
         if self._player == "ffplay":
             cmd += ["-nodisp", "-autoexit", "-loglevel", "quiet"]
-        cmd.append(str(self.path))
-        try:
-            subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception as exc:  # noqa: BLE001
-            return f"(failed: {exc})"
-        return f"played {self.path.name}"
+        return cmd + [str(path)]
+
+    def _do_fire(self, t: float, **params: Any) -> str:
+        files = self.present
+        if self._player is None or not files:
+            return "(simulated sound)"
+
+        def run():  # pragma: no cover - plays through hardware
+            for p in files:
+                try:
+                    subprocess.run(self._cmd(p), stdout=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL, timeout=30)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("audio %s failed on %s: %s", self.name, p.name, exc)
+                    return
+
+        threading.Thread(target=run, daemon=True).start()
+        return "played " + " + ".join(p.name for p in files)
 
 
 class AtomizerActuator(Actuator):
@@ -212,24 +256,92 @@ class AtomizerActuator(Actuator):
         else:
             log.info("gpiozero absent, atomizer %s simulated", name)
 
-    def _do_fire(self) -> str:
+    def _do_fire(self, t: float, **params: Any) -> str:
+        duration = float(params.get("duration_s", self.duration))
         if self._dev is None:
-            return f"(simulated {self.duration:.2f}s scent burst)"
+            return f"(simulated {duration:.2f}s scent burst)"
 
         def run():  # pragma: no cover
             try:
                 self._dev.on()
-                time.sleep(self.duration)
+                time.sleep(duration)
             finally:
                 self._dev.off()
 
         threading.Thread(target=run, daemon=True).start()
-        return f"{self.duration:.2f}s burst"
+        return f"{duration:.2f}s burst"
 
     def close(self) -> None:
         if self._dev is not None:  # pragma: no cover
             try:
                 self._dev.off()
+                self._dev.close()
+            except Exception:
+                pass
+
+
+class LightActuator(Actuator):
+    """Blue (~460 nm) cabin light that stays on, rather than flashing.
+
+    The mechanism is melanopsin in the ipRGCs suppressing melatonin, which
+    takes tens of minutes of exposure, not a pulse: the on-road trials ran it
+    continuously for 30 to 60 minutes. So firing latches the light on for
+    ``hold_s``, and firing again while it is lit restarts that clock rather
+    than toggling anything. The policy ticks it every frame to switch it off.
+
+    It is dimmed by PWM. The effective dose is about 1 lux at the eye, aimed
+    from the periphery, and a 3 W LED at full power is hundreds of times that:
+    enough to glare, and enough to change the NoIR camera's exposure under a
+    locked shutter, which shifts the measured EAR. Tune ``brightness`` with the
+    camera running.
+    """
+
+    def __init__(self, name: str, cfg: dict[str, Any]) -> None:
+        super().__init__(name, cfg)
+        self.pin = int(cfg.get("gpio_pin", 24))
+        self.hold_s = float(cfg.get("hold_s", 1800.0))
+        self.brightness = max(0.0, min(1.0, float(cfg.get("brightness", 0.2))))
+        self.pwm_hz = float(cfg.get("pwm_hz", 1000.0))
+        self.on_until: Optional[float] = None
+        self._dev = None
+        if _HAVE_GPIO:  # pragma: no cover
+            try:
+                self._dev = PWMOutputDevice(self.pin, frequency=self.pwm_hz,
+                                            initial_value=0.0)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("light init failed on pin %s: %s", self.pin, exc)
+                self.available = False
+        else:
+            log.info("gpiozero absent, light %s simulated", name)
+
+    @property
+    def is_on(self) -> bool:
+        return self.on_until is not None
+
+    def _set(self, value: float) -> None:
+        if self._dev is not None:  # pragma: no cover
+            self._dev.value = value
+
+    def _do_fire(self, t: float, **params: Any) -> str:
+        hold = float(params.get("hold_s", self.hold_s))
+        was_on = self.is_on
+        self.on_until = max(self.on_until or t, t + hold)
+        self._set(self.brightness)
+        verb = "held" if was_on else "on"
+        sim = "" if self._dev is not None else "(simulated) "
+        return f"{sim}{verb} at {self.brightness:.0%} for {hold / 60:.0f} min"
+
+    def tick(self, t: float) -> None:
+        if self.on_until is not None and t >= self.on_until:
+            self.on_until = None
+            self._set(0.0)
+            log.info("light %s off after hold", self.name)
+
+    def close(self) -> None:
+        self.on_until = None
+        if self._dev is not None:  # pragma: no cover
+            try:
+                self._dev.value = 0.0
                 self._dev.close()
             except Exception:
                 pass
@@ -292,7 +404,7 @@ class PeltierFanActuator(Actuator):
         if self._peltier is not None:  # pragma: no cover
             self._peltier.off()
 
-    def _do_fire(self) -> str:
+    def _do_fire(self, t: float, **params: Any) -> str:
         ready = "ready" if self.precooled else "NOT pre-cooled, reduced effect"
         if self._fan is None:
             return f"(simulated {self.burst_s:.1f}s cold burst, {ready})"
@@ -324,8 +436,21 @@ _ACTUATOR_TYPES = {
     "audio": AudioActuator,
     "atomizer": AtomizerActuator,
     "peltier_fan": PeltierFanActuator,
+    "light": LightActuator,
     "null": NullActuator,
 }
+
+
+def stage_entries(spec: dict[str, Any]) -> list[tuple[str, Optional[dict[str, Any]]]]:
+    """A stage's actuator list as (name, per-stage overrides or None)."""
+    out = []
+    for entry in spec.get("actuators", []) or []:
+        if isinstance(entry, dict):
+            (name, params), = entry.items()
+            out.append((str(name), dict(params or {})))
+        else:
+            out.append((str(entry), None))
+    return out
 
 
 def build_actuators(cfg: dict[str, Any]) -> dict[str, Actuator]:
@@ -375,10 +500,34 @@ class EscalationPolicy:
         self._stage_entered_at = 0.0
         self._stage_cooldown_until = 0.0
         self.history: list[Actuation] = []
+        # Optional separate response to distraction. Without it, distraction
+        # raises the target to stage 1 as before. With it, a glance away gets
+        # its own short nudge and leaves the drowsiness ladder alone: once
+        # stage 1 became a 30-minute blue light, "a two-second glance lights
+        # the cabin for half an hour" was the wrong answer to a glance.
+        dcfg = cfg.get("distraction") or {}
+        self.distraction_actuators = list(dcfg.get("actuators", []) or [])
+        self.distraction_cooldown_s = float(dcfg.get("cooldown_s", 10.0))
+        self._distraction_ready_at = 0.0
 
     @property
     def stage(self) -> int:
         return self._stage
+
+    def prompt(self, name: str, t: float, reason: str = "") -> Optional[Actuation]:
+        """Fire one actuator outside the ladder, e.g. the open-window prompt.
+
+        Still subject to that actuator's refractory period and budget, and
+        still recorded in the history, so the session log shows every
+        actuation whatever caused it.
+        """
+        act = self.actuators.get(name)
+        if act is None or not self.enabled:
+            return None
+        a = act.fire(t, reason or name)
+        if a is not None:
+            self.history.append(a)
+        return a
 
     def _thermal(self) -> Optional[PeltierFanActuator]:
         for a in self.actuators.values():
@@ -391,8 +540,28 @@ class EscalationPolicy:
         if not self.enabled:
             return AlertDecision(t=t, stage=0, stage_name="disabled")
 
+        for act in self.actuators.values():
+            act.tick(t)
+
         distracted = state.distracted if distracted_override is None else distracted_override
 
+        nudged: list[Actuation] = []
+        if distracted and self.distraction_actuators:
+            if state.calibrated and t >= self._distraction_ready_at:
+                self._distraction_ready_at = t + self.distraction_cooldown_s
+                for name in self.distraction_actuators:
+                    a = self.prompt(name, t, "distraction")
+                    if a is not None:
+                        nudged.append(a)
+            distracted = False      # handled; the ladder is for drowsiness
+        decision = self._update_ladder(state, distracted)
+        if nudged:
+            decision.fired = nudged + decision.fired
+            decision.message = (decision.message + " distraction nudge").strip()
+        return decision
+
+    def _update_ladder(self, state, distracted: bool) -> AlertDecision:
+        t = state.t
         target = min(int(state.level), len(self.stages) - 1)
         if distracted:
             target = max(target, 1)
@@ -470,7 +639,7 @@ class EscalationPolicy:
         fired: list[Actuation] = []
         suppressed: list[str] = []
 
-        for act_name in spec.get("actuators", []) or []:
+        for act_name, params in stage_entries(spec):
             act = self.actuators.get(act_name)
             if act is None:
                 suppressed.append(f"{act_name}: not configured")
@@ -479,7 +648,7 @@ class EscalationPolicy:
             if not ok:
                 suppressed.append(f"{act_name}: {why}")
                 continue
-            a = act.fire(t, name)
+            a = act.fire(t, name, params)
             if a is not None:
                 fired.append(a)
                 self.history.append(a)

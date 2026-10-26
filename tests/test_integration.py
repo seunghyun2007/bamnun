@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from bamnun.alerts import EscalationPolicy          # noqa: E402
+from bamnun.alerts import EscalationPolicy, stage_entries  # noqa: E402
 from bamnun.capture import ArraySource, Frame       # noqa: E402
 from bamnun.features import (                     # noqa: E402
     FeatureExtractor, FeatureFrame, both_eye_ear, gaze_offset, solve_head_pose,
@@ -287,8 +287,11 @@ def run_sequence(extractor, estimator, policy, planner, frames, t0=0.0, dt=0.05)
 
 def build_stack():
     cfg = load_config()
-    cfg["alerts"]["actuators"]["chime"]["type"] = "null"
-    cfg["alerts"]["actuators"]["voice"]["type"] = "null"
+    # Every sound becomes a stub: on a Mac afplay exists, and the suite would
+    # otherwise play the alarm out loud.
+    for spec in cfg["alerts"]["actuators"].values():
+        if spec.get("type") == "audio":
+            spec["type"] = "null"
     extractor = FeatureExtractor(cfg["features"], cfg["calibration"])
     estimator = StateEstimator(cfg["state"])
     policy = EscalationPolicy(cfg["alerts"])
@@ -511,7 +514,7 @@ def test_config_loads_and_has_every_block_the_code_reads():
     for key in ("capture", "landmarks", "features", "calibration", "state",
                 "predictor", "alerts", "logging", "ui"):
         assert key in cfg, f"config is missing the {key!r} block"
-    stage_actuators = {a for s in cfg["alerts"]["stages"]
-                       for a in (s.get("actuators") or [])}
+    stage_actuators = {name for s in cfg["alerts"]["stages"]
+                       for name, _ in stage_entries(s)}
     assert stage_actuators <= set(cfg["alerts"]["actuators"]), \
         "a stage references an actuator that is not defined"

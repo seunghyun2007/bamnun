@@ -27,6 +27,7 @@ _LEVEL_COLOURS = [
     (60, 200, 240),    # mild
     (40, 140, 250),    # drowsy
     (50, 50, 240),     # severe
+    (160, 40, 230),    # extreme (fifth level, when configured)
 ]
 
 

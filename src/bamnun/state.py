@@ -82,6 +82,7 @@ class StateEstimator:
         self.levels = list(cfg.get("levels", [{"name": "alert", "min_score": 0.0, "dwell_s": 0.0}]))
         self.levels.sort(key=lambda d: float(d.get("min_score", 0.0)))
         self.hysteresis = float(cfg.get("recovery_hysteresis", 0.08))
+        self.perclos_hysteresis = float(cfg.get("perclos_hysteresis", 0.02))
         self.no_face_grace_s = float(cfg.get("no_face_grace_s", 1.5))
         # MediaPipe stops finding a face somewhere past 45-50 deg of yaw, so a
         # shoulder check or a far-side mirror check ENDS in a lost face. Judged
@@ -117,8 +118,23 @@ class StateEstimator:
             "head_nod": _ramp(f.pitch_std, *PITCH_STD_RANGE),
         }
 
-    def _resolve_level(self, t: float, score: float,
-                       force_top: bool = False) -> tuple[int, str]:
+    def _meets(self, lv: dict, score: float, perclos: float, slack: float = 0.0,
+               perclos_slack: float = 0.0) -> bool:
+        """A level is reached on the fused score OR on PERCLOS alone.
+
+        The PERCLOS gate maps the four-stage literature scheme (5 / 10 / 15 /
+        20 % PERCLOS, after Wierwille and Dinges) straight onto the levels, so
+        a stage can be quoted against a published threshold. The fused score
+        stays as a second route in, because it also carries blink duration,
+        microsleeps, yawns and nodding, which PERCLOS does not see.
+        """
+        if score >= float(lv.get("min_score", 0.0)) - slack:
+            return True
+        gate = lv.get("min_perclos")
+        return gate is not None and perclos >= float(gate) - perclos_slack
+
+    def _resolve_level(self, t: float, score: float, force_top: bool = False,
+                       perclos: float = 0.0) -> tuple[int, str]:
         """Level selection with dwell on the way up and hysteresis on the way down.
 
         ``force_top`` bypasses the dwell entirely. It is set while the eye is
@@ -129,7 +145,7 @@ class StateEstimator:
         """
         target = 0
         for i, lv in enumerate(self.levels):
-            if score >= float(lv.get("min_score", 0.0)):
+            if self._meets(lv, score, perclos):
                 target = i
 
         if force_top:
@@ -146,9 +162,11 @@ class StateEstimator:
                 self._level = target
                 self._candidate = None
         elif target < self._level:
-            # Require the score to fall clearly below the level we are in.
-            current_min = float(self.levels[self._level].get("min_score", 0.0))
-            if score < current_min - self.hysteresis:
+            # Require the evidence to fall clearly below the level we are in,
+            # on both routes in.
+            if not self._meets(self.levels[self._level], score, perclos,
+                               slack=self.hysteresis,
+                               perclos_slack=self.perclos_hysteresis):
                 self._level = target
                 self._candidate = None
             else:
@@ -229,7 +247,8 @@ class StateEstimator:
             score = max(score, 0.90)
 
         score = max(0.0, min(1.0, score))
-        level, level_name = self._resolve_level(t, score, force_top=microsleep_now)
+        level, level_name = self._resolve_level(t, score, force_top=microsleep_now,
+                                                perclos=f.perclos)
 
         # Distraction channel, independent of the score above.
         distracted = False

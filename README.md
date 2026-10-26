@@ -16,15 +16,15 @@ Built for the 2026 연세-넥슨 √i RC창의플랫폼.
 |---|---|
 | Capture abstraction (Picamera2 / webcam / video) | done, Picamera2 path untested on hardware |
 | MediaPipe landmark wrapper | done, needs the model bundle downloaded |
-| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 178 tests passing |
+| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 200 tests passing |
 | State estimation (drowsiness + distraction) | done |
 | Rest planning (trend + two-process alertness prior) | done |
-| Graded alert policy | done, actuators run as logging stubs without GPIO |
-| Actuator hardware | atomizer, speakers and IR LED wired (see the pin map below); thermal stage dropped; blue alertness LED wired, not yet staged |
+| Graded alert policy | four stages (blue light → mint → slow chime → looming alarm), entered on the fused score or PERCLOS 5/10/15/20 %; actuators run as logging stubs without GPIO |
+| Actuator hardware | atomizer, speakers, blue LED, IR LED and SCD41 wired (see the pin map below); thermal stage dropped; voice prompts not yet recorded |
 | Real IR validation | not started |
 
 ```
-python -m pytest tests/ -q          # 178 passed
+python -m pytest tests/ -q          # 200 passed
 python tools/simulate.py --minutes 45 --hours-awake 15
 ```
 
@@ -102,7 +102,15 @@ does not silently change the metric.
 
 **The escalation ladder is paced by cooldowns, not by the frame rate.** Obvious
 in hindsight, easy to get wrong: "advance one stage per update" at 25 Hz fires
-all three stages in 120 ms.
+every stage in under 200 ms.
+
+**Each stage uses the modality that fits its timescale.** Stage 1 is a dim
+blue light held for 30 minutes (melatonin suppression takes tens of minutes),
+stage 2 adds a mint burst (trigeminal, fast, resists habituation), stage 3 a
+slow 1 Hz chime plus a recorded voice, stage 4 a 3 Hz alarm that rises 30 dB
+instead of starting at full volume, to avoid a startle at the wheel. A glance
+away gets its own short chime and leaves the ladder alone. Rationale and
+sources: the team research doc; check the primary references before quoting.
 
 **The prediction blends slopes, not levels.** See `predictor.py`; blending
 predicted levels puts a discontinuity at the present and, worse, bends the
@@ -195,18 +203,18 @@ were both on your list of what distinguishes winning posters.
 
 | GPIO | Header pin | Connected to | Used by |
 |---|---|---|---|
-| 2 / 3 | 3 / 5 | SCD41 CO₂ sensor (I2C, 0x62) | not yet read by the app |
+| 2 / 3 | 3 / 5 | SCD41 CO₂ sensor (I2C, 0x62) | `air`: logs CO₂, plays the open-window prompt |
 | 17 | 11 | MOSFET board → ultrasonic mister (button bridged) | `alerts.actuators.scent` |
 | 18 | 12 | I2S BCLK: INMP441 SCK + both MAX98357A BCLK | sound card |
 | 19 | 35 | I2S LRCLK: INMP441 WS + both MAX98357A LRC | sound card |
 | 20 | 38 | I2S data in: INMP441 SD | sound card |
 | 21 | 40 | I2S data out: both MAX98357A DIN | sound card |
-| 24 | 18 | MOSFET board → blue alertness LED | wired, not yet in a stage |
+| 24 | 18 | MOSFET board → blue alertness LED (PWM-dimmed) | `alerts.actuators.blue_light` |
 | 25 | 22 | MOSFET board → 3 W IR LED (built-in driver, 3–6 V, run at 5 V) | `capture.illuminator` |
 
 The sound card is `dtoverlay=googlevoicehat-soundcard` in
 `/boot/firmware/config.txt`, made the ALSA default in `/etc/asound.conf` so
-`aplay` with no device reaches the speakers. `chime` and `voice` both play
+`aplay` with no device reaches the speakers. Every sound actuator plays
 through it; the piezo buzzer the chime was designed for would have sat on
 GPIO18, which I2S now owns. `tests/test_hardware_map.py` fails if an actuator
 is ever configured on an I2S or I2C pin.
@@ -277,8 +285,9 @@ novelty — so the schedule should protect the evidence, not the feature list.
 | `python -m bamnun.app --source video --device clip.mp4 --fast` | re-score a recording at full speed |
 | `python tools/simulate.py --minutes 45` | synthetic 45-minute drive through the real decision stack |
 | `python tools/download_models.py` | fetch the MediaPipe bundle |
-| `python -m pytest tests/ -q` | 178 tests |
-| `python tools/make_chime.py` | regenerate `assets/chime.wav` |
+| `python -m pytest tests/ -q` | 200 tests |
+| `python tools/make_chime.py` | regenerate the alert tones in `assets/` |
+| `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic (`--list`, `--only NAME`) |
 
 Session logs land in `runs/`: one CSV of per-frame features at 10 Hz, one JSONL
 of alert and closure events, one JSON of the exact config used. The CSV is the

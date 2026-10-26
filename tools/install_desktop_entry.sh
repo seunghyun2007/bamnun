@@ -57,6 +57,24 @@ EOF
 chmod +x "$ENTRY"
 echo "installed $ENTRY"
 
+# The desktop's right-click menu does not list Desktop Actions, so the demo
+# also gets an entry, and an icon, of its own.
+DEMO="$APPS/bamnun-demo.desktop"
+cat > "$DEMO" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=bamnun demo
+Comment=Showcase: keys 1-4 fire each stage, t runs a tour
+Exec=$ROOT/tools/run_pi.sh --demo
+Icon=$ROOT/assets/bamnun.png
+Terminal=true
+Categories=Utility;
+StartupNotify=true
+EOF
+chmod +x "$DEMO"
+echo "installed $DEMO"
+
 # The desktop folder is localised, so ask rather than assume "Desktop".
 DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
 if [ -d "$DESKTOP_DIR" ]; then
@@ -65,6 +83,10 @@ if [ -d "$DESKTOP_DIR" ]; then
     # pcmanfm will not launch an entry it does not trust; harmless if absent.
     gio set "$DESKTOP_DIR/bamnun.desktop" metadata::trusted true 2>/dev/null || true
     echo "installed $DESKTOP_DIR/bamnun.desktop"
+    cp "$DEMO" "$DESKTOP_DIR/bamnun-demo.desktop"
+    chmod +x "$DESKTOP_DIR/bamnun-demo.desktop"
+    gio set "$DESKTOP_DIR/bamnun-demo.desktop" metadata::trusted true 2>/dev/null || true
+    echo "installed $DESKTOP_DIR/bamnun-demo.desktop"
 fi
 
 command -v update-desktop-database >/dev/null 2>&1 \

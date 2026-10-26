@@ -508,6 +508,9 @@ class EscalationPolicy:
         dcfg = cfg.get("distraction") or {}
         self.distraction_actuators = list(dcfg.get("actuators", []) or [])
         self.distraction_cooldown_s = float(dcfg.get("cooldown_s", 10.0))
+        # A lost face is not a glance: it is an empty seat as often as a
+        # slumped driver, and chiming every 10 s at an empty seat is noise.
+        self.face_lost_cooldown_s = float(dcfg.get("face_lost_cooldown_s", 45.0))
         self._distraction_ready_at = 0.0
 
     @property
@@ -548,7 +551,9 @@ class EscalationPolicy:
         nudged: list[Actuation] = []
         if distracted and self.distraction_actuators:
             if state.calibrated and t >= self._distraction_ready_at:
-                self._distraction_ready_at = t + self.distraction_cooldown_s
+                self._distraction_ready_at = t + (
+                    self.face_lost_cooldown_s if state.face_lost
+                    else self.distraction_cooldown_s)
                 for name in self.distraction_actuators:
                     a = self.prompt(name, t, "distraction")
                     if a is not None:

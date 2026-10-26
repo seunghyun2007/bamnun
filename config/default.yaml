@@ -225,6 +225,7 @@ alerts:
   distraction:
     actuators: [chime]
     cooldown_s: 10.0
+    face_lost_cooldown_s: 45.0   # "driver not visible" is often an empty seat
   # Pi pin map. GPIO18-21 are I2S (INMP441 mic, two MAX98357A amps) and must
   # not be used here; GPIO2/3 are I2C (SCD41); GPIO25 is the IR illuminator.
   actuators:

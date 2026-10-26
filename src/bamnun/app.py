@@ -98,6 +98,7 @@ class Monitor:
         self._last_plan_t = -1e9
         self._last_alert = None
         self._cal_attempts_seen = 0
+        self._cal_run = False
 
         cal_path = args.calibration or self.cfg["calibration"].get("save_path")
         self._cal_path = self.root / str(cal_path)
@@ -174,6 +175,7 @@ class Monitor:
             first = self.source.read()
             if first is not None:
                 self.features.start_calibration(first.timestamp)
+                self._cal_run = True
                 self._voice("calibrate_voice", first.timestamp)
 
         t_start = None
@@ -215,7 +217,11 @@ class Monitor:
                         and not getattr(self, "_cal_announced", False):
                     self._save_calibration()
                     self._cal_announced = True
-                    self._voice("calibrated_voice", frame.timestamp)
+                    # Only after a calibration that ran now, not one loaded
+                    # from disk at start-up.
+                    if self._cal_run:
+                        self._cal_run = False
+                        self._voice("calibrated_voice", frame.timestamp)
                 state = self.estimator.update(
                     ff, calibrated=self.features.calibration.complete
                 )
@@ -266,6 +272,7 @@ class Monitor:
                     break
                 if key == ord("c"):
                     self.features.start_calibration(frame.timestamp)
+                    self._cal_run = True
                     self._voice("calibrate_voice", frame.timestamp)
                     self._cal_announced = False
                     console.print("[cyan]calibration restarted[/]")

@@ -298,3 +298,16 @@ def test_co2_threshold_drops_once_the_driver_is_drowsy():
     air.ppm = 1100
     assert not air.should_prompt(1)
     assert air.should_prompt(2)
+
+
+def test_an_empty_seat_is_nudged_less_often_than_a_glance():
+    pol = EscalationPolicy(_quiet_policy_cfg())
+    est = StateEstimator(load_config()["state"])
+    fired = []
+    t = 0.0
+    while t < 60.0:
+        d = pol.update(est.update(FeatureFrame(t=t, face_found=False), calibrated=True))
+        fired += [a.t for a in d.fired if a.actuator == "chime"]
+        t += 0.5
+    assert len(fired) == 2, fired               # once after the grace, once 45 s on
+    assert fired[1] - fired[0] >= 45.0

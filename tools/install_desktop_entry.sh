@@ -39,7 +39,11 @@ Icon=$ROOT/assets/bamnun.png
 Terminal=true
 Categories=Utility;
 StartupNotify=true
-Actions=Record;Headless;
+Actions=Demo;Record;Headless;
+
+[Desktop Action Demo]
+Name=Demo mode (keys 1-4, t for a tour)
+Exec=$ROOT/tools/run_pi.sh --demo
 
 [Desktop Action Record]
 Name=Record a 10-minute session

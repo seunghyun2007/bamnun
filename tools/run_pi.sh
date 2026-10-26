@@ -11,6 +11,7 @@
 #   ./tools/run_pi.sh                      live monitor, preview window
 #   ./tools/run_pi.sh --no-window          headless, for a recording session
 #   ./tools/run_pi.sh --duration 600 --tag drive1
+#   ./tools/run_pi.sh --demo               showcase: keys fire each feature
 #
 # Any arguments are passed straight through to bamnun.app.
 

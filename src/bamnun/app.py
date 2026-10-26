@@ -22,7 +22,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from .air import CabinAir
-from .alerts import EscalationPolicy
+from .alerts import AlertDecision, EscalationPolicy
+from . import demo as demo_mode
 from .capture import Illuminator, open_source
 from .features import Calibration, FeatureExtractor, FeatureFrame
 from .landmarks import FaceLandmarker
@@ -48,6 +49,8 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="driver's hours since waking, for the alertness prior")
     p.add_argument("--tag", default="", help="label appended to the session log filenames")
     p.add_argument("--duration", type=float, default=None, help="stop after N seconds")
+    p.add_argument("--demo", action="store_true",
+                   help="showcase mode: keys 1-4 fire each stage, t runs a tour")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -72,6 +75,10 @@ class Monitor:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self.cfg = load_config(args.config, build_overrides(args))
+        self.demo = bool(getattr(args, "demo", False))
+        if self.demo:
+            self.cfg = demo_mode.apply_demo(self.cfg)
+        self.tour = demo_mode.Tour()
         self.root = repo_root()
 
         self.source = open_source(
@@ -132,6 +139,31 @@ class Monitor:
         )
         console.print(f"[green]calibration saved[/] {self._cal_path}")
 
+    def _demo_action(self, key: str, t: float) -> None:
+        """One showcase action: a stage, a glance nudge, the CO2 prompt, off."""
+        console.print(f"[bold magenta]demo[/] {demo_mode.LABELS.get(key, key)}")
+        if key in "1234":
+            decision = self.policy.trigger(int(key), t, note="demo")
+        elif key == "0":
+            decision = self.policy.reset(t)
+        else:
+            if key == "d":
+                names = self.policy.distraction_actuators or ["chime"]
+                stage = "distraction"
+            else:
+                names = [self.air.actuator]
+                stage = "co2"
+            fired = [a for a in (self.policy.prompt(n, t, stage) for n in names) if a]
+            decision = AlertDecision(t=t, stage=self.policy.stage, stage_name=stage,
+                                     changed=True, fired=fired, message="demo")
+        decision.message = f"demo {key}"
+        self._last_alert = decision
+        self.logger.log_event("demo", decision)
+        for a in decision.fired:
+            console.print(f"     -> {a.actuator}: {a.detail}")
+        for why in decision.suppressed:
+            console.print(f"     [yellow]suppressed[/] {why}")
+
     def _voice(self, name: str, t: float) -> None:
         """Play an optional spoken cue outside the alert ladder."""
         a = self.policy.prompt(name, t)
@@ -184,6 +216,11 @@ class Monitor:
         self.illuminator.on()
 
         console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")
+        if self.demo:
+            console.print(f"[bold magenta]{demo_mode.HELP}[/]")
+            if not self.show_window:
+                # No window means no keys; run the tour once instead.
+                self.tour.start(time.monotonic())
 
         for frame in self.source:
             if not self._running:
@@ -249,6 +286,10 @@ class Monitor:
                                                       "duration_s": ff.ongoing_closure_s})
                 self.logger.log_frame(ff, state)
 
+            if self.demo:
+                for action in self.tour.due(time.monotonic()):
+                    self._demo_action(action, frame.timestamp)
+
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
             last = now
@@ -263,6 +304,12 @@ class Monitor:
                     cal_stats=(self.features.calibrator.stats(frame.timestamp)
                                if calibrating else None),
                 )
+                if self.demo:
+                    h = canvas.shape[0]
+                    label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
+                    cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
+                    cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+                                (230, 120, 230), 1, cv2.LINE_AA)
                 scale = float(self.cfg["ui"].get("window_scale", 1.0))
                 if scale != 1.0:
                     canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
@@ -283,6 +330,12 @@ class Monitor:
                 if key == ord("a"):
                     alerts_on = not alerts_on
                     console.print(f"actuators {'on' if alerts_on else 'off'}")
+                if self.demo and key != 0xFF and chr(key) in "01234dw":
+                    self.tour.stop()
+                    self._demo_action(chr(key), frame.timestamp)
+                if self.demo and key == ord("t"):
+                    self.tour.start(time.monotonic())
+                    console.print("[bold magenta]demo[/] tour started")
             elif not self.show_window:
                 # Headless heartbeat, once a second.
                 if int(frame.timestamp) != int(frame.timestamp - 1 / max(fps, 1)):

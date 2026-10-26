@@ -333,9 +333,12 @@ class LightActuator(Actuator):
 
     def tick(self, t: float) -> None:
         if self.on_until is not None and t >= self.on_until:
-            self.on_until = None
-            self._set(0.0)
+            self.off()
             log.info("light %s off after hold", self.name)
+
+    def off(self) -> None:
+        self.on_until = None
+        self._set(0.0)
 
     def close(self) -> None:
         self.on_until = None
@@ -516,6 +519,22 @@ class EscalationPolicy:
     @property
     def stage(self) -> int:
         return self._stage
+
+    def trigger(self, stage_idx: int, t: float, note: str = "manual") -> AlertDecision:
+        """Fire a stage on demand, for the demo. Refractories still apply."""
+        stage_idx = max(0, min(int(stage_idx), len(self.stages) - 1))
+        return self._fire_stage(t, stage_idx, changed=True, note=note)
+
+    def reset(self, t: float) -> AlertDecision:
+        """Back to stage 0 with every latched output off."""
+        for act in self.actuators.values():
+            if isinstance(act, LightActuator):
+                act.off()
+        self._stage = 0
+        self._stage_entered_at = t
+        self._stage_cooldown_until = 0.0
+        return AlertDecision(t=t, stage=0, stage_name=str(self.stages[0].get("name", "")),
+                             changed=True, message="reset")
 
     def prompt(self, name: str, t: float, reason: str = "") -> Optional[Actuation]:
         """Fire one actuator outside the ladder, e.g. the open-window prompt.

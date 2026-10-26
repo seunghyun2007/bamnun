@@ -26,7 +26,7 @@ import pytest
 
 try:  # pragma: no cover - depends on the host, not on the code under test
     from gpiozero import Device
-    from gpiozero.pins.mock import MockFactory
+    from gpiozero.pins.mock import MockFactory, MockPWMPin
 except Exception:  # noqa: BLE001 - gpiozero is absent on dev laptops
     Device = None
     MockFactory = None
@@ -40,7 +40,9 @@ def _never_touch_real_gpio():
         return
 
     previous = Device.pin_factory
-    Device.pin_factory = MockFactory()
+    # PWM-capable mock pins: the blue light is a PWMOutputDevice, and on the
+    # default MockPin it fails to build and silently becomes unavailable.
+    Device.pin_factory = MockFactory(pin_class=MockPWMPin)
     try:
         yield
     finally:

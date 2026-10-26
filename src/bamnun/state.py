@@ -37,6 +37,12 @@ YAWN_RATE_RANGE = (0.0, 12.0)         # per hour
 PITCH_STD_RANGE = (2.0, 10.0)         # degrees over 10 s
 
 
+# The fused sub-scores, in a fixed order. The session CSV takes its columns
+# from this, so a frame with no face (and so no components) cannot leave them
+# out of the header.
+COMPONENTS = ("perclos", "blink_duration", "microsleep", "yawn", "head_nod")
+
+
 def _ramp(x: float, lo: float, hi: float) -> float:
     """Clamped linear map from [lo, hi] onto [0, 1]."""
     if hi <= lo:

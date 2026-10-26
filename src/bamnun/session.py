@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from .state import COMPONENTS
+
 log = logging.getLogger("bamnun.session")
 
 
@@ -96,8 +98,13 @@ class SessionLogger:
             "distraction_reason": state.distraction_reason,
             "confidence": round(state.confidence, 3),
         })
-        for k, v in (state.components or {}).items():
-            row[f"c_{k}"] = round(v, 4)
+        # Every component column on every row. The header is fixed by the
+        # first row written, and a session that opened on an empty seat used
+        # to write one without them; the first frame with a face then crashed
+        # the logger with "dict contains fields not in fieldnames".
+        comps = state.components or {}
+        for k in COMPONENTS:
+            row[f"c_{k}"] = round(comps[k], 4) if k in comps else ""
 
         if self._writer is None:
             self._csv_fh = open(self.csv_path, "w", newline="", encoding="utf-8")

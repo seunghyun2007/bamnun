@@ -16,7 +16,7 @@ Built for the 2026 연세-넥슨 √i RC창의플랫폼.
 |---|---|
 | Capture abstraction (Picamera2 / webcam / video) | done, Picamera2 path untested on hardware |
 | MediaPipe landmark wrapper | done, needs the model bundle downloaded |
-| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 201 tests passing |
+| Feature extraction (EAR, PERCLOS, blinks, pose, gaze, yawn) | done, 202 tests passing |
 | State estimation (drowsiness + distraction) | done |
 | Rest planning (trend + two-process alertness prior) | done |
 | Graded alert policy | four stages (blue light → mint → slow chime → looming alarm), entered on the fused score or PERCLOS 5/10/15/20 %; actuators run as logging stubs without GPIO |
@@ -24,7 +24,7 @@ Built for the 2026 연세-넥슨 √i RC창의플랫폼.
 | Real IR validation | not started |
 
 ```
-python -m pytest tests/ -q          # 201 passed
+python -m pytest tests/ -q          # 202 passed
 python tools/simulate.py --minutes 45 --hours-awake 15
 ```
 
@@ -285,7 +285,7 @@ novelty — so the schedule should protect the evidence, not the feature list.
 | `python -m bamnun.app --source video --device clip.mp4 --fast` | re-score a recording at full speed |
 | `python tools/simulate.py --minutes 45` | synthetic 45-minute drive through the real decision stack |
 | `python tools/download_models.py` | fetch the MediaPipe bundle |
-| `python -m pytest tests/ -q` | 201 tests |
+| `python -m pytest tests/ -q` | 202 tests |
 | `python tools/make_chime.py` | regenerate the alert tones in `assets/` |
 | `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic (`--list`, `--only NAME`) |
 

@@ -518,3 +518,22 @@ def test_config_loads_and_has_every_block_the_code_reads():
                        for name, _ in stage_entries(s)}
     assert stage_actuators <= set(cfg["alerts"]["actuators"]), \
         "a stage references an actuator that is not defined"
+
+
+def test_session_log_survives_a_face_appearing_after_an_empty_start(tmp_path):
+    """Regression: the CSV header came from the first row, which had no
+    component columns when the seat was empty, so the first face crashed it."""
+    from bamnun.features import FeatureFrame
+    from bamnun.session import SessionLogger
+    from bamnun.state import DriverState
+
+    logger = SessionLogger({"dir": str(tmp_path), "csv_hz": 1000.0}, tag="t")
+    logger.log_frame(FeatureFrame(t=0.0, face_found=False),
+                     DriverState(t=0.0, face_lost=True))
+    est = StateEstimator(load_config()["state"])
+    f = FeatureFrame(t=1.0, face_found=True, pose_valid=True, gaze_valid=True,
+                     interocular_px=120.0, ear_norm=1.0)
+    logger.log_frame(f, est.update(f, calibrated=True))
+    logger.close()
+    rows = (tmp_path / logger.csv_path.name).read_text().splitlines()
+    assert len(rows) == 3 and "c_perclos" in rows[0]

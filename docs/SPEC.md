@@ -2,14 +2,14 @@
 
 How the Bamnun phone app and the Raspberry Pi backend should behave. This is the source of truth: build to it, and update it when a decision changes.
 
-Status: draft v1. Sections 0–2 apply to everything; sections 3–9 are features, built one at a time in the order of section 10.
+Status: draft v2 (Android and iOS from the start). Sections 0–2 apply to everything; sections 3–9 are features, built one at a time in the order of section 10. Section 12 lists every place the two platforms differ, and what needs a Mac.
 
 ---
 
 ## 0. Architecture
 
 - **The Pi does the safety work on its own.** Camera, detection, and the four-stage wake-up ladder (blue light → mint mist → chime + voice → rising alarm) all run on the Pi and keep working if the phone is off, locked, or out of range.
-- **The phone app is a Capacitor app** built from `frontend/`. 
+- **The phone app is a Capacitor app** built from `frontend/`, for **Android and iOS from the start**, with one shared codebase. Only plugins that support both platforms are used. Where a platform can't do what this spec asks, section 12 says what happens instead.
 - **Phone ↔ Pi link**
   - Bluetooth LE is used only to find a nearby Bamnun and set it up (see section 7).
   - Live data and commands go over the Pi's own Wi-Fi hotspot. A FastAPI server on the Pi gives a REST API for settings and trips, and a WebSocket at `/ws` for live data and events.
@@ -40,6 +40,7 @@ WebSocket `/ws`, server → phone messages (JSON with `type`):
 - `calibration`: step changes and progress (section 6).
 - `test_result`: a part's result.
 - `trip`: started / ended, with summary.
+- `emergency`: the driver hasn't responded after stage 4 (section 9b). Sent immediately.
 
 The phone sends `hello` with its clock time and language on connect (the Pi has no reliable clock).
 
@@ -55,7 +56,10 @@ The phone sends `hello` with its clock time and language on connect (the Pi has 
   - The voice language is chosen on the voice screen (section 6) and defaults to the app language.
   - It can differ from the app language. For example, the app can be in English while Ollie speaks Korean.
 - **The clips are recorded by the team**, using `tools/record_prompts.py` extended with `--lang en|ko`, through the device's own mic. The repo already argues that a familiar human voice wakes people better than a synthetic one. Because the clips are fixed recordings, Ollie never says the driver's name out loud; the name appears on screen and in notifications.
-- **The phone** shows a notification for every alert, with an owl hoot sound (`owl_hoot.wav`, its own Android notification channel), in the app language.
+- **The phone** shows a notification for every alert, with an owl hoot sound, in the app language.
+  - Android: `owl_hoot.wav` in `res/raw`, on its own notification channel.
+  - iOS: there are no channels. `owl_hoot.wav` is bundled in the app and set on each notification. It must be under 30 s, and the ring/silent switch mutes it.
+  - The phone only receives alerts while the app can run. See "Drive mode" in section 12.
 
 ---
 
@@ -143,22 +147,37 @@ Welcome → Meet → Name → Vehicle → Work week → Wake-up ladder → Priva
 
 ## 7. Permissions (screen 10) and finding the device (screen 11)
 
-**Permissions**: three rows, each with a button that triggers the **real Android prompt**.
+**Permissions**: three rows, each with a button that triggers the **real system prompt**.
 
-| Row | Android permission | Why (shown to user) |
-|---|---|---|
-| Bluetooth | `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | Find your Bamnun |
-| Location | `ACCESS_FINE_LOCATION` | Map, route and rest stops |
-| Notifications | `POST_NOTIFICATIONS` | Ollie's alerts and break reminders |
+| Row | Android permission | iOS permission | Why (shown to user) |
+|---|---|---|---|
+| Bluetooth | `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | `NSBluetoothAlwaysUsageDescription` | Find your Bamnun |
+| Location | `ACCESS_FINE_LOCATION` | `NSLocationWhenInUseUsageDescription` | Map, route and rest stops |
+| Notifications | `POST_NOTIFICATIONS` | System prompt, no Info.plist text | Ollie's alerts and break reminders |
 
 - Each row shows the real result: Allow (not asked), Allowed ✓, or Denied → "Open settings" (deep link to app settings).
 - The screen re-checks when the app returns from settings.
 - Next is always enabled. Missing permissions are explained where they're needed, never a dead end.
+- Android 6–11 has no Bluetooth scan permission and needs Location to scan, so on those versions the Bluetooth row also asks for Location.
+
+**iOS only**
+- iOS asks for each permission once. After a refusal the only route back is the Settings app, so the Denied state always shows "Open settings".
+- **Local network** is a fourth permission on iOS (`NSLocalNetworkUsageDescription`). iOS shows it the first time the app contacts the Pi, and gives apps no way to ask for it early or read its state. So it isn't a row here. It's handled on screen 11: if `/api/health` fails while on the Bamnun Wi-Fi, show "Allow Local Network for Bamnun in Settings" with a button.
+- Info.plist usage texts, in English and Korean:
+
+| Key | English | Korean |
+|---|---|---|
+| `NSBluetoothAlwaysUsageDescription` | Bamnun uses Bluetooth to find your device and set it up. | 밤눈 기기를 찾고 설정하기 위해 블루투스를 사용해요. |
+| `NSLocationWhenInUseUsageDescription` | Bamnun uses your location for the map, your route and rest stops. | 지도, 경로, 휴게소 안내를 위해 위치를 사용해요. |
+| `NSLocalNetworkUsageDescription` | Bamnun connects to your device over its own Wi-Fi to show live data. | 실시간 정보를 보여주기 위해 밤눈 기기의 Wi-Fi로 연결해요. |
 
 **Finding the device (screen 11)**
 1. The radar animation runs while scanning BLE for devices advertising the Bamnun service UUID.
 2. When one is found, show "Found Bamnun · {id}".
 3. The phone reads the hotspot name and password over BLE and joins that Wi-Fi network.
+   - Android: `WifiNetworkSpecifier`, with the app's traffic to the Pi bound to that network.
+   - iOS: `NEHotspotConfiguration`. iOS shows its own "Join Wi-Fi?" prompt, and the driver taps Join. This needs the Hotspot capability, which needs a paid Apple Developer account (section 12).
+   - If joining fails on either platform, or the capability isn't available, show the network name and password with a copy button and "Join this network in Wi-Fi settings, then come back". The app continues as soon as `/api/health` answers.
 4. It calls `/api/health`.
 5. The six part checks tick using the **real** status from `/api/health`. A failed part shows ✗ with a one-line fix.
 6. If nothing is found in 20 s, show "Can't find Bamnun", with a checklist (powered on? within 3 m?) and Retry.
@@ -191,7 +210,8 @@ Rules:
   - Ollie highlights the stop that comes **before** the driver's tired window and within the break interval, with the reason ("Stop here at 02:40, before your tired window").
 - **Set route**: saves `{destination, route summary, planned stops}` to the current trip and sends it to the Pi, so the break reminder can say "rest stop in {km} km".
 - **Without location permission**: the map still works, and the start point must be typed instead.
-- **API keys**: Kakao JS key and REST key in `frontend/.env`, not committed. Register the app's Android package and `http://localhost` in Kakao Developers.
+- **API keys**: Kakao JS key and REST key in `frontend/.env`, not committed. Register the app's Android package, iOS bundle ID and `http://localhost` in Kakao Developers.
+- **iOS risk, to test at step 7**: the Kakao JS SDK checks the page's web address. The Android app runs at `http://localhost`, which can be registered. The iOS app runs at `capacitor://localhost`, and iOS doesn't allow http or https there. If Kakao rejects it, the fallback is to host the map page on a small https site and load it inside the app.
 
 ## 9b. Emergency response (no response after the alarm)
 
@@ -210,12 +230,25 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
    - a map link to the GPS location,
    - the time.
    Then it calls that contact.
-3. **119, optional and off by default.** If the driver turned on "Call 119 if I don't respond" in Settings, a second 30 s countdown follows. Then the phone dials **119** (fire and medical, the correct number for a possible crash or medical event; 112 is for crimes).
+3. **119, optional and off by default.** If the driver turned on "Call 119 if I don't respond" in Settings, a second 30 s countdown follows. Then the phone opens the dialer with **119** filled in (fire and medical, the correct number for a possible crash or medical event; 112 is for crimes). **Someone has to tap Call on both platforms**: Android doesn't let an app place a call to an emergency number itself (`ACTION_CALL` is refused for them; only `ACTION_DIAL` works), and iOS always needs a tap.
+
+**What each platform can do at the end of the countdown**
+
+| Action | Android | iOS |
+|---|---|---|
+| SMS to the contact | Sent automatically (`SEND_SMS`) | **Needs a tap.** The Messages sheet opens with the text filled in. iOS has no way for an app to send an SMS by itself |
+| Call the contact | Placed automatically (`CALL_PHONE`) | **Needs a tap.** A `tel:` link hands over to the Phone app and may ask for confirmation |
+| Dial 119 | Dialer opens, **needs a tap** | Same as a contact call, **needs a tap** |
+| Full-screen alert | Yes, including over the lock screen (full-screen intent) | Only while the app is open. Otherwise a notification |
+| Loud alarm on silent | Yes (alarm audio stream) | While the app is open: yes. Otherwise muted, unless Apple grants Critical Alerts (section 12) |
+
+**This matters**: the driver who triggers this flow is by definition not responding, so on iOS, the SMS and call won't go out unless someone taps. See Q6 for the fix.
 
 **Setup**
 - Emergency contact (name + phone) is added in onboarding after Permissions, and is skippable. It's editable in Settings → Safety.
 - The 119 toggle lives in Settings → Safety, with a clear warning.
-- Permissions: `SEND_SMS` and `CALL_PHONE` (Android), requested only when the driver turns these features on.
+- Permissions: `SEND_SMS` and `CALL_PHONE` (Android), requested only when the driver turns these features on. iOS needs no permission for the Messages sheet or `tel:`.
+- Google Play restricts `SEND_SMS` to default SMS apps and approved exceptions, so a Play release needs a Permissions Declaration, and may be refused. Installing the APK directly is unaffected.
 
 **Logging**: every emergency event is saved to the trip, along with whether it was cancelled.
 
@@ -225,7 +258,7 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 
 ## 10. Build order
 
-1. Capacitor shell: wrap `frontend/` as an Android app; it runs on a real phone.
+1. Capacitor shell: wrap `frontend/` as an Android and iOS app; it runs on a real Android phone, and the iOS project is generated and ready for its first Mac build (section 12).
 2. Pi FastAPI server + `/api/health` + `/ws` snapshot stream.
 3. Profile and settings storage (Pi SQLite + phone cache): sections 3, 4, 5.
 4. Permissions + BLE find + Wi-Fi join: section 7.
@@ -242,3 +275,59 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 - **Q3. Truck routing.** Does Kakao Mobility offer truck-specific routes (height and weight limits)? If not, use car routing and say so in the app.
 - **Q4. Hotspot vs phone hotspot.** In a real truck, does the Pi make its own Wi-Fi, or join the driver's phone hotspot (which keeps the phone online)?
 - **Q5. Emergency thresholds.** Are 20 s of no response after stage 4 and a 30 s countdown right? Ask an expert (faculty or a truck company) for the report.
+- **Q6. Unattended SMS on iOS.** iOS can't send an SMS or place a call without a tap, so section 9b can't reach anyone from an iPhone if the driver doesn't respond. The fix is for the phone to ask a small cloud service to send the SMS over mobile data, through an SMS provider. That brings a small part of the cloud work forward, costs per message, and only works while the app is running (see Drive mode). Do this, or accept the tap on iOS for now?
+- **Q7. Alerts with the app closed on iOS.** Drive mode needs the app open on iOS. Keeping a Bluetooth connection to the Pi could wake the app for alerts, but it needs native Swift code and testing on a real iPhone. Is keeping the app open acceptable?
+- **Q8. Apple account and Mac.** Who has a Mac with Xcode 26 or later, and does the team have a paid Apple Developer account (section 12)?
+
+## 12. Android and iOS differences
+
+### App setup
+
+| | Android | iOS |
+|---|---|---|
+| App ID | `kr.bamnun.app` | `kr.bamnun.app` |
+| App runs at | `http://localhost` | `capacitor://localhost` (iOS doesn't allow http or https here) |
+| Plain HTTP to the Pi | Allowed by the app's `http` scheme and `cleartext` | Allowed for local addresses by `NSAllowsLocalNetworking`. **Test on an iPhone at step 2**: if the WebView refuses `ws://`, use a native WebSocket plugin |
+| Address of the Pi | Hotspot IP | `bamnun.local` where possible, because iOS's local networking exception covers `.local` names. Falls back to the hotspot IP |
+
+### Drive mode
+
+iOS suspends an app seconds after it leaves the screen, which closes the WebSocket. The Pi can't send a push notification either, because it has no internet. So alerts only reach the phone while the app is able to run.
+
+- **The device itself is unaffected.** The ladder, voice and alarm all run on the Pi. This only concerns the phone's notifications and the emergency flow.
+- **On both platforms**, while connected to the Pi the app shows a Drive mode screen and keeps the screen on (`keep-awake`). The phone should sit in a mount, on charge.
+- **Android** also runs a foreground service, so the connection survives the app being in the background or the screen being off.
+- **iOS** needs the app open and on screen. If the driver leaves it, the app shows a notification saying alerts are paused until it's reopened.
+- See Q7 for the Bluetooth option on iOS.
+
+### Staying online on the Pi's Wi-Fi
+
+The Pi's hotspot has no internet, but the Kakao map, search and routes need it. The hotspot gives phones an address with **no default gateway**, so they should keep using mobile data for internet and use Wi-Fi only to reach the Pi. Test this on both platforms at step 4, because it affects Q4.
+
+### Notifications and alarms on iOS
+
+- **Sound on silent.** Apps can't override the ring/silent switch from a notification without the **Critical Alerts** entitlement. Apple grants it on request, only for justified safety uses, it can take weeks, and it may be refused. Apply early.
+- Until then, alerts use **Time Sensitive** notifications, which get through Focus modes but are still muted by the silent switch.
+- While the app is open, the alarm plays through a native audio session, which does ignore the switch.
+
+### Needs a Mac
+
+Capacitor's iOS tools only run on macOS, so everything here needs a Mac with Xcode 26 or later. All the shared code and the Android app can be built on Windows.
+
+| Task | Needs |
+|---|---|
+| Generate and edit the iOS project files | Windows is fine for generating and text edits |
+| Compile the iOS app | Mac, or a cloud Mac such as a GitHub Actions macOS runner |
+| Run on an iPhone or the iOS Simulator | Mac |
+| Add Korean translations of the Info.plist texts to the Xcode project | Mac |
+| Turn on Hotspot, Background Modes and other capabilities in Xcode | Mac |
+| Test BLE, Wi-Fi join, Local Network, notifications, and the Messages and Phone hand-off | Mac and a real iPhone (the Simulator has no Bluetooth or calling) |
+| TestFlight and App Store releases | Mac (or a cloud Mac), and a paid account |
+
+### Needs a paid Apple Developer account
+
+A free Apple ID can run the app on your own iPhone, but the app expires after 7 days, and the free tier doesn't cover everything. The paid program is US$99 a year.
+
+- Hotspot capability, for joining the Pi's Wi-Fi from inside the app. Confirm against Apple's capability table before paying. Until then, use the manual Wi-Fi fallback in section 7.
+- Critical Alerts entitlement.
+- TestFlight, App Store, and installing on teammates' iPhones.

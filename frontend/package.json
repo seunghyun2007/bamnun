@@ -4,7 +4,7 @@
   "private": true,
   "description": "Bamnun phone app for Android and iOS",
   "scripts": {
-    "build": "python build/build.py screens www/index.html ollie || python3 build/build.py screens www/index.html ollie",
+    "build": "python build/build.py screens www/index.html,Bamnun_app.html ollie || python3 build/build.py screens www/index.html,Bamnun_app.html ollie",
     "sync": "npm run build && npx cap sync"
   },
   "dependencies": {

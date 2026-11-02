@@ -1,4 +1,4 @@
-import re, json, base64, sys, os, shutil
+import re, json, base64, sys, os
 D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
 ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Voice","Ladder","Privacy","Permissions","Pair","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
 BLOB = {
@@ -70,13 +70,19 @@ for name in ORDER:
 
 shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="utf-8").read()
 dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
+live = open(os.path.join(os.path.dirname(__file__), "live.js"), encoding="utf-8").read()
 html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
+             .replace("/*__LIVE__*/", live)
              .replace("<!--__TEMPLATES__-->", "\n".join(tpls))
              .replace("/*__IMG__*/", "const IMG=" + json.dumps(IMG) + ";\n" + dyn)
              .replace("/*__ORDER__*/", json.dumps(ORDER))
              .replace("/*__KO__*/", open(os.path.join(os.path.dirname(__file__), "ko.json"), encoding="utf-8").read()))
-out_dir = os.path.dirname(OUT) or "."
-os.makedirs(out_dir, exist_ok=True)
-open(OUT, "w", encoding="utf-8", newline="\n").write(html)
-shutil.copytree(os.path.join(os.path.dirname(__file__), "..", "fonts"), os.path.join(out_dir, "fonts"), dirs_exist_ok=True)
+# Fonts go inside the file, like the images, so the one file is the whole app:
+# it opens from disk, from the Pi or in Capacitor with nothing beside it.
+FONTS = os.path.join(os.path.dirname(__file__), "..", "fonts")
+html = re.sub(r"url\(fonts/([\w.-]+\.woff2)\)", lambda m: "url(data:font/woff2;base64," + base64.b64encode(open(os.path.join(FONTS, m.group(1)), "rb").read()).decode() + ")", html)
+# OUT may list several paths separated by commas; all get the same build.
+for out in OUT.split(","):
+    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+    open(out, "w", encoding="utf-8", newline="\n").write(html)
 print("ok", len(html))

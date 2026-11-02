@@ -101,6 +101,46 @@ def synth_ear_stream(minutes: float, fps: float, ear_open: float = 0.30,
         yield (t, max(ear, 0.01), mar, yaw, pitch)
 
 
+def feature_frame(extractor: FeatureExtractor, t: float, ear: float, mar: float,
+                  yaw: float, pitch: float) -> FeatureFrame:
+    """Feed one synthetic sample through the real trackers.
+
+    This bypasses only the landmark geometry, which the unit tests cover
+    separately. Shared with tools/sim_server.py, so the app sees exactly the
+    pipeline this script tests.
+    """
+    ear_s = extractor.ear_ewma.update(ear)
+    cal = extractor.calibration
+    ear_norm = ear_s / cal.ear_open
+    ev = extractor.blink.update(t, ear_s, cal.ear_open)
+    extractor.perclos_window.push(t, ear_norm)
+    perclos = extractor.perclos_window.time_fraction_below(extractor.perclos_fraction)
+    extractor.yawn.update(t, mar)
+    off = extractor.head.update(t, yaw, pitch, True)
+
+    return FeatureFrame(
+        t=t, face_found=True, ear_raw=ear, ear=ear_s, ear_norm=ear_norm,
+        eye_closed=extractor.blink.is_closed,
+        ongoing_closure_s=extractor.blink.ongoing_closure_s,
+        microsleep_now=extractor.blink.microsleep_in_progress,
+        perclos=perclos,
+        blink_rate_per_min=extractor.blink.blink_rate_per_min(),
+        mean_blink_duration_s=extractor.blink.mean_blink_duration_s(),
+        microsleep_count=extractor.blink.microsleep_count(),
+        long_closure_count=extractor.blink.long_closure_count(),
+        mar=mar, yawn_count=extractor.yawn.count(),
+        yawn_rate_per_hour=extractor.yawn.rate_per_hour(),
+        yaw=yaw, pitch=pitch, pose_valid=True,
+        pitch_std=extractor.head.pitch_std(), nodding=extractor.head.nodding(),
+        gaze_h=0.0, gaze_v=0.0, gaze_valid=True,
+        off_road=off, off_road_alarm=extractor.head.off_road_alarm,
+        off_road_glance_s=extractor.head.current_glance_s,
+        long_glance_count=extractor.head.long_glance_count(),
+        interocular_px=120.0,
+        blink_event=ev.kind if ev else None,
+    )
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--minutes", type=float, default=45.0)
@@ -131,38 +171,8 @@ def main() -> int:
 
     for (t, ear, mar, yaw, pitch) in synth_ear_stream(
             args.minutes, args.fps, seed=args.seed):
-        # Feed the real trackers directly. This bypasses only the landmark
-        # geometry, which the unit tests cover separately.
-        ear_s = extractor.ear_ewma.update(ear)
-        cal = extractor.calibration
-        ear_norm = ear_s / cal.ear_open
-        ev = extractor.blink.update(t, ear_s, cal.ear_open)
-        extractor.perclos_window.push(t, ear_norm)
-        perclos = extractor.perclos_window.time_fraction_below(extractor.perclos_fraction)
-        extractor.yawn.update(t, mar)
-        off = extractor.head.update(t, yaw, pitch, True)
-
-        ff = FeatureFrame(
-            t=t, face_found=True, ear_raw=ear, ear=ear_s, ear_norm=ear_norm,
-            eye_closed=extractor.blink.is_closed,
-            ongoing_closure_s=extractor.blink.ongoing_closure_s,
-            microsleep_now=extractor.blink.microsleep_in_progress,
-            perclos=perclos,
-            blink_rate_per_min=extractor.blink.blink_rate_per_min(),
-            mean_blink_duration_s=extractor.blink.mean_blink_duration_s(),
-            microsleep_count=extractor.blink.microsleep_count(),
-            long_closure_count=extractor.blink.long_closure_count(),
-            mar=mar, yawn_count=extractor.yawn.count(),
-            yawn_rate_per_hour=extractor.yawn.rate_per_hour(),
-            yaw=yaw, pitch=pitch, pose_valid=True,
-            pitch_std=extractor.head.pitch_std(), nodding=extractor.head.nodding(),
-            gaze_h=0.0, gaze_v=0.0, gaze_valid=True,
-            off_road=off, off_road_alarm=extractor.head.off_road_alarm,
-            off_road_glance_s=extractor.head.current_glance_s,
-            long_glance_count=extractor.head.long_glance_count(),
-            interocular_px=120.0,
-            blink_event=ev.kind if ev else None,
-        )
+        ff = feature_frame(extractor, t, ear, mar, yaw, pitch)
+        ear_s, ear_norm, perclos = ff.ear, ff.ear_norm, ff.perclos
 
         state = estimator.update(ff, calibrated=True)
         planner.push(t, state.score)

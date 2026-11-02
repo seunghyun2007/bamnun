@@ -586,6 +586,9 @@ class BlinkTracker:
         # reopen can finalise it rather than record the same closure twice.
         self._latched_event: Optional[BlinkEvent] = None
         self.ongoing_closure_s = 0.0
+        # Duration of the most recent ordinary blink, for the app's Camera
+        # screen. Long closures and microsleeps are reported elsewhere.
+        self.last_blink_s: Optional[float] = None
 
     def reset(self) -> None:
         self._closed = False
@@ -593,6 +596,7 @@ class BlinkTracker:
         self._microsleep_latched = False
         self._latched_event = None
         self.ongoing_closure_s = 0.0
+        self.last_blink_s = None
         self._events.clear()
 
     def update(self, t: float, ear: float, ear_open: float) -> Optional[BlinkEvent]:
@@ -640,6 +644,8 @@ class BlinkTracker:
                         kind=self._classify(dur),
                     )
                     self._events.append(event)
+                    if event.kind == "blink":
+                        self.last_blink_s = dur
 
         # Latch a microsleep DURING the closure so the alert can fire now.
         if self._closed and not self._microsleep_latched and \

@@ -1,0 +1,244 @@
+# Bamnun app — spec
+
+How the Bamnun phone app and the Raspberry Pi backend should behave. This is the source of truth: build to it, and update it when a decision changes.
+
+Status: draft v1. Sections 0–2 apply to everything; sections 3–9 are features, built one at a time in the order of section 10.
+
+---
+
+## 0. Architecture
+
+- **The Pi does the safety work on its own.** Camera, detection, and the four-stage wake-up ladder (blue light → mint mist → chime + voice → rising alarm) all run on the Pi and keep working if the phone is off, locked, or out of range.
+- **The phone app is a Capacitor app** built from `frontend/`. 
+- **Phone ↔ Pi link**
+  - Bluetooth LE is used only to find a nearby Bamnun and set it up (see section 7).
+  - Live data and commands go over the Pi's own Wi-Fi hotspot. A FastAPI server on the Pi gives a REST API for settings and trips, and a WebSocket at `/ws` for live data and events.
+- **Storage**
+  - The Pi is the master copy of the driver profile and settings, in SQLite (`runs/bamnun.db`), so the device behaves correctly without the phone.
+  - The phone keeps a cached copy in Capacitor Preferences so screens load instantly, and pushes changes to the Pi whenever it's connected.
+  - Supabase comes later, for cloud sync of trips.
+- **Language**: every user-facing string, notification and voice line exists in English and Korean, and follows the app language setting.
+
+## 1. Phone ↔ Pi protocol (shared by all features)
+
+REST (JSON):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/health` | device id, firmware version, parts status, calibrated yes/no |
+| GET / PUT | `/api/profile` | name, owl name, vehicle, work week, voice language, app language |
+| GET / PUT | `/api/settings` | ladder toggles, sensitivity, volumes, break interval |
+| POST | `/api/calibration/start` · `/api/calibration/cancel` | guided calibration (section 6) |
+| POST | `/api/say/{line}` | play one of Ollie's recorded lines on the device speaker, in the saved voice language |
+| POST | `/api/test/{part}` | fire one part for the device test: `speaker`, `chime`, `blue_light`, `mist`, `alarm` |
+| GET | `/api/trips` · `/api/trips/{id}` | trip history |
+
+WebSocket `/ws`, server → phone messages (JSON with `type`):
+
+- `snapshot` (5×/s): eye openness (`null` if no face), blink rate, PERCLOS, alert stage 0–4, CO₂ ppm + age, trip time.
+- `alert`: stage changed, with stage, reason and timestamp. Sent immediately.
+- `calibration`: step changes and progress (section 6).
+- `test_result`: a part's result.
+- `trip`: started / ended, with summary.
+
+The phone sends `hello` with its clock time and language on connect (the Pi has no reliable clock).
+
+## 2. Ollie's voice: one speaker, two languages
+
+- **Ollie speaks through the Bamnun device's speaker, always.** Every time the app plays Ollie's voice, the sound comes out of the device in the truck, not the phone:
+  - previews while the driver is choosing something,
+  - calibration instructions,
+  - alerts and break reminders,
+  - CO₂ prompts.
+  The phone sends a command (`POST /api/say/{line}`) and the Pi plays it.
+- **Two voice languages: English and Korean.** Each line exists as a recorded clip in both, in `assets/voice/en/` and `assets/voice/ko/`.
+  - The voice language is chosen on the voice screen (section 6) and defaults to the app language.
+  - It can differ from the app language. For example, the app can be in English while Ollie speaks Korean.
+- **The clips are recorded by the team**, using `tools/record_prompts.py` extended with `--lang en|ko`, through the device's own mic. The repo already argues that a familiar human voice wakes people better than a synthetic one. Because the clips are fixed recordings, Ollie never says the driver's name out loud; the name appears on screen and in notifications.
+- **The phone** shows a notification for every alert, with an owl hoot sound (`owl_hoot.wav`, its own Android notification channel), in the app language.
+
+---
+
+## 3. Name and owl name (screen 04)
+
+**User sees**: two fields, "Your name" and "Your owl's name" (default "Ollie" / "올리"), and a Next button.
+
+**Behaviour**
+- Next is disabled while the driver's name is empty. Names are trimmed and limited to 20 characters.
+- On Next:
+  - save to phone Preferences;
+  - `PUT /api/profile` if the Pi is connected, otherwise queue it and send on the next connect.
+- The **driver's name** replaces "Siroj" everywhere: the Home greeting, the speech bubble, "You're all set, {name}!", Settings, and notifications ("{name}, your eyes are closing.").
+- The **owl name** replaces "Ollie" everywhere: screen copy, notifications ("{owl} says…"), and Settings. Use one helper, `t(key, {name, owl})`, so no screen hard-codes either name.
+- Editable later from Settings → profile card.
+
+## 4. What do you drive (screen 05)
+
+Every option is selectable and saved to `profile.vehicle`. The choice sets these defaults, all editable later in Settings:
+
+| Vehicle | Alert volume | Break reminder | Camera setup hint |
+|---|---|---|---|
+| Long-haul truck | High (loud cab) | every 2 h, 15 min | mount 50–70 cm, high dashboard |
+| Delivery truck | High | every 2 h | mount 50–70 cm |
+| Bus or coach | Medium | every 2 h, 15 min | mount 50–70 cm |
+| Taxi or van | Medium | every 2 h | mount 40–60 cm |
+| My own car | Medium | every 2 h | mount 40–60 cm |
+
+- 2 h / 15 min follows the Korean rule for commercial drivers (verify the exact law before quoting it).
+- Volume maps to the Pi's chime, voice and alarm gain.
+- The camera hint is shown during calibration (section 6), and its distance sets the focus preset in `config` (`lens_position`).
+
+## 5. When do you work (screen 06)
+
+**Layout, cleaned up**: title and subtitle, the **Days** row, a **Usual shift** preset row (Day / Evening / Night / Custom), and a **Starts / Ends** row. That's all. The bottom card (24 h timeline bar, legend, and "Your hardest stretch…") is **removed**.
+
+**Behaviour**
+- Days: tap to toggle. At least one day must be on for Next to work.
+- Presets fill Starts and Ends. Tapping Starts or Ends opens a native time picker, which switches the preset to Custom.
+- "My hours change every week" saves `shift: variable` and skips the times.
+- Skip saves nothing and moves on.
+- Saved to `profile.work = {days, start, end, variable}`. The Pi uses it to estimate hours awake for the rest prediction and the tired window.
+
+## 6. Ollie's voice (screen 07, moved to after the device is connected)
+
+There are no personality styles; Ollie has one voice and one way of talking. This screen only picks **which language Ollie speaks**.
+
+**Position in onboarding**: this screen needs the device, so it moves to right after "Connect device" (screen 11) and before calibration. New order:
+
+Welcome → Meet → Name → Vehicle → Work week → Wake-up ladder → Privacy → Permissions → Connect device → **Ollie's voice** → Calibrate → All set
+
+**User sees**
+- Ollie, a title ("How should Ollie talk to you?"), and two big cards: **English** and **한국어**, with a speaker button on each.
+- Under them, a "Hear both" button.
+
+**Behaviour**
+- When the screen opens, Ollie greets the driver through the device speaker **once in Korean, then once in English**:
+  - "안녕하세요! 저는 올리예요. 어떤 언어로 말할까요?"
+  - "Hi! I'm Ollie. Which language should I speak?"
+  - The matching card glows while each line plays.
+- Tapping a card selects it and plays a sample line in that language on the device speaker:
+  - "운전하는 동안 제가 지켜볼게요."
+  - "I'll keep watch while you drive."
+- "Hear both" replays the greeting.
+- Saved to `profile.voice_lang`, both on the phone and on the Pi.
+- If the device isn't connected, the cards still work, but show "Connect your Bamnun to hear Ollie", and nothing plays on the phone.
+- Changeable later in Settings → Sound → "Ollie's voice language".
+
+**Ollie's lines** (recorded in both languages; one set, no styles)
+
+| Key | When | English | Korean |
+|---|---|---|---|
+| `greet` | voice screen opens | Hi! I'm Ollie. Which language should I speak? | 안녕하세요! 저는 올리예요. 어떤 언어로 말할까요? |
+| `sample` | card tapped | I'll keep watch while you drive. | 운전하는 동안 제가 지켜볼게요. |
+| `stage3` | stage 3, after the slow chime | Your eyes are closing. Let's find a place to rest. | 눈이 감기고 있어요. 쉴 곳을 찾아봐요. |
+| `stage4` | stage 4, after the alarm | Wake up! Pull over now. | 일어나세요! 지금 차를 세우세요. |
+| `rest_soon` | rest planner says stop soon | Plan a break in the next few minutes. | 몇 분 안에 휴식을 계획하세요. |
+| `break_due` | break interval reached | Two hours in. Time for a break. | 두 시간 운전했어요. 쉬어갈 시간이에요. |
+| `open_window` | CO₂ above 1500 ppm | The air is stale. Open a window. | 공기가 탁해요. 창문을 열어주세요. |
+| `emergency_check` | emergency countdown starts | Are you OK? Say something or tap your phone. | 괜찮으세요? 휴대폰을 눌러주세요. |
+| calibration lines | section 8 | see section 8 | see section 8 |
+
+- **Phone notifications**: title = owl name, body = the same line in the app language, with the owl hoot sound.
+  - Stages 1–2 (light and mint) don't speak. They only send a quiet notification: "A little light to keep you fresh" / "A breath of mint".
+
+## 7. Permissions (screen 10) and finding the device (screen 11)
+
+**Permissions**: three rows, each with a button that triggers the **real Android prompt**.
+
+| Row | Android permission | Why (shown to user) |
+|---|---|---|
+| Bluetooth | `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | Find your Bamnun |
+| Location | `ACCESS_FINE_LOCATION` | Map, route and rest stops |
+| Notifications | `POST_NOTIFICATIONS` | Ollie's alerts and break reminders |
+
+- Each row shows the real result: Allow (not asked), Allowed ✓, or Denied → "Open settings" (deep link to app settings).
+- The screen re-checks when the app returns from settings.
+- Next is always enabled. Missing permissions are explained where they're needed, never a dead end.
+
+**Finding the device (screen 11)**
+1. The radar animation runs while scanning BLE for devices advertising the Bamnun service UUID.
+2. When one is found, show "Found Bamnun · {id}".
+3. The phone reads the hotspot name and password over BLE and joins that Wi-Fi network.
+4. It calls `/api/health`.
+5. The six part checks tick using the **real** status from `/api/health`. A failed part shows ✗ with a one-line fix.
+6. If nothing is found in 20 s, show "Can't find Bamnun", with a checklist (powered on? within 3 m?) and Retry.
+
+## 8. Calibration and device test (screen 12)
+
+The Blinks / Open-eye level / Head angle boxes are **removed**. Instead there's a big Ollie, a one-line instruction, a progress ring, and a checklist that fills in as it goes. The Pi speaker says every instruction out loud in the chosen voice language (lines `cal_position`, `cal_look`, `cal_close`, `cal_hear`, `cal_chime`, `cal_light`, `cal_mist`, `cal_done`, recorded in English and Korean).
+
+1. **Get in position.** "Sit like you're driving and look at me." Waits until a face is seen steadily for 2 s, showing the camera hint from section 4. If no face is seen for 15 s, say "I can't see you. Check the camera faces you."
+2. **Look ahead (12 s).** "Look straight ahead and blink normally." Ring counts down. This is the existing 12 s calibrator.
+3. **Close your eyes (3 s).** "Now close your eyes… and open." Checks that closure is detected with the new threshold. If not detected, repeat step 2 once, then fail with advice.
+4. **Speaker.** Plays a voice line: "Can you hear me?" Phone shows Yes / No.
+5. **Chime.** Plays the stage 3 chime: "That's my wake-up chime." Yes / No.
+6. **Blue light.** Turns on for 3 s: "See the blue light?" Yes / No.
+7. **Mint mist.** "Mist is coming out now." Fires 2 s: "Smell the mint?" Yes / No.
+8. **Done.** "All set. I've got your eyes." Shows the summary checklist ✓/✗.
+
+Rules:
+- Cancel at any time keeps the previous calibration.
+- The new calibration only replaces the old one if steps 1–3 pass.
+- If calibration is started mid-drive, the ladder keeps running on the old calibration until the new one succeeds.
+- A part that fails (No, or the Pi reports an error) is marked ✗, and the Home device card shows it.
+
+## 9. Route (screen 14)
+
+- **Map**: Kakao Maps JS SDK, centered on the phone's GPS position, with a blue dot.
+- **Search**: the "Where to?" field uses Kakao Local keyword search; results show as a list with distance. Recent destinations are saved on the phone.
+- **Route**: on pick, Kakao Mobility Directions draws the route line and shows distance and ETA.
+- **Rest stops**: highway rest areas (휴게소) along the route are found with Kakao Local keyword search around points sampled along the route line, and shown as pins.
+  - Ollie highlights the stop that comes **before** the driver's tired window and within the break interval, with the reason ("Stop here at 02:40, before your tired window").
+- **Set route**: saves `{destination, route summary, planned stops}` to the current trip and sends it to the Pi, so the break reminder can say "rest stop in {km} km".
+- **Without location permission**: the map still works, and the start point must be typed instead.
+- **API keys**: Kakao JS key and REST key in `frontend/.env`, not committed. Register the app's Android package and `http://localhost` in Kakao Developers.
+
+## 9b. Emergency response (no response after the alarm)
+
+Ollie never calls the police directly. Drowsiness alone isn't an emergency, a false call to 112 is a legal problem, and the driver is usually fine once woken. Instead, the response escalates step by step to a person, with a countdown the driver can cancel.
+
+**Trigger** (decided on the Pi, sent to the phone as `emergency`): stage 4 has been running for **20 s** and the driver still hasn't responded, meaning either
+- the eyes stay closed, or
+- no face is seen after one was.
+
+**What happens**
+
+1. **Countdown.** The phone takes over the screen with a full-screen alert, a loud alarm (even on silent), and a **30 s countdown**: "Are you OK? Contacting {contact} in 30 s". A big "I'm OK" button cancels it. The device speaker says `emergency_check` ("Are you OK? Say something or tap your phone." / "괜찮으세요? 휴대폰을 눌러주세요.").
+2. **Emergency contact.** If the countdown ends, the phone sends an SMS to the driver's emergency contact (family member, dispatcher or fleet manager) with:
+   - the driver's name,
+   - "Bamnun detected that {name} may have fallen asleep at the wheel and isn't responding",
+   - a map link to the GPS location,
+   - the time.
+   Then it calls that contact.
+3. **119, optional and off by default.** If the driver turned on "Call 119 if I don't respond" in Settings, a second 30 s countdown follows. Then the phone dials **119** (fire and medical, the correct number for a possible crash or medical event; 112 is for crimes).
+
+**Setup**
+- Emergency contact (name + phone) is added in onboarding after Permissions, and is skippable. It's editable in Settings → Safety.
+- The 119 toggle lives in Settings → Safety, with a clear warning.
+- Permissions: `SEND_SMS` and `CALL_PHONE` (Android), requested only when the driver turns these features on.
+
+**Logging**: every emergency event is saved to the trip, along with whether it was cancelled.
+
+**Demo mode**: a "Demo" switch in Settings → Safety runs the full flow but only shows what *would* be sent, never really texting or dialing. **Always use it at the exhibition.**
+
+---
+
+## 10. Build order
+
+1. Capacitor shell: wrap `frontend/` as an Android app; it runs on a real phone.
+2. Pi FastAPI server + `/api/health` + `/ws` snapshot stream.
+3. Profile and settings storage (Pi SQLite + phone cache): sections 3, 4, 5.
+4. Permissions + BLE find + Wi-Fi join: section 7.
+5. Guided calibration + device test: section 8.
+6. Voice language screen, recorded EN/KO clips, `/api/say`, notification channel with the owl sound, alert notifications: sections 2 and 6.
+7. Route with Kakao: section 9.
+7b. Emergency response with countdown, contact SMS and call, optional 119: section 9b.
+8. Live Home and Camera screens, trips, insights (from the earlier plan).
+
+## 11. Open questions
+
+- **Q1. Who records the voice?** One teammate for both languages, or a native Korean speaker for Korean and someone else for English?
+- **Q2. Owl hoot sound.** Record a real one, or use a free sound effect (check the license)?
+- **Q3. Truck routing.** Does Kakao Mobility offer truck-specific routes (height and weight limits)? If not, use car routing and say so in the app.
+- **Q4. Hotspot vs phone hotspot.** In a real truck, does the Pi make its own Wi-Fi, or join the driver's phone hotspot (which keeps the phone online)?
+- **Q5. Emergency thresholds.** Are 20 s of no response after stage 4 and a 30 s countdown right? Ask an expert (faculty or a truck company) for the report.

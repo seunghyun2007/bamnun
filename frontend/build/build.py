@@ -37,7 +37,7 @@ def scope(css, sid):
 
 styles = []; tpls = []
 for name in ORDER:
-    src = open(f"{D}/{name}.dc.html").read()
+    src = open(f"{D}/{name}.dc.html", encoding="utf-8").read()
     helmet = re.search(r"<helmet>(.*?)</helmet>", src, re.S).group(1)
     css = "\n".join(re.findall(r"<style>(.*?)</style>", helmet, re.S))
     body = re.search(r"</helmet>(.*?)</x-dc>", src, re.S).group(1)
@@ -68,12 +68,12 @@ for name in ORDER:
     styles.append(f"/* {name} */\n" + scope(css, f"#s-{name}"))
     tpls.append(f'<template id="t-{name}">{body}</template>')
 
-shell = open(os.path.join(os.path.dirname(__file__), "shell.html")).read()
-dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js")).read()
+shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="utf-8").read()
+dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
 html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
              .replace("<!--__TEMPLATES__-->", "\n".join(tpls))
              .replace("/*__IMG__*/", "const IMG=" + json.dumps(IMG) + ";\n" + dyn)
              .replace("/*__ORDER__*/", json.dumps(ORDER))
              .replace("/*__KO__*/", open(os.path.join(os.path.dirname(__file__), "ko.json"), encoding="utf-8").read()))
-open(OUT, "w").write(html)
+open(OUT, "w", encoding="utf-8", newline="\n").write(html)
 print("ok", len(html))

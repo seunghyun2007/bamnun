@@ -18,10 +18,10 @@ Front-end prototype of the Bamnun / 밤눈 phone app, with no back end yet. Open
 ## Rebuild
 
 ```
-python3 build/build.py screens build/out.html ollie
+python3 build/build.py screens Bamnun_app.html ollie
 ```
 
-`out.html` is missing the doctype and charset at the top. The browser handles that, but if you need them, wrap it the same way as `Bamnun_app.html`.
+Run it from this folder. On Windows use `python` instead of `python3`.
 
 ## Notes
 

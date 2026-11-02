@@ -8,6 +8,8 @@ Serves three things (docs/SPEC.md, sections 0 and 1):
 * ``GET /api/health``  device id, version, part status, calibration.
 * ``WS  /ws``          a ``snapshot`` 5 times a second, and each ``alert`` as
                        soon as the stage changes.
+* ``GET /video``       the camera as MJPEG, for the Camera screen only. The
+                       camera loop encodes frames only while a stream is open.
 * ``GET /``            the built app from ``frontend/www``, so a browser on
                        the Pi's network can open it with nothing installed.
 
@@ -27,7 +29,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -38,10 +40,33 @@ log = logging.getLogger("bamnun.server")
 
 SNAPSHOT_PERIOD_S = 0.2     # 5 per second, as the spec asks
 EVENT_POLL_S = 0.05         # an alert reaches the phone within 50 ms
+FRAME_POLL_S = 0.03
+BOUNDARY = "frame"
 
 
 def default_www() -> Path:
     return repo_root() / "frontend" / "www"
+
+
+async def mjpeg_stream(hub: Hub, poll_s: float = FRAME_POLL_S):
+    """multipart/x-mixed-replace parts, one per new frame, while connected.
+
+    Registering as a viewer is what makes the camera loop start encoding;
+    the ``finally`` runs when the client goes away, so it stops again.
+    """
+    hub.add_viewer()
+    try:
+        seen = -1
+        while True:
+            seq, jpeg = hub.latest_frame()
+            if jpeg is not None and seq != seen:
+                seen = seq
+                yield (b"--" + BOUNDARY.encode() + b"\r\nContent-Type: image/jpeg\r\n"
+                       b"Content-Length: " + str(len(jpeg)).encode() + b"\r\n\r\n"
+                       + jpeg + b"\r\n")
+            await asyncio.sleep(poll_s)
+    finally:
+        hub.remove_viewer()
 
 
 def create_app(hub: Hub, www: Optional[Path] = None) -> FastAPI:
@@ -56,6 +81,14 @@ def create_app(hub: Hub, www: Optional[Path] = None) -> FastAPI:
     def health() -> dict[str, Any]:
         return {"device": socket.gethostname(), "version": __version__,
                 **hub.health()}
+
+    @app.get("/video")
+    def video():
+        if not hub.video_capable:
+            return PlainTextResponse("no camera on this device", status_code=404)
+        return StreamingResponse(
+            mjpeg_stream(hub), media_type=f"multipart/x-mixed-replace; boundary={BOUNDARY}",
+            headers={"Cache-Control": "no-store"})
 
     @app.websocket("/ws")
     async def ws(sock: WebSocket) -> None:

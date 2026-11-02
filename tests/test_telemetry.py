@@ -122,3 +122,27 @@ def test_blink_tracker_remembers_the_last_ordinary_blink():
     assert bt.last_blink_s is not None and abs(bt.last_blink_s - 0.2) < 1e-6
     bt.reset()
     assert bt.last_blink_s is None
+
+
+def test_video_is_wanted_only_while_someone_watches():
+    hub = Hub()
+    assert not hub.wants_video()
+    hub.add_viewer()
+    hub.add_viewer()
+    hub.publish_frame(b"jpeg-1")
+    hub.remove_viewer()
+    assert hub.wants_video() and hub.latest_frame() == (1, b"jpeg-1")
+    hub.remove_viewer()
+    assert not hub.wants_video()
+    # The last viewer leaving drops the picture: nothing of the driver lingers.
+    assert hub.latest_frame()[1] is None
+    hub.remove_viewer()                      # an extra remove never goes negative
+    assert not hub.wants_video()
+
+
+def test_snapshots_and_health_say_whether_there_is_video():
+    hub = Hub()
+    hub.publish({"type": "snapshot"})
+    assert hub.latest()["video"] is False and hub.health()["video"] is False
+    hub.video_capable = True
+    assert hub.latest()["video"] is True and hub.health()["video"] is True

@@ -89,3 +89,39 @@ def test_a_taken_port_does_not_raise(www):
         while server.running and time.monotonic() < deadline:
             time.sleep(0.05)
         assert not server.running        # gave up quietly instead of crashing us
+
+
+def test_video_is_refused_when_the_device_has_no_camera(www):
+    r = TestClient(create_app(Hub(), www)).get("/video")
+    assert r.status_code == 404
+
+
+def test_video_stream_sends_each_new_frame_once_and_releases_the_viewer():
+    import asyncio
+
+    from bamnun.server import mjpeg_stream
+
+    async def run():
+        hub = Hub()
+        stream = mjpeg_stream(hub, poll_s=0.001)
+        hub.publish_frame(b"JPEG-ONE")
+        first = await stream.__anext__()
+        assert hub.wants_video()                       # watching starts encoding
+        hub.publish_frame(b"JPEG-TWO")
+        second = await stream.__anext__()
+        await stream.aclose()                          # the phone left the screen
+        return hub, first, second
+
+    hub, first, second = asyncio.run(run())
+    assert first.startswith(b"--frame\r\nContent-Type: image/jpeg\r\n")
+    assert first.endswith(b"JPEG-ONE\r\n") and second.endswith(b"JPEG-TWO\r\n")
+    assert not hub.wants_video()                       # and leaving stops it
+
+
+def test_video_frame_is_a_small_jpeg():
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("cv2")
+    from bamnun.viz import video_frame
+
+    jpeg = video_frame(np.full((864, 1536), 90, np.uint8), None, eye_closed=False)
+    assert jpeg[:2] == b"\xff\xd8" and len(jpeg) < 60_000

@@ -2,8 +2,10 @@
 
 Two rules, both from the spec (docs/SPEC.md, section 0):
 
-1. Video never leaves the Pi. A snapshot carries numbers only, which is also
-   what the Privacy screen promises the driver.
+1. Video only goes to the driver's phone, and only while someone watches.
+   A snapshot carries numbers only. Camera frames are a separate channel:
+   the loop encodes them only while ``wants_video`` is true, that is while
+   the Camera screen is open, and nothing here records or stores them.
 
 2. The camera loop never waits on a client. It only ever calls ``publish``
    and ``emit`` on the Hub, which take a lock for a few microseconds and
@@ -104,6 +106,12 @@ class Hub:
         self._events: deque[dict[str, Any]] = deque(maxlen=max_events)
         self._seq = 0
         self.client_hello: Optional[dict[str, Any]] = None
+        # Live video for the Camera screen. ``video_capable`` says a real
+        # camera feeds this Hub (false for the simulated driver).
+        self.video_capable = False
+        self._jpeg: Optional[bytes] = None
+        self._jpeg_seq = 0
+        self._viewers = 0
 
     # -- camera loop side ------------------------------------------------ #
 
@@ -121,6 +129,16 @@ class Hub:
             self._seq += 1
             self._events.append(dict(event, seq=self._seq))
 
+    def wants_video(self) -> bool:
+        """True while at least one Camera screen is watching."""
+        with self._lock:
+            return self._viewers > 0
+
+    def publish_frame(self, jpeg: bytes) -> None:
+        with self._lock:
+            self._jpeg = jpeg
+            self._jpeg_seq += 1
+
     # -- server side ----------------------------------------------------- #
 
     @property
@@ -135,14 +153,30 @@ class Hub:
         if snap is None or at is None:
             return None
         age = time.monotonic() - at
-        return dict(snap, age_s=round(age, 2), stale=age > STALE_AFTER_S)
+        return dict(snap, age_s=round(age, 2), stale=age > STALE_AFTER_S,
+                    video=self.video_capable)
 
     def health(self) -> dict[str, Any]:
         with self._lock:
             health, at = dict(self._health), self._snapshot_at
         age = None if at is None else time.monotonic() - at
         health["camera_live"] = age is not None and age <= STALE_AFTER_S
+        health["video"] = self.video_capable
         return health
+
+    def add_viewer(self) -> None:
+        with self._lock:
+            self._viewers += 1
+
+    def remove_viewer(self) -> None:
+        with self._lock:
+            self._viewers = max(0, self._viewers - 1)
+            if self._viewers == 0:
+                self._jpeg = None       # don't keep a picture of the driver around
+
+    def latest_frame(self) -> tuple[int, Optional[bytes]]:
+        with self._lock:
+            return self._jpeg_seq, self._jpeg
 
     def events_after(self, seq: int) -> list[dict[str, Any]]:
         with self._lock:

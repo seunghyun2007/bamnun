@@ -38,6 +38,7 @@ console = Console()
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.
 PUBLISH_PERIOD_S = 0.1
 HEALTH_PERIOD_S = 1.0
+VIDEO_PERIOD_S = 0.1        # Camera screen video, about 10 fps, only while watched
 log = logging.getLogger("bamnun")
 
 
@@ -120,8 +121,10 @@ class Monitor:
         # Live data for the phone app. The Hub always exists, so publishing
         # costs the same with or without --serve; only the server is optional.
         self.hub = Hub()
+        self.hub.video_capable = True
         self.server = None
         self._last_publish = -1e9
+        self._last_video = -1e9
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -288,6 +291,14 @@ class Monitor:
             self._last_health = now
             self.hub.set_health(self._health())
 
+    def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
+        """Encode a Camera-screen frame, but only while someone is watching."""
+        if not self.hub.wants_video() or now - self._last_video < VIDEO_PERIOD_S:
+            return
+        self._last_video = now
+        from .viz import video_frame
+        self.hub.publish_frame(video_frame(image, lms, ff.eye_closed))
+
     # ----------------------------------------------------------------- #
 
     def run(self) -> int:
@@ -403,6 +414,7 @@ class Monitor:
             fps = sum(self._fps) / len(self._fps)
             self._guarded(self._publish, now, ff, state, calibrating, progress,
                           fps, frame.timestamp - t_start)
+            self._guarded(self._publish_video, now, frame.image, lms, ff)
 
             if self.show_window and cv2 is not None:
                 from .viz import draw_overlay

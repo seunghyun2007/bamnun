@@ -26,10 +26,12 @@
     return "10.42.0.1:8000";
   }
 
+  const secure = () => location.protocol === "https:";
+
   function connect() {
     conn = "connecting"; paint();
     try {
-      ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + piAddress() + "/ws");
+      ws = new WebSocket((secure() ? "wss://" : "ws://") + piAddress() + "/ws");
     } catch (e) { return later(); }
     ws.onopen = () => {
       retry = 0; conn = "open";
@@ -175,6 +177,24 @@
       const img = stage >= 4 || (live && s.microsleep) ? IMG.wake : stage >= 1 ? IMG.sleepy : IMG.idle;
       for (const el of all("owl")) if (el.getAttribute("src") !== img) el.setAttribute("src", img);
       css("owl-eye", "display", img === IMG.idle ? "" : "none");
+    }
+
+    // Camera screen video, straight from the device, only while this screen
+    // is open: leaving the screen removes the <img>, which ends the stream,
+    // and the Pi stops encoding. The drawing below stays as the fallback for
+    // the demo, the simulated device, or a stream that fails.
+    for (const img of all("video")) {
+      const want = live && s.video && !DEMO && !img.dataset.failed;
+      if (want && !img.getAttribute("src")) {
+        img.onerror = () => { img.dataset.failed = "1"; img.removeAttribute("src"); paint(); };
+        img.onload = () => paint();
+        img.src = (secure() ? "https://" : "http://") + piAddress() + "/video";
+      } else if (!want && img.getAttribute("src")) {
+        img.removeAttribute("src");
+      }
+      const showing = want && img.naturalWidth > 0;
+      img.style.display = showing ? "block" : "none";
+      css("face-drawing", "visibility", showing ? "hidden" : "visible");
     }
 
     // Camera screen: the drawn eyes follow the measured openness.

@@ -14,7 +14,8 @@ Status: draft v2 (Android and iOS from the start). Sections 0–2 apply to every
   - Bluetooth LE is used only to find a nearby Bamnun and set it up (see section 7).
   - Live data and commands go over the Pi's own Wi-Fi hotspot. A FastAPI server on the Pi gives a REST API for settings and trips, and a WebSocket at `/ws` for live data and events.
   - The same server also serves the built app at `/`, so any browser on the Pi's network can open it without installing anything. This is for development and demos; drivers use the Capacitor app.
-  - **Camera video never leaves the Pi.** Only the numbers below are sent. The Camera screen draws the driver's eyes from the measured eye openness.
+  - **Camera video only ever goes to the driver's phone, over the Pi's own Wi-Fi, and never online.** The Pi streams it only while the Camera screen is open, with the tracked eye outlines drawn on top, and encodes nothing when nobody is watching. Everything else is numbers. Video is never recorded or uploaded, and Supabase sync will never include it. When there's no video (the simulated device, or the stream fails), the Camera screen falls back to a drawing whose eyes follow the measured eye openness.
+  - Until the Pi runs its own password-protected hotspot, anyone on the same Wi-Fi network as the Pi can open the video. Don't run `--serve` on a shared network with a driver in view.
   - The server runs on its own thread, and only reads what the camera loop publishes. If the server fails, or a phone is slow, detection and the ladder carry on unaffected.
 - **Storage**
   - The Pi is the master copy of the driver profile and settings, in SQLite (`runs/bamnun.db`), so the device behaves correctly without the phone.
@@ -35,6 +36,7 @@ REST (JSON):
 | POST | `/api/say/{line}` | play one of Ollie's recorded lines on the device speaker, in the saved voice language |
 | POST | `/api/test/{part}` | fire one part for the device test: `speaker`, `chime`, `blue_light`, `mist`, `alarm` |
 | GET | `/api/trips` · `/api/trips/{id}` | trip history |
+| GET | `/video` | live camera as MJPEG (about 10 frames per second, 480 px wide, eye outlines drawn on), for the Camera screen only |
 
 WebSocket `/ws`, server → phone messages (JSON with `type`):
 
@@ -58,6 +60,7 @@ WebSocket `/ws`, server → phone messages (JSON with `type`):
   | `trip_s` | seconds since monitoring started (until trips exist, a "trip" is one run of the Pi program) |
   | `fps` | camera frames processed per second |
   | `age_s`, `stale` | how old this snapshot is; `stale` is true after 2 s, meaning the camera loop has stopped sending |
+  | `video` | the device has a camera picture to stream at `/video` (false on the simulated device) |
 
 - `alert`: stage changed, with stage, reason and timestamp. Sent immediately.
 - `calibration`: step changes and progress (section 6).
@@ -293,7 +296,8 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 
 **Done early** (branch `live-camera`), viewed in a browser rather than the Capacitor app:
 - Step 2: the Pi server, `/api/health`, and the `/ws` snapshot and `alert` stream. Commands from the phone come later.
-- The live parts of step 8: the Home "Right now", camera tile, cab air and wake-up step cards, and the Camera screen.
+- The live parts of step 8: the Home "Right now", camera tile, cab air and wake-up step cards, and the Camera screen, including the device's live video.
+- The Privacy screen says video goes only to the driver's phone and never online, matching section 0.
 - A simulated driver (`tools/sim_server.py`), so the app can be developed without a camera.
 - A **demo mode** inside the app: a simulated 2½-minute drive played by the page itself, so the live screens can be seen with nothing installed. It starts only when the app is opened as a file (`frontend/Bamnun_app.html`) or with `?demo` in the address. The connection chip says "Demo · simulated driver", so the real app never shows made-up numbers when it loses the Pi.
 

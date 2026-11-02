@@ -147,8 +147,10 @@ without touching the rest.
   shared "hub" (`src/bamnun/telemetry.py`) and moves on; the server reads from
   the hub at its own pace. A crashed server, a slow phone or no phone at all
   change nothing about when the ladder fires.
-- **Video never leaves the Pi.** Only numbers are sent. The app's Camera
-  screen draws the driver's eyes from the measured eye openness.
+- **Video only goes to the driver's phone, never online.** The Pi streams
+  its camera to the app's Camera screen only while that screen is open, with
+  the tracked eye outlines drawn on, and encodes nothing when nobody is
+  watching. It is never recorded or uploaded. Everything else is numbers.
 
 ---
 
@@ -259,8 +261,10 @@ one file, wrapped with Capacitor for Android and iOS. See
 - **Live today**: Home's "Right now" card (status, sleepiness gauge, eyes
   closed %, blinks per minute, trip time), the camera tile, cab air, the
   wake-up steps (the current stage lights up), Ollie's mood, and the whole
-  Camera screen (drawn eyes, eye state, frame rate, last blink, head
-  direction).
+  Camera screen: the device's live video with eye outlines, eye state, frame
+  rate, last blink and head direction. Without a camera (the demo or
+  `sim_server.py`) the Camera screen shows a drawn face whose eyes follow the
+  numbers instead.
 - **Still sample data**: name, last trip, trips, insights, settings, route.
   Those come with the later steps of the spec.
 - **Ways to open it**:
@@ -304,6 +308,15 @@ Full contract: `docs/SPEC.md`, section 1. What exists today:
 A part is `ok`, `simulated` (no hardware, or nothing to play), `missing`
 (failed to start) or `off`. `camera_live` is false when the camera loop
 hasn't published for 2 seconds.
+
+### `GET /video`
+
+The camera as MJPEG, about 10 frames per second, 480 px wide, with the eye
+outlines drawn on. The app's Camera screen shows it as an ordinary image. The
+Pi encodes frames only while at least one `/video` stream is open, and drops
+the last frame when the last viewer leaves. It answers 404 when there is no
+camera, as on the simulated device. `"video": true` in `/api/health` and in
+each snapshot says it's available.
 
 ### `WS /ws`
 
@@ -390,7 +403,7 @@ Where each threshold comes from (published, physical, or our choice):
 
 ```bash
 pip install -r requirements.txt
-python -m pytest tests/ -q        # 221 tests
+python -m pytest tests/ -q        # 226 tests
 ```
 
 - The suite never touches real hardware: on the Pi, gpiozero is pointed at a
@@ -453,9 +466,10 @@ judge costs more than a miss.
 thread; the camera loop only hands it numbers. Every publishing step is
 guarded, so even a bug there can't stop detection.
 
-**Video stays on the device.** It's the privacy promise on the app's Privacy
-screen, and it's also the cheaper design: a few hundred bytes five times a
-second instead of a video stream.
+**Video goes to the driver's phone and nowhere else.** It travels only over
+the local network, only while the Camera screen is open, and is never stored.
+The rest of the time the link carries a few hundred bytes five times a
+second, and the Pi spends nothing on encoding.
 
 ---
 
@@ -475,8 +489,9 @@ second instead of a video stream.
 6. **One test driver so far.** More people, with different eye shapes and at
    least one glasses wearer, would matter more than any new code.
 7. **The live server has no login.** Anyone on the same network can read the
-   live numbers (not video). Fine on the Pi's own hotspot; not on a shared
-   network.
+   live numbers **and open the camera video**. Fine on the Pi's own
+   password-protected hotspot once it exists; until then, don't run `--serve`
+   on a shared network (school, café) with a driver in view.
 8. **Trip time is time since the program started**, until trips exist.
 9. **The phone app is only partly live**; see section 5.
 
@@ -488,6 +503,7 @@ second instead of a video stream.
 |---|---|
 | The app shows "Not connected" | The device isn't reachable at that address. Open the exact `http://<address>:8000` the Pi uses, or add `?pi=<address>:8000`. Phone and Pi must be on the same network |
 | The app says "No camera" | The camera loop stopped sending: check the program's console |
+| The Camera screen shows a drawn green face, not video | Expected with the demo or `sim_server.py`, which have no camera. With a real camera: check `/api/health` says `"video": true`, and that the address is reachable |
 | `--serve needs fastapi and uvicorn` | `pip install -r requirements.txt` |
 | Port 8000 already in use | Detection keeps running without the server. Use `--port 8001`, or stop the other program |
 | Calibration keeps restarting | The console says why: no face, head turned more than 30°, or too few frames. Face the camera squarely and check the lighting |
@@ -523,11 +539,11 @@ bamnun/
 │   ├── alerts.py           actuators and the wake-up ladder
 │   ├── air.py              CO₂ sensor
 │   ├── telemetry.py        the snapshot and the hub between the loop and the server
-│   ├── server.py           FastAPI: the app, /api/health, /ws
+│   ├── server.py           FastAPI: the app, /api/health, /ws, /video
 │   ├── session.py          config loading and session logs
 │   ├── demo.py             showcase mode
 │   └── viz.py              the preview overlay
-├── tests/                  221 tests
+├── tests/                  226 tests
 ├── tools/                  see section 8
 ├── assets/                 alert tones, icon; voice prompts go in assets/voice/
 ├── frontend/               the phone app: see frontend/README.md

@@ -113,6 +113,33 @@ def _bar(img, x: int, y: int, w: int, h: int, frac: float, colour,
                     cv2.LINE_AA)
 
 
+def video_frame(image: np.ndarray, landmarks, eye_closed: bool,
+                width: int = 480, quality: int = 70) -> bytes:
+    """One JPEG for the app's Camera screen: the frame plus the eye outlines.
+
+    Deliberately much lighter than draw_overlay: no panel or text, which the
+    app draws itself, and scaled down before encoding so it costs a few
+    milliseconds and a few tens of kilobytes.
+    """
+    import cv2
+
+    canvas = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR) if image.ndim == 2 else image.copy()
+    if landmarks is not None and landmarks.ok:
+        pts = landmarks.points
+        colour = (177, 143, 244) if eye_closed else (240, 155, 169)   # pink / lilac, BGR
+        for ring in (RIGHT_EYE_RING, LEFT_EYE_RING):
+            ring_pts = [pts[i][:2] for i in ring
+                        if i < len(pts) and (pts[i][0] or pts[i][1])]
+            if len(ring_pts) >= 3:
+                cv2.polylines(canvas, [np.array(ring_pts, dtype=np.int32)], True,
+                              colour, 2, cv2.LINE_AA)
+    h, w = canvas.shape[:2]
+    if w > width:
+        canvas = cv2.resize(canvas, (width, int(h * width / w)), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+    return buf.tobytes() if ok else b""
+
+
 def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
                  plan=None, alert=None, ui_cfg: Optional[dict[str, Any]] = None,
                  fps: float = 0.0, calibrating: float = -1.0,

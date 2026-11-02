@@ -528,7 +528,8 @@ bamnun/
 │   ├── SPEC.md             the app and backend spec: the source of truth
 │   ├── hardware.md         pin map, wiring cautions, parts list, IR eye safety
 │   ├── thresholds.md       where each threshold comes from
-│   └── ir_fallback.md      plan B if face tracking fails on infrared
+│   ├── ir_fallback.md      plan B if face tracking fails on infrared
+│   └── original-readme.md  the original README, unchanged
 ├── src/bamnun/
 │   ├── app.py              the main loop; --serve starts the server
 │   ├── capture.py          Pi camera, webcam, video file; the IR LED
@@ -568,6 +569,7 @@ bamnun/
   safety, and the parts list.
 - `docs/thresholds.md`: where every number in the config comes from.
 - `docs/ir_fallback.md`: what to do if face tracking fails on infrared.
+- `docs/original-readme.md`: the original README, kept word for word, including the September plan.
 - `frontend/README.md`: building and running the app.
 
 Coming up: Nov 10 exhibition · Nov 12 예심 · Nov 24 창의공모전.

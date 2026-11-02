@@ -1,10 +1,12 @@
 # Bamnun app front end
 
-Front-end prototype of the Bamnun / 밤눈 phone app, with no back end yet. Open `Bamnun_app.html` in any browser to try it.
+The Bamnun / 밤눈 phone app, a Capacitor app for Android and iOS. `docs/SPEC.md` in the repo root says how it should behave.
 
 ## Folders
 
-- `Bamnun_app.html` is the built app: a single file with everything inside. Don't edit it by hand. Rebuild it instead.
+- `www/` is the built app. It's generated, so it isn't in git. Don't edit it by hand.
+- `android/` and `ios/` are the native projects.
+- `fonts/` holds the app's fonts, so it looks right with no internet.
 - `screens/` holds the source for each screen (`*.dc.html`). Each one has a `<helmet>` with that screen's CSS, then the markup.
   - Links between screens are written as `href="Name.dc.html"`.
   - Images are referenced as `/_blob/<id>`, and `build.py` swaps in the files from `ollie/`.
@@ -17,11 +19,31 @@ Front-end prototype of the Bamnun / 밤눈 phone app, with no back end yet. Open
 
 ## Rebuild
 
+Run these from this folder. Node 22 or later is required.
+
 ```
-python3 build/build.py screens Bamnun_app.html ollie
+npm install        # first time only
+npm run build      # screens to www/
+npm run sync       # build, then copy into android/ and ios/
 ```
 
-Run it from this folder. On Windows use `python` instead of `python3`.
+## Run on an Android phone
+
+Install Android Studio 2025.2.1 or later, and turn on USB debugging on the phone. Then:
+
+```
+npm run sync
+npx cap run android
+```
+
+## Run on an iPhone
+
+This needs a Mac with Xcode 26 or later. See section 12 of the spec.
+
+```
+npm run sync
+npx cap open ios
+```
 
 ## Notes
 

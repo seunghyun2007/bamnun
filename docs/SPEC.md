@@ -312,11 +312,10 @@ The Pi's hotspot has no internet, but the Kakao map, search and routes need it. 
 
 ### Needs a Mac
 
-Capacitor's iOS tools only run on macOS, so everything here needs a Mac with Xcode 26 or later. All the shared code and the Android app can be built on Windows.
+All the shared code and the Android app can be built on Windows. The iOS project can also be generated and its text files edited on Windows, but nothing there can compile or run it. Everything below needs a Mac with Xcode 26 or later.
 
 | Task | Needs |
 |---|---|
-| Generate and edit the iOS project files | Windows is fine for generating and text edits |
 | Compile the iOS app | Mac, or a cloud Mac such as a GitHub Actions macOS runner |
 | Run on an iPhone or the iOS Simulator | Mac |
 | Add Korean translations of the Info.plist texts to the Xcode project | Mac |

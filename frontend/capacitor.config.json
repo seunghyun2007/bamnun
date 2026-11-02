@@ -1,0 +1,9 @@
+{
+  "appId": "kr.bamnun.app",
+  "appName": "Bamnun",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

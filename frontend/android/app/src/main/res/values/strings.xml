@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bamnun</string>
+    <string name="title_activity_main">Bamnun</string>
+    <string name="package_name">kr.bamnun.app</string>
+    <string name="custom_url_scheme">kr.bamnun.app</string>
+</resources>

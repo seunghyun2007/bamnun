@@ -1,4 +1,4 @@
-import re, json, base64, sys, os
+import re, json, base64, sys, os, shutil
 D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
 ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Voice","Ladder","Privacy","Permissions","Pair","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
 BLOB = {
@@ -75,5 +75,8 @@ html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
              .replace("/*__IMG__*/", "const IMG=" + json.dumps(IMG) + ";\n" + dyn)
              .replace("/*__ORDER__*/", json.dumps(ORDER))
              .replace("/*__KO__*/", open(os.path.join(os.path.dirname(__file__), "ko.json"), encoding="utf-8").read()))
+out_dir = os.path.dirname(OUT) or "."
+os.makedirs(out_dir, exist_ok=True)
 open(OUT, "w", encoding="utf-8", newline="\n").write(html)
+shutil.copytree(os.path.join(os.path.dirname(__file__), "..", "fonts"), os.path.join(out_dir, "fonts"), dirs_exist_ok=True)
 print("ok", len(html))

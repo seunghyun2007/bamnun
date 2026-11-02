@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Trips</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:inherit;cursor:pointer}</style>
+</helmet>
+<div style="width:390px;height:1240px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;padding:58px 16px 0">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0 6px">
+    <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1">Trips</h1>
+    <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4;background:rgba(255,255,255,.11);padding:4px 8px;border-radius:99px">Sample data</span>
+  </div>
+  <div style="display:flex;gap:4px;margin-top:16px;padding:4px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
+    <button style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:14px">Week</button>
+    <button style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:transparent;color:#B3A6B4;font-weight:700;font-size:14px">Month</button>
+    <button style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:transparent;color:#B3A6B4;font-weight:700;font-size:14px">All</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px">
+    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px"><span style="display:block;font-size:12px;color:#B3A6B4">Trips</span><b style="font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">3</b></div>
+    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px"><span style="display:block;font-size:12px;color:#B3A6B4">Distance</span><b style="font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">798 km</b></div>
+    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px"><span style="display:block;font-size:12px;color:#B3A6B4">Alerts</span><b style="font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">3</b></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">
+    <section style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;overflow:hidden">
+      <svg width="358" viewBox="0 0 360 120" aria-hidden="true" style="display:block;width:100%;height:auto;background:rgba(22,12,20,.5)"><g stroke="rgba(255,255,255,.06)" stroke-width="1.2"><path d="M0 40H360M0 80H360M80 0V120M180 0V120M280 0V120"></path></g><path d="M30 96 C90 90 120 60 170 58 S260 30 330 22" fill="none" stroke="#F49AC1" stroke-width="4" stroke-linecap="round"></path><circle cx="30" cy="96" r="6" fill="#F8C4A4"></circle><circle cx="330" cy="22" r="7" fill="#F4EFE6"></circle><circle cx="118" cy="66" r="6" fill="#A99BF0"></circle><circle cx="226" cy="40" r="6" fill="#C4B5FD"></circle></svg>
+      <div style="padding:12px 16px 14px"><span style="font-size:12.5px;color:#B3A6B4">Yesterday · 11:40 PM</span><h2 style="margin:2px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:21px;font-weight:800">Incheon to Daejeon</h2>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:14px"><span><b>168 km</b></span><span><b>2h 14m</b></span><span style="color:#C4B5FD"><b>2 alerts</b></span><span style="color:#B3A6B4">1 break</span></div></div>
+    </section>
+    <section style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;overflow:hidden">
+      <svg width="358" viewBox="0 0 360 120" aria-hidden="true" style="display:block;width:100%;height:auto;background:rgba(22,12,20,.5)"><g stroke="rgba(255,255,255,.06)" stroke-width="1.2"><path d="M0 40H360M0 80H360M80 0V120M180 0V120M280 0V120"></path></g><path d="M40 20 C80 40 110 50 150 70 S240 90 320 104" fill="none" stroke="#F49AC1" stroke-width="4" stroke-linecap="round"></path><circle cx="40" cy="20" r="6" fill="#F8C4A4"></circle><circle cx="320" cy="104" r="7" fill="#F4EFE6"></circle><circle cx="250" cy="92" r="6" fill="#C4B5FD"></circle></svg>
+      <div style="padding:12px 16px 14px"><span style="font-size:12.5px;color:#B3A6B4">Wednesday · 10:15 PM</span><h2 style="margin:2px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:21px;font-weight:800">Pyeongtaek to Busan</h2>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:14px"><span><b>334 km</b></span><span><b>4h 05m</b></span><span style="color:#C4B5FD"><b>1 alert</b></span><span style="color:#B3A6B4">2 breaks</span></div></div>
+    </section>
+    <section style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;overflow:hidden">
+      <svg width="358" viewBox="0 0 360 120" aria-hidden="true" style="display:block;width:100%;height:auto;background:rgba(22,12,20,.5)"><g stroke="rgba(255,255,255,.06)" stroke-width="1.2"><path d="M0 40H360M0 80H360M80 0V120M180 0V120M280 0V120"></path></g><path d="M60 18 C70 50 90 70 130 80 S200 96 290 100" fill="none" stroke="#F49AC1" stroke-width="4" stroke-linecap="round"></path><circle cx="60" cy="18" r="6" fill="#F8C4A4"></circle><circle cx="290" cy="100" r="7" fill="#F4EFE6"></circle></svg>
+      <div style="padding:12px 16px 14px"><span style="font-size:12.5px;color:#B3A6B4">Monday · 9:30 PM</span><h2 style="margin:2px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:21px;font-weight:800">Incheon to Gwangju</h2>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:14px"><span><b>296 km</b></span><span><b>3h 40m</b></span><span style="color:#F8C4A4"><b>No alerts</b></span><span style="color:#B3A6B4">1 break</span></div></div>
+    </section>
+  </div>
+
+  <nav style="position:absolute;left:16px;right:16px;bottom:26px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;gap:4px;padding:6px;border-radius:99px;background:rgba(46,34,50,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.55)">
+      <a href="Home.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+      <a href="Trips.dc.html" aria-current="page" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#F4EFE6;color:#241A26;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"></path></svg>Trips</a>
+      <a href="Insights.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-8"></path></svg>Insights</a>
+    </div>
+    <a href="Route.dc.html" aria-label="Start trip" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#C4B5FD,#F9A8D4);color:#241A26;display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 0 6px rgba(196,181,253,.2)"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"></path></svg></a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

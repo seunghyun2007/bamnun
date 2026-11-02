@@ -1,0 +1,79 @@
+import re, json, base64, sys, os
+D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
+ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Voice","Ladder","Privacy","Permissions","Pair","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
+BLOB = {
+ "bb73e1b39dabf3b35d036c39c5cdd1c1":"idle","be4e6418a0a3f416c7aca695e46d9667":"hello","4af7029f76e815daac75989af4aba986":"thinking",
+ "fa546fa5fa5789063fdee0a2beebd5b2":"sleepy","57efe0ac85b17a5178828ea07e413fad":"wake","f6f6ffbf7935cbf40e40727534b41f50":"celebrate",
+ "5e3b2ef0811cd96b7ab97688744ccbd7":"peek","e5ad4d3fd744c75caea7c6c78782a441":"driving","070226ec21792f2c9c1824851ca1ff5a":"cup"}
+IMG = {n: "data:image/webp;base64," + base64.b64encode(open(f"{OL}/{n}.webp","rb").read()).decode() for n in BLOB.values()}
+
+def scope(css, sid):
+    out = []; i = 0; n = len(css)
+    while i < n:
+        j = css.find("{", i)
+        if j < 0: break
+        head = css[i:j].strip()
+        depth = 0; k = j
+        while k < n:
+            if css[k] == "{": depth += 1
+            elif css[k] == "}":
+                depth -= 1
+                if depth == 0: break
+            k += 1
+        body = css[j+1:k]
+        if head.startswith("@keyframes"):
+            out.append(f"{head}{{{body}}}")
+        elif head.startswith("@media"):
+            out.append(f"{head}{{{scope(body, sid)}}}")
+        else:
+            sels = []
+            for s in head.split(","):
+                s = s.strip()
+                if s == "body": sels.append(sid)
+                else: sels.append(f"{sid} {s}")
+            out.append(",".join(sels) + "{" + body + "}")
+        i = k + 1
+    return "\n".join(out)
+
+styles = []; tpls = []
+for name in ORDER:
+    src = open(f"{D}/{name}.dc.html").read()
+    helmet = re.search(r"<helmet>(.*?)</helmet>", src, re.S).group(1)
+    css = "\n".join(re.findall(r"<style>(.*?)</style>", helmet, re.S))
+    body = re.search(r"</helmet>(.*?)</x-dc>", src, re.S).group(1)
+    if name == "Night":
+        body = re.sub(r'(<div style="display:flex;justify-content:space-between">)\s*<sc-for list="\{\{days\}\}".*?</sc-for>', r'<div id="nDays" style="display:flex;justify-content:space-between">', body, flags=re.S)
+        body = re.sub(r'(<div style="display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\);gap:8px">)\s*<sc-for list="\{\{presets\}\}".*?</sc-for>', r'<div id="nPresets" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">', body, flags=re.S)
+        body = re.sub(r'<b ([^>]*)>\{\{start\}\}</b>', r'<b id="nStart" \1></b>', body)
+        body = re.sub(r'<b ([^>]*)>\{\{end\}\}</b>', r'<b id="nEnd" \1></b>', body)
+        body = re.sub(r'<p ([^>]*)>\{\{hardest\}\}</p>', r'<p id="nHard" \1></p>', body)
+        body = re.sub(r'<sc-for list="\{\{segs\}\}".*?</sc-for>', '<div id="nSegs" style="position:absolute;inset:0"></div>', body, flags=re.S)
+    if name == "Ladder":
+        tr = "position:relative;width:50px;height:30px;flex-shrink:0;border:0;border-radius:99px;padding:0;background:#7BD88F;transition:background .2s"
+        kn = "position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#F4EFE6;transition:transform .25s cubic-bezier(.3,1.5,.5,1)"
+        body = re.sub(r'<button role="switch" aria-checked="\{\{(\w+)\}\}" aria-label="([^"]+)" onClick="\{\{\w+\}\}" style="\{\{\w+\}\}"><span style="\{\{\w+\}\}"></span></button>',
+                      lambda m: f'<button type="button" role="switch" data-tog="{m.group(1)}" aria-checked="true" aria-label="{m.group(2)}" style="{tr}"><span style="{kn}"></span></button>', body)
+    if name == "Voice":
+        body = body.replace('<img src="{{cur.src}}" alt=""', '<img id="vAv" alt=""')
+        body = body.replace('<p class="vc-say"', '<p id="vSay" class="vc-say"').replace('>{{cur.line}}</p>', '></p>')
+        body = re.sub(r'(<div style="display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:12px;margin-top:18px">)\s*<sc-for list="\{\{cards\}\}".*?</button>\s*</sc-for>', r'<div id="vCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px">', body, flags=re.S)
+    if name in ("Home", "Trips", "Insights"):
+        body = re.sub(r'height:(1520|1240)px;box-sizing:border-box;position:relative;overflow:hidden;', 'min-height:844px;box-sizing:border-box;position:relative;overflow:clip;', body, count=1)
+        body = body.replace('<nav style="position:absolute;left:16px;right:16px;bottom:26px;', '<nav style="position:sticky;z-index:20;margin:24px ' + ('16px' if name == "Home" else '0') + ' 0;bottom:26px;')
+        body = re.sub(r'(</nav>)', r'\1<div style="height:26px"></div>', body, count=1)
+    assert "{{" not in body and "<sc-" not in body, (name, re.findall(r".{40}\{\{.{30}", body)[:3])
+    for bid, n in BLOB.items():
+        body = body.replace(f"/_blob/{bid}", IMG[n])
+    body = re.sub(r'href="(\w+)\.dc\.html"', r'href="#\1" data-go="\1"', body)
+    styles.append(f"/* {name} */\n" + scope(css, f"#s-{name}"))
+    tpls.append(f'<template id="t-{name}">{body}</template>')
+
+shell = open(os.path.join(os.path.dirname(__file__), "shell.html")).read()
+dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js")).read()
+html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
+             .replace("<!--__TEMPLATES__-->", "\n".join(tpls))
+             .replace("/*__IMG__*/", "const IMG=" + json.dumps(IMG) + ";\n" + dyn)
+             .replace("/*__ORDER__*/", json.dumps(ORDER))
+             .replace("/*__KO__*/", open(os.path.join(os.path.dirname(__file__), "ko.json"), encoding="utf-8").read()))
+open(OUT, "w").write(html)
+print("ok", len(html))

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add a route</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d6f7f}</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(80% 45% at 0% 70%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 60%),radial-gradient(80% 45% at 100% 80%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
+  <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:10px">
+    <a href="Plan.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:80%;font-size:24px">Plan your route</h1>
+  </div>
+  <div style="position:relative;display:flex;flex-direction:column;gap:8px;padding:12px 12px 12px 40px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
+    <span aria-hidden="true" style="position:absolute;left:18px;top:28px;width:10px;height:10px;border-radius:50%;background:#F8C4A4"></span>
+    <span aria-hidden="true" style="position:absolute;left:22px;top:42px;height:32px;border-left:2px dotted #7d6f7f"></span>
+    <span aria-hidden="true" style="position:absolute;left:18px;bottom:28px;width:10px;height:10px;background:#F4EFE6"></span>
+    <label for="rtFrom" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">From</label>
+    <input id="rtFrom" value="Current location · Incheon" style="padding:12px 14px;border-radius:12px;border:0;background:rgba(255,255,255,.11);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none">
+    <label for="rtTo" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Where to</label>
+    <input id="rtTo" value="Busan" placeholder="Where to?" style="padding:12px 14px;border-radius:12px;border:2px solid #C4B5FD;background:rgba(255,255,255,.11);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none">
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:9px 12px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-size:13.5px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C4B5FD" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Leave now</span>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:9px 12px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-size:13.5px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F5B5C8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17V8h11v9M14 11h4l3 3v3H3"></path></svg>Truck route</span>
+  </div>
+  <p style="margin:20px 2px 6px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4">Suggestions</p>
+  <div style="display:flex;flex-direction:column">
+    <a href="Home.dc.html" style="display:flex;gap:14px;align-items:center;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.11);text-decoration:none">
+      <span style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></span>
+      <span style="flex-grow:1"><b style="display:block;font-size:15.5px">Busan New Port</b><span style="font-size:13px;color:#B3A6B4">Gangseo-gu, Busan</span></span><span style="font-size:13px;color:#B3A6B4;white-space:nowrap">390 km</span>
+    </a>
+    <a href="Home.dc.html" style="display:flex;gap:14px;align-items:center;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.11);text-decoration:none">
+      <span style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></span>
+      <span style="flex-grow:1"><b style="display:block;font-size:15.5px">Busan Port, North Port</b><span style="font-size:13px;color:#B3A6B4">Dong-gu, Busan</span></span><span style="font-size:13px;color:#B3A6B4;white-space:nowrap">395 km</span>
+    </a>
+    <a href="Home.dc.html" style="display:flex;gap:14px;align-items:center;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.11);text-decoration:none">
+      <span style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B3A6B4" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg></span>
+      <span style="flex-grow:1"><b style="display:block;font-size:15.5px">Pyeongtaek Port</b><span style="font-size:13px;color:#B3A6B4">Recent · Pyeongtaek</span></span><span style="font-size:13px;color:#B3A6B4;white-space:nowrap">78 km</span>
+    </a>
+  </div>
+  <div style="margin-top:16px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#B3A6B4;font-size:13.5px;line-height:1.4;display:flex;gap:10px;align-items:flex-start">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F8C4A4" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v.5M12 11v5"></path></svg>
+    <span>Ollie will pick rest stops on the way, timed before your tired window.</span>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
+    <a href="Home.dc.html" style="width:100%;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:17px 30px;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Set route</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

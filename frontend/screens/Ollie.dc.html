@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ollie animations</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
+.olw{position:relative;aspect-ratio:600/640}
+.ol-shadow{position:absolute;left:24%;right:24%;bottom:2%;height:5%;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px)}
+.ol-clip{position:absolute;inset:0}
+.ol-clip.peek{inset:0 0 3% 0;overflow:hidden}
+.ol-enter{position:absolute;inset:0;transform-origin:50% 96%;animation:olIn .8s cubic-bezier(.22,1,.36,1) both}
+.ol-clip.peek .ol-enter{animation:olPeekIn 1.1s cubic-bezier(.34,1.45,.55,1) both}
+.ol-loop{position:absolute;inset:0;transform-origin:50% 96%}
+.ol-loop img{position:absolute;inset:0;width:100%;height:100%;display:block;filter:drop-shadow(0 .4em .8em rgba(0,0,0,.35))}
+.ol-eye{position:absolute;width:18.6%;height:17.44%;border-radius:50%;overflow:hidden}
+.ol-lid{position:absolute;left:-4%;right:-4%;top:-4%;height:108%;background:#714330;border-bottom:.22em solid #1b1320;border-radius:0 0 45% 45%/0 0 22% 22%;transform:translateY(-112%);animation:olBlink 5s cubic-bezier(.4,0,.2,1) infinite}
+.a-breathe{animation:olBreathe 3.4s ease-in-out infinite}
+.a-wave{animation:olWave 1.4s ease-in-out infinite}
+.a-think{animation:olThink 3.8s ease-in-out infinite}
+.a-sleep{animation:olSleep 4.4s ease-in-out infinite}
+.a-shock{animation:olShock .6s ease-out both,olTremble 2.2s .6s ease-in-out infinite}
+.a-jump{animation:olJump 1.1s cubic-bezier(.45,0,.55,1) infinite}
+.a-peek{animation:olPeekBob 2.8s 1.1s ease-in-out infinite}
+.a-drive{animation:olDrive 3.2s ease-in-out infinite}
+.s-jump{animation:olShadow 1.1s cubic-bezier(.45,0,.55,1) infinite}
+.ol-fx{position:absolute;pointer-events:none;line-height:1;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;color:#F4EFE6}
+.fx-q{animation:olQ 2.4s ease-in-out infinite}
+.fx-z{opacity:0;animation:olZ 3.3s ease-out infinite}
+.fx-bang{color:#C4B5FD;animation:olBang .55s .15s cubic-bezier(.3,1.8,.5,1) both,olBangP 1.6s .8s ease-in-out infinite}
+.fx-ray{position:absolute;left:50%;top:30%;width:.28em;height:1em;margin-left:-.14em;border-radius:.2em;background:#F4EFE6;opacity:0;animation:olRay 1.3s ease-out infinite}
+.fx-cf{position:absolute;top:-6%;width:.38em;height:.6em;border-radius:.12em;opacity:0;animation:olCf 2s linear infinite}
+.fx-star{position:absolute;width:1.3em;height:1.3em;animation:olTw 1.4s ease-in-out infinite}
+.fx-wl{position:absolute;width:1em;height:1em;border-right:.2em solid #F4EFE6;border-radius:50%;opacity:0;animation:olWl 1.4s ease-in-out infinite}
+.fx-ledge{left:2%;right:2%;bottom:2.4%;height:.3em;border-radius:.3em;background:#F4EFE6;opacity:.9}
+.fx-cup{position:absolute;right:-4%;bottom:2%;width:15%}
+.fx-steam{opacity:0;animation:olSteam 2.6s ease-out infinite}
+@keyframes olIn{0%{opacity:0;transform:translateY(14%) scale(.5,.42)}38%{opacity:1;transform:translateY(-5%) scale(1.07,.95)}58%{transform:translateY(0) scale(.95,1.05)}78%{transform:scale(1.02,.98)}100%{opacity:1;transform:none}}
+@keyframes olPeekIn{0%{transform:translateY(75%)}55%{transform:translateY(-6%)}75%{transform:translateY(2%)}100%{transform:translateY(0)}}
+@keyframes olBlink{0%,90%,100%{transform:translateY(-112%)}93%,94.5%{transform:translateY(0)}}
+@keyframes olBreathe{0%,100%{transform:scale(1,1)}50%{transform:scale(.985,1.03)}}
+@keyframes olWave{0%,100%{transform:rotate(-3deg) scale(1,1)}30%{transform:rotate(2.5deg) scale(1.02,.98)}55%{transform:rotate(3.5deg) scale(.99,1.01)}80%{transform:rotate(-1deg) scale(1.01,.99)}}
+@keyframes olThink{0%,100%{transform:rotate(0) scale(1,1)}40%{transform:rotate(-3.5deg) scale(.99,1.015)}70%{transform:rotate(-2deg) scale(1,1)}}
+@keyframes olSleep{0%,100%{transform:rotate(0) scale(1,1)}50%{transform:rotate(2.5deg) scale(1.035,.965)}}
+@keyframes olShock{0%{transform:scale(.88,1.14)}18%{transform:translateX(-5%) rotate(-5deg) scale(1.06,.95)}36%{transform:translateX(5%) rotate(5deg)}54%{transform:translateX(-3%) rotate(-3deg)}72%{transform:translateX(1.5%) rotate(1deg)}100%{transform:none}}
+@keyframes olTremble{0%,60%,100%{transform:translateX(0)}64%{transform:translateX(-1.2%)}68%{transform:translateX(1.2%)}72%{transform:translateX(-.8%)}76%{transform:translateX(0)}}
+@keyframes olJump{0%{transform:translateY(0) scale(1.08,.9)}22%{transform:translateY(-15%) scale(.93,1.09)}42%{transform:translateY(-22%) scale(1,1)}62%{transform:translateY(-4%) scale(.96,1.05)}72%{transform:translateY(0) scale(1.1,.88)}84%{transform:translateY(0) scale(.97,1.03)}100%{transform:translateY(0) scale(1.08,.9)}}
+@keyframes olShadow{0%,72%,100%{transform:scale(1);opacity:1}42%{transform:scale(.55);opacity:.45}}
+@keyframes olPeekBob{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(2.5%) rotate(-2deg)}60%{transform:translateY(0) rotate(2deg)}}
+@keyframes olDrive{0%,100%{transform:translateY(0) rotate(0)}10%{transform:translateY(-.8%)}20%{transform:translateY(0)}30%{transform:translateY(-.6%)}40%{transform:translateY(0) rotate(0)}55%{transform:rotate(-2deg)}70%{transform:rotate(1.5deg)}85%{transform:rotate(0)}}
+@keyframes olQ{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-.35em) rotate(10deg)}}
+@keyframes olZ{0%{opacity:0;transform:translate(0,0) scale(.5)}20%{opacity:1}100%{opacity:0;transform:translate(1.4em,-2.4em) scale(1.25)}}
+@keyframes olBang{0%{opacity:0;transform:translateY(.6em) scale(.3)}100%{opacity:1;transform:none}}
+@keyframes olBangP{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.15) rotate(6deg)}}
+@keyframes olRay{0%{opacity:0;transform:rotate(var(--a)) translateY(-3.6em) scaleY(.3)}35%{opacity:1}100%{opacity:0;transform:rotate(var(--a)) translateY(-5.2em) scaleY(1)}}
+@keyframes olCf{0%{opacity:0;transform:translateY(0) rotate(0)}10%{opacity:1}90%{opacity:1}100%{opacity:0;transform:translateY(10em) rotate(var(--r,540deg))}}
+@keyframes olTw{0%,100%{transform:scale(.6) rotate(0);opacity:.5}50%{transform:scale(1.15) rotate(25deg);opacity:1}}
+@keyframes olWl{0%{opacity:0;transform:translateX(-.2em)}30%{opacity:1}100%{opacity:0;transform:translateX(.5em)}}
+@keyframes olSteam{0%{opacity:0;transform:translateY(0) scaleX(1)}30%{opacity:.8}100%{opacity:0;transform:translateY(-1.6em) scaleX(1.4)}}
+</style>
+</helmet>
+<div style="width:1200px;height:940px;box-sizing:border-box;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;padding:56px 64px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:56px">
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div>
+      <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:64px;line-height:1">Ollie</h1>
+      <p style="margin:6px 0 0;color:#B3A6B4;font-size:16px">Bamnun's night co-pilot · 8 animated states · tap a state to play it</p>
+    </div>
+    <div style="position:relative;height:500px;border-radius:32px;background:radial-gradient(360px 300px at 50% 55%,#383D6E 0%,rgba(255,255,255,.05) 75%);display:grid;place-items:center;overflow:hidden">
+      <sc-if value="{{showA}}" hint-placeholder-val="{{true}}">
+        <sc-for list="{{stage}}" as="o" hint-placeholder-count="1">
+          <div class="olw" style="{{o.wrap}}">
+            <sc-if value="{{o.shadow}}" hint-placeholder-val="{{true}}"><div class="{{o.shadowCls}}"></div></sc-if>
+            <div class="{{o.clipCls}}"><div class="ol-enter"><div class="ol-loop {{o.anim}}">
+              <img src="{{o.src}}" alt="{{o.alt}}">
+              <sc-for list="{{o.eyes}}" as="e" hint-placeholder-count="2"><div class="ol-eye" style="{{e.style}}"><div class="ol-lid"></div></div></sc-for>
+            </div></div></div>
+            <sc-if value="{{o.ledge}}" hint-placeholder-val="{{false}}"><div class="ol-fx fx-ledge"></div></sc-if>
+            <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
+            <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
+            <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
+            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
+          </div>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{showB}}" hint-placeholder-val="{{false}}">
+        <sc-for list="{{stage}}" as="o" hint-placeholder-count="1">
+          <div class="olw" style="{{o.wrap}}">
+            <sc-if value="{{o.shadow}}" hint-placeholder-val="{{true}}"><div class="{{o.shadowCls}}"></div></sc-if>
+            <div class="{{o.clipCls}}"><div class="ol-enter"><div class="ol-loop {{o.anim}}">
+              <img src="{{o.src}}" alt="{{o.alt}}">
+              <sc-for list="{{o.eyes}}" as="e" hint-placeholder-count="2"><div class="ol-eye" style="{{e.style}}"><div class="ol-lid"></div></div></sc-for>
+            </div></div></div>
+            <sc-if value="{{o.ledge}}" hint-placeholder-val="{{false}}"><div class="ol-fx fx-ledge"></div></sc-if>
+            <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
+            <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
+            <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
+            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
+          </div>
+        </sc-for>
+      </sc-if>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px">
+      <h2 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:30px;font-weight:800">{{curName}}</h2>
+      <span style="color:#B3A6B4;font-size:15px;text-align:right">{{curUse}}</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="8">
+        <button aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.name}}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+    <p style="margin:12px 0 0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4">All states, looping</p>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+      <sc-for list="{{grid}}" as="o" hint-placeholder-count="8">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:14px 12px 12px;border-radius:22px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)">
+          <div class="olw" style="{{o.wrap}}">
+            <sc-if value="{{o.shadow}}" hint-placeholder-val="{{true}}"><div class="{{o.shadowCls}}"></div></sc-if>
+            <div class="{{o.clipCls}}"><div class="ol-enter"><div class="ol-loop {{o.anim}}">
+              <img src="{{o.src}}" alt="{{o.alt}}">
+              <sc-for list="{{o.eyes}}" as="e" hint-placeholder-count="2"><div class="ol-eye" style="{{e.style}}"><div class="ol-lid"></div></div></sc-for>
+            </div></div></div>
+            <sc-if value="{{o.ledge}}" hint-placeholder-val="{{false}}"><div class="ol-fx fx-ledge"></div></sc-if>
+            <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
+            <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
+            <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
+            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""></sc-if>
+          </div>
+          <div style="min-width:0"><b style="display:block;font-size:16px">{{o.name}}</b><span style="display:block;color:#B3A6B4;font-size:13px;line-height:1.35;margin-top:2px">{{o.use}}</span></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1200,"height":940}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cur: 1, flip: false, manual: false }; }
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      if (this.state.manual) return;
+      this.setState({ cur: (this.state.cur + 1) % 8, flip: !this.state.flip });
+    }, 3600);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    const eye = (l, t) => ({ style: 'left:' + l + '%;top:' + t + '%' });
+    const S = [
+      { id: 'idle', name: 'Idle', use: 'Home screen, ready to drive', src: '/_blob/bb73e1b39dabf3b35d036c39c5cdd1c1', anim: 'a-breathe', eyes: [eye(27.08, 32.58), eye(54.2, 32.6)] },
+      { id: 'hello', name: 'Hello', use: 'Welcome and sign-in', src: '/_blob/be4e6418a0a3f416c7aca695e46d9667', anim: 'a-wave', eyes: [], wl: true },
+      { id: 'thinking', name: 'Thinking', use: 'Loading, calibrating, questions', src: '/_blob/4af7029f76e815daac75989af4aba986', anim: 'a-think', eyes: [eye(26.76, 35.45), eye(50.56, 31.49)], q: true },
+      { id: 'sleepy', name: 'Sleepy', use: 'Drowsiness spotted, first wake-up step', src: '/_blob/fa546fa5fa5789063fdee0a2beebd5b2', anim: 'a-sleep', eyes: [], z: true },
+      { id: 'wake', name: 'Wake up!', use: 'Alarm step and microsleeps', src: '/_blob/57efe0ac85b17a5178828ea07e413fad', anim: 'a-shock', eyes: [], bang: true },
+      { id: 'celebrate', name: 'Celebrate', use: 'Setup done, safe trip finished', src: '/_blob/f6f6ffbf7935cbf40e40727534b41f50', anim: 'a-jump', eyes: [], cf: true, jump: true },
+      { id: 'peek', name: 'Peek', use: 'Meet Ollie, tips and reminders', src: '/_blob/5e3b2ef0811cd96b7ab97688744ccbd7', anim: 'a-peek', eyes: [eye(27.86, 66.63), eye(53.23, 66.47)], ledge: true, peek: true },
+      { id: 'driving', name: 'Driving', use: 'Live trip in progress', src: '/_blob/e5ad4d3fd744c75caea7c6c78782a441', anim: 'a-drive', eyes: [eye(27.65, 38.91), eye(53.35, 38.71)], cup: true }
+    ];
+    const angles = [-75, -48, -24, 24, 48, 75];
+    const rays = angles.map((a, i) => ({ style: '--a:' + a + 'deg;animation-delay:' + (0.6 + i * 0.05).toFixed(2) + 's' }));
+    const cols = ['#C4B5FD', '#F8C4A4', '#A99BF0', '#F48FB1', '#F5B5C8', '#F5E6C8'];
+    const conf = Array.from({ length: 12 }, (_, i) => ({ style: 'left:' + (6 + i * 7.8) + '%;background:' + cols[i % 6] + ';animation-duration:' + (1.6 + (i * 37 % 10) / 10) + 's;animation-delay:' + ((i * 53 % 17) / 10) + 's;--r:' + (i % 2 ? 540 : -480) + 'deg' }));
+    const stars = [{ style: 'left:4%;top:8%' }, { style: 'left:86%;top:0%;animation-delay:.4s' }, { style: 'left:90%;top:40%;animation-delay:.8s;width:1em;height:1em' }];
+    const build = (s, w) => ({
+      name: s.name, use: s.use, src: s.src, alt: 'Ollie the owl, ' + s.name,
+      wrap: 'width:' + w + 'px;font-size:' + (w / 10) + 'px;flex-shrink:0',
+      anim: s.anim, eyes: s.eyes, clipCls: s.peek ? 'ol-clip peek' : 'ol-clip',
+      shadow: !s.peek, shadowCls: s.jump ? 'ol-shadow s-jump' : 'ol-shadow',
+      q: !!s.q, z: !!s.z, bang: !!s.bang, cf: !!s.cf, wl: !!s.wl, ledge: !!s.ledge, cup: !!s.cup,
+      rays, conf, stars
+    });
+    const st = this.state;
+    const cur = S[st.cur];
+    const chips = S.map((s, i) => ({
+      name: s.name, on: String(i === st.cur),
+      style: 'padding:10px 16px;border-radius:99px;font-weight:700;font-size:14px;border:2px solid ' + (i === st.cur ? '#C4B5FD' : 'transparent') + ';background:' + (i === st.cur ? '#C4B5FD' : 'rgba(255,255,255,.07)') + ';color:' + (i === st.cur ? '#241A26' : '#F4EFE6'),
+      pick: () => this.setState({ cur: i, flip: !st.flip, manual: true })
+    }));
+    return {
+      stage: [build(cur, 300)], showA: !st.flip, showB: st.flip,
+      curName: cur.name, curUse: 'Used for: ' + cur.use, chips,
+      grid: S.map((s) => build(s, 96))
+    };
+  }
+}
+</script>
+</body>
+</html>

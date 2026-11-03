@@ -3,6 +3,7 @@
     python -m bamnun.app --source webcam            # laptop development
     python -m bamnun.app --source picamera --no-window   # headless on the Pi
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
+    python -m bamnun.app --serve                    # plus the app and live data on :8000
 
 Keys in the window: c recalibrate, s snapshot, a toggle actuators, q quit.
 """
@@ -22,7 +23,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from .air import CabinAir
-from .alerts import AlertDecision, EscalationPolicy
+from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
 from .features import Calibration, FeatureExtractor, FeatureFrame
@@ -30,8 +31,14 @@ from .landmarks import FaceLandmarker
 from .predictor import RestPlanner
 from .session import SessionLogger, load_config, repo_root
 from .state import DriverState, StateEstimator
+from .telemetry import Hub, alert_event, build_snapshot
 
 console = Console()
+
+# The camera loop runs at 25-30 fps; the app only needs a fraction of that.
+PUBLISH_PERIOD_S = 0.1
+HEALTH_PERIOD_S = 1.0
+VIDEO_PERIOD_S = 0.1        # Camera screen video, about 10 fps, only while watched
 log = logging.getLogger("bamnun")
 
 
@@ -51,6 +58,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--duration", type=float, default=None, help="stop after N seconds")
     p.add_argument("--demo", action="store_true",
                    help="showcase mode: keys 1-4 fire each stage, t runs a tour")
+    p.add_argument("--serve", action="store_true",
+                   help="serve the phone app and live data (needs fastapi, uvicorn)")
+    p.add_argument("--host", default="0.0.0.0", help="--serve: address to listen on")
+    p.add_argument("--port", type=int, default=8000, help="--serve: port")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -107,6 +118,17 @@ class Monitor:
         self._cal_attempts_seen = 0
         self._cal_run = False
 
+        # Live data for the phone app. The Hub always exists, so publishing
+        # costs the same with or without --serve; only the server is optional.
+        self.hub = Hub()
+        self.hub.video_capable = True
+        self.server = None
+        self._last_publish = -1e9
+        self._last_video = -1e9
+        self._last_health = -1e9
+        self._published_stage = 0
+        self._publish_failed = False
+
         cal_path = args.calibration or self.cfg["calibration"].get("save_path")
         self._cal_path = self.root / str(cal_path)
         self._load_calibration()
@@ -158,6 +180,7 @@ class Monitor:
                                      changed=True, fired=fired, message="demo")
         decision.message = f"demo {key}"
         self._last_alert = decision
+        self._note_stage(decision)
         self.logger.log_event("demo", decision)
         for a in decision.fired:
             console.print(f"     -> {a.actuator}: {a.detail}")
@@ -184,6 +207,97 @@ class Monitor:
 
     def stop(self, *_a) -> None:
         self._running = False
+
+    # -- live data for the app ------------------------------------------ #
+
+    def start_server(self) -> None:
+        """Serve the app and live data. Never fatal: detection runs regardless."""
+        try:
+            from .server import ServerThread
+        except ImportError as exc:
+            console.print(f"[yellow]--serve needs fastapi and uvicorn ({exc}); "
+                          "pip install -r requirements.txt[/]")
+            return
+        try:
+            self.server = ServerThread(self.hub, self.args.host, self.args.port).start()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not start the server: %s", exc)
+            return
+        console.print(f"[green]app and live data[/] on port {self.args.port}: "
+                      f"open http://<this machine's address>:{self.args.port}")
+
+    def _guarded(self, fn, *args) -> None:
+        """Run a publishing step; a fault there must never stop detection."""
+        try:
+            fn(*args)
+        except Exception as exc:  # noqa: BLE001
+            if not self._publish_failed:
+                self._publish_failed = True
+                log.warning("live data publishing failed (detection unaffected): %r", exc)
+
+    def _note_stage(self, decision: AlertDecision) -> None:
+        """Send an ``alert`` message when the ladder stage changes."""
+        def emit():
+            if decision.stage != self._published_stage:
+                self.hub.emit(alert_event(decision, self._published_stage))
+                self._published_stage = decision.stage
+        self._guarded(emit)
+
+    def _health(self) -> dict:
+        """Part status for /api/health: ok, simulated, missing or off."""
+        acts = self.policy.actuators
+
+        def part(name: str) -> str:
+            a = acts.get(name)
+            if a is None or not a.available:
+                return "missing"
+            if isinstance(a, AudioActuator):
+                # A player with nothing recorded to play is still a stub.
+                return "ok" if a._player and a.present else "simulated"
+            return "ok" if getattr(a, "_dev", None) is not None else "simulated"
+
+        ir = self.illuminator
+        return {
+            "calibrated": bool(self.features.calibration.complete),
+            "gpio": bool(_HAVE_GPIO),
+            "parts": {
+                "camera": str(self.cfg["capture"].get("source", "")),
+                "ir_light": ("ok" if ir.is_on and ir._dev is not None
+                             else "simulated" if ir.is_on else "off"),
+                "blue_light": part("blue_light"),
+                "mist": part("scent"),
+                "speakers": part("chime"),
+                "co2": "ok" if self.air.available else "missing",
+            },
+        }
+
+    def _publish(self, now: float, ff: FeatureFrame, state: DriverState,
+                 calibrating: bool, progress: float, fps: float,
+                 trip_s: float) -> None:
+        if now - self._last_publish < PUBLISH_PERIOD_S:
+            return
+        self._last_publish = now
+        air = self.air
+        co2_age = (None if air.updated_at is None
+                   else time.monotonic() - air.updated_at)
+        self.hub.publish(build_snapshot(
+            ff, state, stage=self.policy.stage,
+            stage_name=str(self.policy.stages[self.policy.stage].get("name", "")),
+            calibrated=self.features.calibration.complete,
+            calibrating=calibrating, cal_progress=progress, trip_s=trip_s,
+            fps=fps, last_blink_s=self.features.blink.last_blink_s,
+            co2_ppm=air.ppm, co2_age_s=co2_age))
+        if now - self._last_health >= HEALTH_PERIOD_S:
+            self._last_health = now
+            self.hub.set_health(self._health())
+
+    def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
+        """Encode a Camera-screen frame, but only while someone is watching."""
+        if not self.hub.wants_video() or now - self._last_video < VIDEO_PERIOD_S:
+            return
+        self._last_video = now
+        from .viz import video_frame
+        self.hub.publish_frame(video_frame(image, lms, ff.eye_closed))
 
     # ----------------------------------------------------------------- #
 
@@ -214,6 +328,8 @@ class Monitor:
         last = time.monotonic()
         alerts_on = True
         self.illuminator.on()
+        if self.args.serve:
+            self.start_server()
 
         console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")
         if self.demo:
@@ -273,6 +389,8 @@ class Monitor:
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
                 decision = self.policy.update(state) if alerts_on else None
+                if decision is not None:
+                    self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
                     self._last_alert = decision
                     self.logger.log_event("alert", decision)
@@ -294,6 +412,9 @@ class Monitor:
             self._fps.append(1.0 / max(now - last, 1e-6))
             last = now
             fps = sum(self._fps) / len(self._fps)
+            self._guarded(self._publish, now, ff, state, calibrating, progress,
+                          fps, frame.timestamp - t_start)
+            self._guarded(self._publish_video, now, frame.image, lms, ff)
 
             if self.show_window and cv2 is not None:
                 from .viz import draw_overlay
@@ -348,6 +469,8 @@ class Monitor:
         if self._plan is not None:
             console.print(f"[bold]final rest plan:[/] {self._plan.summary()}")
         self.logger.log_event("shutdown", {"actuations": len(self.policy.history)})
+        if self.server is not None:
+            self.server.stop()
         self.logger.close()
         self.policy.close()
         self.air.close()

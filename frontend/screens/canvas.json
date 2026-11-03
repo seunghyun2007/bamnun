@@ -1,0 +1,30 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-10-31T06:40:00Z"},"title":"Bamnun App Screens","launch":{"view":"canvas"},"pages":[],
+"boards":{
+"Main.dc.html":{"x":0,"y":0,"w":390,"h":844,"title":"01 Splash","is_interactive":true,"radius":44},
+"Welcome.dc.html":{"x":470,"y":0,"w":390,"h":844,"title":"02 Welcome","is_interactive":true,"radius":44},
+"Meet.dc.html":{"x":940,"y":0,"w":390,"h":844,"title":"03 Meet Ollie","is_interactive":true,"radius":44},
+"Name.dc.html":{"x":1410,"y":0,"w":390,"h":844,"title":"04 Name","is_interactive":true,"radius":44},
+"Vehicle.dc.html":{"x":1880,"y":0,"w":390,"h":844,"title":"05 Vehicle","is_interactive":true,"radius":44},
+"Night.dc.html":{"x":2350,"y":0,"w":390,"h":844,"title":"06 Work week","is_interactive":true,"radius":44},
+"Voice.dc.html":{"x":2820,"y":0,"w":390,"h":844,"title":"07 Ollie's style","is_interactive":true,"radius":44},
+"Ladder.dc.html":{"x":3290,"y":0,"w":390,"h":844,"title":"08 Wake-up ladder","is_interactive":true,"radius":44},
+"Privacy.dc.html":{"x":0,"y":1264,"w":390,"h":844,"title":"09 Privacy","is_interactive":true,"radius":44},
+"Permissions.dc.html":{"x":470,"y":1264,"w":390,"h":844,"title":"10 Permissions","is_interactive":true,"radius":44},
+"Pair.dc.html":{"x":940,"y":1264,"w":390,"h":844,"title":"11 Connect device","is_interactive":true,"radius":44},
+"Calibrate.dc.html":{"x":1410,"y":1264,"w":390,"h":844,"title":"12 Calibrate","is_interactive":true,"radius":44},
+"Plan.dc.html":{"x":1880,"y":1264,"w":390,"h":844,"title":"13 All set","is_interactive":true,"radius":44},
+"Route.dc.html":{"x":2350,"y":1264,"w":390,"h":844,"title":"14 Add a route","is_interactive":true,"radius":44},
+"Home.dc.html":{"x":0,"y":2528,"w":390,"h":1520,"title":"15 Home","is_interactive":true,"radius":44},
+"Camera.dc.html":{"x":470,"y":2528,"w":390,"h":844,"title":"16 Live camera","is_interactive":true,"radius":44},
+"Trips.dc.html":{"x":940,"y":2528,"w":390,"h":1240,"title":"17 Trips","is_interactive":true,"radius":44},
+"Insights.dc.html":{"x":1410,"y":2528,"w":390,"h":1240,"title":"18 Insights","is_interactive":true,"radius":44},
+"Settings.dc.html":{"x":1880,"y":2528,"w":390,"h":1460,"title":"19 Settings","is_interactive":true,"radius":44},
+"Ollie.dc.html":{"x":2350,"y":2528,"w":1200,"h":940,"title":"Ollie · mascot animations","is_interactive":true,"radius":32}
+},
+"order":["Main.dc.html","Welcome.dc.html","Meet.dc.html","Name.dc.html","Vehicle.dc.html","Night.dc.html","Voice.dc.html","Ladder.dc.html","Privacy.dc.html","Permissions.dc.html","Pair.dc.html","Calibrate.dc.html","Plan.dc.html","Route.dc.html","Home.dc.html","Camera.dc.html","Trips.dc.html","Insights.dc.html","Settings.dc.html","Ollie.dc.html"],
+"notes":{
+"row1":{"x":0,"y":-300,"text":"Onboarding · the driver and Ollie","kind":"title1","maxW":3680},
+"row2":{"x":0,"y":964,"text":"Onboarding · device, calibration and first route","kind":"title1","maxW":2740},
+"row3":{"x":0,"y":2228,"text":"App · home, tabs and Ollie","kind":"title1","maxW":3550}
+},
+"designSystems":[]}

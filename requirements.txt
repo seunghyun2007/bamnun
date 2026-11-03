@@ -53,8 +53,16 @@ rich>=13.7
 scipy>=1.11
 scikit-learn>=1.4
 
-# Tests
+# Live data for the phone app (python -m bamnun.app --serve). Optional at
+# runtime: without them the monitor runs exactly as before and --serve says
+# what is missing. websockets is what uvicorn speaks WebSocket with.
+fastapi>=0.110
+uvicorn>=0.29
+websockets>=12.0
+
+# Tests. httpx drives FastAPI's TestClient; the server tests skip without it.
 pytest>=8.0
+httpx>=0.27
 
 # ---------------------------------------------------------------------------
 # Raspberry Pi only (install manually on the Pi, they are no-ops elsewhere):

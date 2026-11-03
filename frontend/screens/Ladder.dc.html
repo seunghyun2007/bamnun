@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How Ollie wakes you</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:inherit;cursor:pointer}</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
+  <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
+    <a href="Voice.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:55%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+  </div>
+  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center">How Ollie wakes you</h1>
+  <p style="margin:12px auto 0;max-width:30ch;text-align:center;color:#B3A6B4;font-size:15.5px;line-height:1.45">Four steps, from a soft glow to an alarm. Each one only fires if the last one wasn't enough.</p>
+  <div style="position:relative;margin-top:18px;display:flex;flex-direction:column">
+    <div aria-hidden="true" style="position:absolute;left:21px;top:30px;bottom:30px;width:2px;background:linear-gradient(#A99BF0,#F5B5C8,#C4B5FD,#F48FB1);opacity:.45"></div>
+    <div style="display:flex;gap:14px;align-items:center;padding:11px 0">
+      <span style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;display:grid;place-items:center;background:#A99BF0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"></path></svg></span>
+      <div style="flex-grow:1"><h2 style="margin:0;font-size:16px">Blue light</h2><p style="margin:2px 0 0;color:#B3A6B4;font-size:13.5px;line-height:1.35">A dim blue glow at the edge of your view, held 30 min.</p></div>
+      <span style="font-size:12px;color:#B3A6B4;font-weight:600">Always</span>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;padding:11px 0">
+      <span style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;display:grid;place-items:center;background:#F5B5C8"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c-5-3-7-7-5-12 4 0 8 3 8 8M12 21c4-2 6-6 5-10"></path></svg></span>
+      <div style="flex-grow:1"><h2 style="margin:0;font-size:16px">Mint mist</h2><p style="margin:2px 0 0;color:#B3A6B4;font-size:13.5px;line-height:1.35">A 10 s burst of peppermint. Wakes the senses fast.</p></div>
+      <button role="switch" aria-checked="{{mint}}" aria-label="Mint mist" onClick="{{toggleMint}}" style="{{mintTrack}}"><span style="{{mintKnob}}"></span></button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;padding:11px 0">
+      <span style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;display:grid;place-items:center;background:#C4B5FD"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15V10a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"></path></svg></span>
+      <div style="flex-grow:1"><h2 style="margin:0;font-size:16px">Chime and voice</h2><p style="margin:2px 0 0;color:#B3A6B4;font-size:13.5px;line-height:1.35">A slow chime, then Ollie speaks to you.</p></div>
+      <button role="switch" aria-checked="{{voice}}" aria-label="Chime and voice" onClick="{{toggleVoice}}" style="{{voiceTrack}}"><span style="{{voiceKnob}}"></span></button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;padding:11px 0">
+      <span style="position:relative;width:44px;height:44px;flex-shrink:0;border-radius:14px;display:grid;place-items:center;background:#F48FB1"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 16H3zM12 10v4M12 17v.5"></path></svg></span>
+      <div style="flex-grow:1"><h2 style="margin:0;font-size:16px">Rising alarm</h2><p style="margin:2px 0 0;color:#B3A6B4;font-size:13.5px;line-height:1.35">Fast beeps that grow louder. Never a sudden blast.</p></div>
+      <span style="font-size:12px;color:#B3A6B4;font-weight:600">Always</span>
+    </div>
+  </div>
+  <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#B3A6B4;font-size:13.5px;line-height:1.4;display:flex;gap:10px;align-items:flex-start">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A99BF0" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v.5M12 11v5"></path></svg>
+    <span>A long look away from the road gets one short chime and doesn't climb the ladder. If your eyes stay shut for half a second, Ollie jumps straight to the alarm.</span>
+  </div>
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
+    <a href="Privacy.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mint: true, voice: true }; }
+  renderVals() {
+    const track = (on) => 'position:relative;width:50px;height:30px;flex-shrink:0;border:0;border-radius:99px;padding:0;background:' + (on ? '#C4B5FD' : 'rgba(255,255,255,.11)');
+    const knob = (on) => 'position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#F4EFE6;transition:transform .2s;transform:translateX(' + (on ? 20 : 0) + 'px)';
+    const s = this.state;
+    return {
+      mint: String(s.mint), voice: String(s.voice),
+      mintTrack: track(s.mint), mintKnob: knob(s.mint),
+      voiceTrack: track(s.voice), voiceKnob: knob(s.voice),
+      toggleMint: () => this.setState({ mint: !s.mint }),
+      toggleVoice: () => this.setState({ voice: !s.voice })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Insights</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:inherit;cursor:pointer}</style>
+</helmet>
+<div style="width:390px;height:1240px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;padding:58px 16px 0">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:0 6px">
+    <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1">Insights</h1>
+    <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4;background:rgba(255,255,255,.11);padding:4px 8px;border-radius:99px">Sample data</span>
+  </div>
+  <div style="display:flex;gap:4px;margin-top:16px;padding:4px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
+    <button style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:14px">This week</button>
+    <button style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:transparent;color:#B3A6B4;font-weight:700;font-size:14px">This month</button>
+  </div>
+
+  <section style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;padding:18px 16px">
+    <div style="display:flex;gap:14px;align-items:center">
+      <div style="position:relative;width:92px;height:92px;flex-shrink:0">
+        <svg width="92" height="92" viewBox="0 0 92 92" aria-hidden="true"><circle cx="46" cy="46" r="38" fill="none" stroke="rgba(255,255,255,.11)" stroke-width="9"></circle><circle cx="46" cy="46" r="38" fill="none" stroke="#F8C4A4" stroke-width="9" stroke-linecap="round" stroke-dasharray="224 239" transform="rotate(-90 46 46)"></circle></svg>
+        <b style="position:absolute;inset:0;display:grid;place-items:center;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">94%</b>
+      </div>
+      <div><h2 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:22px;font-weight:800">Alert driving</h2><p style="margin:4px 0 0;color:#B3A6B4;font-size:14px;line-height:1.35">Share of driving time with no drowsiness signs. Up from 89% last week.</p></div>
+    </div>
+  </section>
+
+  <section style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;padding:18px 16px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:16px">Alerts per night</h2><span style="color:#B3A6B4;font-size:13px">3 total</span></div>
+    <svg width="326" viewBox="0 0 326 150" role="img" aria-label="Alerts per night this week: Monday 0, Tuesday 0, Wednesday 1, Thursday 2, Friday 0, Saturday and Sunday off" style="display:block;margin-top:12px;max-width:100%">
+      <g stroke="rgba(255,255,255,.16)" stroke-dasharray="2 4"><path d="M10 20H316"></path><path d="M10 65H316"></path><path d="M10 110H316"></path></g>
+      <g font-family="Figtree, Arial" font-size="11" fill="#B3A6B4" text-anchor="middle">
+        <text x="32" y="140">M</text><text x="76" y="140">T</text><text x="120" y="140">W</text><text x="164" y="140">T</text><text x="208" y="140">F</text><text x="252" y="140">S</text><text x="296" y="140">S</text>
+      </g>
+      <rect x="20" y="106" width="24" height="4" rx="2" fill="#F8C4A4"></rect>
+      <rect x="64" y="106" width="24" height="4" rx="2" fill="#F8C4A4"></rect>
+      <rect x="108" y="65" width="24" height="45" rx="6" fill="#C4B5FD"></rect>
+      <rect x="152" y="20" width="24" height="90" rx="6" fill="#F48FB1"></rect>
+      <rect x="196" y="106" width="24" height="4" rx="2" fill="#F8C4A4"></rect>
+      <rect x="240" y="108" width="24" height="2" rx="1" fill="rgba(255,255,255,.16)"></rect>
+      <rect x="284" y="108" width="24" height="2" rx="1" fill="rgba(255,255,255,.16)"></rect>
+      <g font-family="Figtree, Arial" font-size="11" font-weight="700" text-anchor="middle" fill="#F4EFE6"><text x="120" y="58">1</text><text x="164" y="14">2</text></g>
+    </svg>
+    <p style="margin:6px 0 0;font-size:12.5px;color:#B3A6B4">Saturday and Sunday are off days in your work week.</p>
+  </section>
+
+  <section style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;padding:18px 16px">
+    <h2 style="margin:0;font-size:16px">When you got tired</h2>
+    <div role="img" aria-label="Tired moments by hour across your night shift, highest from 3 to 5 AM" style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;margin-top:12px">
+      <span style="height:34px;border-radius:6px;background:rgba(255,255,255,.11)"></span><span style="height:34px;border-radius:6px;background:rgba(255,255,255,.11)"></span><span style="height:34px;border-radius:6px;background:rgba(196,181,253,.28)"></span><span style="height:34px;border-radius:6px;background:rgba(196,181,253,.5)"></span><span style="height:34px;border-radius:6px;background:rgba(244,154,193,.75)"></span><span style="height:34px;border-radius:6px;background:rgba(244,154,193,.95)"></span><span style="height:34px;border-radius:6px;background:rgba(196,181,253,.45)"></span><span style="height:34px;border-radius:6px;background:rgba(255,255,255,.11)"></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#B3A6B4"><span>10 PM</span><span>2 AM</span><span>6 AM</span></div>
+    <p style="margin:10px 0 0;font-size:14.5px;font-weight:600">Most tired hour: 3 to 4 AM</p>
+  </section>
+
+  <section style="margin-top:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;padding:18px 16px">
+    <h2 style="margin:0;font-size:16px">What woke you up</h2>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;font-size:14px">
+      <div style="display:grid;grid-template-columns:80px minmax(0,1fr) 20px;gap:10px;align-items:center"><span>Blue light</span><div style="height:8px;border-radius:9px;background:rgba(255,255,255,.11);overflow:hidden"><div style="width:100%;height:100%;background:#A99BF0"></div></div><b style="text-align:right">2</b></div>
+      <div style="display:grid;grid-template-columns:80px minmax(0,1fr) 20px;gap:10px;align-items:center"><span>Mint mist</span><div style="height:8px;border-radius:9px;background:rgba(255,255,255,.11);overflow:hidden"><div style="width:50%;height:100%;background:#F5B5C8"></div></div><b style="text-align:right">1</b></div>
+      <div style="display:grid;grid-template-columns:80px minmax(0,1fr) 20px;gap:10px;align-items:center"><span>Voice</span><div style="height:8px;border-radius:9px;background:rgba(255,255,255,.11);overflow:hidden"><div style="width:0%;height:100%;background:#C4B5FD"></div></div><b style="text-align:right">0</b></div>
+      <div style="display:grid;grid-template-columns:80px minmax(0,1fr) 20px;gap:10px;align-items:center"><span>Alarm</span><div style="height:8px;border-radius:9px;background:rgba(255,255,255,.11);overflow:hidden"><div style="width:0%;height:100%;background:#F48FB1"></div></div><b style="text-align:right">0</b></div>
+    </div>
+    <p style="margin:12px 0 0;font-size:13px;color:#B3A6B4;line-height:1.4">The first step was enough 2 out of 3 times.</p>
+  </section>
+
+  <nav style="position:absolute;left:16px;right:16px;bottom:26px;display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;gap:4px;padding:6px;border-radius:99px;background:rgba(46,34,50,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.55)">
+      <a href="Home.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+      <a href="Trips.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"></path></svg>Trips</a>
+      <a href="Insights.dc.html" aria-current="page" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#F4EFE6;color:#241A26;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-8"></path></svg>Insights</a>
+    </div>
+    <a href="Route.dc.html" aria-label="Start trip" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#C4B5FD,#F9A8D4);color:#241A26;display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 0 6px rgba(196,181,253,.2)"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"></path></svg></a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

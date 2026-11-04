@@ -25,6 +25,17 @@ const DYN = {
     });
     draw();
   },
+  Name(root) {
+    const inp = root.querySelector('#inName'), next = root.querySelector('#nameNext');
+    try { inp.value = localStorage.getItem('bn-name') || ''; } catch (e) {}
+    const clean = () => inp.value.trim().slice(0, 20);
+    const paint = () => { const ok = !!clean(); next.setAttribute('aria-disabled', String(!ok)); next.style.opacity = ok ? 1 : 0.4; next.style.pointerEvents = ''; inp.style.borderColor = ok ? '#C4B5FD' : 'rgba(255,255,255,.18)'; };
+    inp.addEventListener('input', () => { try { localStorage.setItem('bn-name', clean()); } catch (e) {} paint(); if (window.BN_PROFILE) BN_PROFILE.save({ name: clean() }); });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && clean()) next.click(); });
+    next.addEventListener('click', (e) => { if (!clean()) { e.preventDefault(); e.stopPropagation(); inp.focus(); SFX.play('off'); } });
+    paint();
+    setTimeout(() => { if (root.isConnected && !clean()) inp.focus({ preventScroll: true }); }, 400);
+  },
   Ladder(root) {
     root.querySelectorAll('[data-tog]').forEach((b) => {
       const paint = () => { const on = b.getAttribute('aria-checked') === 'true'; b.style.background = on ? '#C4B5FD' : 'rgba(255,255,255,.11)'; b.firstElementChild.style.transform = 'translateX(' + (on ? 20 : 0) + 'px)'; };

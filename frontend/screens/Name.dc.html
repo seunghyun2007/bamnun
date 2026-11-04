@@ -47,14 +47,10 @@ body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d
   <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center;text-wrap:balance">What should Ollie call you?</h1>
   <div style="margin-top:22px;display:flex;flex-direction:column;gap:8px">
     <label for="inName" style="font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4;padding-left:4px">Your name</label>
-    <input id="inName" autocomplete="given-name" placeholder="e.g. Minsu" value="Siroj" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid #C4B5FD;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
-  </div>
-  <div style="margin-top:22px;display:flex;flex-direction:column;gap:8px">
-    <label for="inOwl" style="font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4;padding-left:4px">Your owl's name</label>
-    <input id="inOwl" value="Ollie" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid transparent;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
+    <input id="inName" autocomplete="given-name" placeholder="e.g. Minsu" value="" maxlength="20" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid #C4B5FD;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
   </div>
   <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
-    <a href="Vehicle.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    <a id="nameNext" href="Vehicle.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
   </div>
 </div>
 </x-dc>

@@ -86,6 +86,8 @@ const KO=/*__KO__*/;
 const DAYS=["M","T","W","T","F","S","S"],KDAYS=["월","화","수","목","금","토","일"];
 let LANG="en";try{LANG=localStorage.getItem("bn-lang")||"en"}catch(e){}
 window.BN_LANG=()=>LANG;
+window.BN_NAME=()=>{let n="";try{n=(localStorage.getItem("bn-name")||"").trim()}catch(e){}return n||BN_T("Driver");};
+function fillNames(node){const w=document.createTreeWalker(node,4);let t;const nm=BN_NAME();while(t=w.nextNode())if(t.data.includes("{name}"))t.data=t.data.split("{name}").join(nm);}
 window.BN_T=(s,v)=>{let o=LANG==="ko"&&KO.text[s]||s;if(v)for(const k in v)o=o.split("{"+k+"}").join(v[k]);return o;};
 const phone=document.getElementById("phone");
 let cur=null,ret=null;
@@ -127,6 +129,7 @@ function go(name,opts={}){
   const root=document.createElement("div"); root.id="s-"+name;
   root.appendChild(document.getElementById("t-"+name).content.cloneNode(true));
   translate(root);
+  fillNames(root);
   sc.appendChild(root); phone.appendChild(sc);
   if(opts.keepScroll&&old)sc.scrollTop=old.scrollTop;
   cur=name;

@@ -1,6 +1,6 @@
 import re, json, base64, sys, os
 D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
-ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Voice","Ladder","Privacy","Permissions","Pair","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
+ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Ladder","Privacy","Permissions","Contact","Pair","Voice","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
 BLOB = {
  "bb73e1b39dabf3b35d036c39c5cdd1c1":"idle","be4e6418a0a3f416c7aca695e46d9667":"hello","4af7029f76e815daac75989af4aba986":"thinking",
  "fa546fa5fa5789063fdee0a2beebd5b2":"sleepy","57efe0ac85b17a5178828ea07e413fad":"wake","f6f6ffbf7935cbf40e40727534b41f50":"celebrate",
@@ -71,6 +71,8 @@ for name in ORDER:
 shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="utf-8").read()
 dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
 live = open(os.path.join(os.path.dirname(__file__), "live.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "api.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "overlay.js"), encoding="utf-8").read()
 html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
              .replace("/*__LIVE__*/", live)
              .replace("<!--__TEMPLATES__-->", "\n".join(tpls))

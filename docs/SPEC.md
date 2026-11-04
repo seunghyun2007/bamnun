@@ -301,7 +301,7 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 - A simulated driver (`tools/sim_server.py`), so the app can be developed without a camera.
 - A **demo mode** inside the app: a simulated 2½-minute drive played by the page itself, so the live screens can be seen with nothing installed. It starts only when the app is opened as a file (`frontend/Bamnun_app.html`) or with `?demo` in the address. The connection chip says "Demo · simulated driver", so the real app never shows made-up numbers when it loses the Pi.
 
-**Device side done** (the app screens are connected next):
+**Device side done**, and the app screens are connected to it (name, vehicle, work week, ladder, permissions in the browser, emergency contact, device check, voice language, guided calibration, Home, Trips, Insights, Settings, the emergency countdown), in English and Korean. Still to do: Bluetooth search and Wi-Fi join (native), the Kakao route, and native notifications.
 - Step 3: profile and settings in SQLite on the Pi (`runs/bamnun.db`), `GET/PUT /api/profile` and `/api/settings`, vehicle defaults, and the settings applied to the running ladder (mint and voice toggles, sensitivity, volume, CO₂ prompt). The owl is always called Ollie: there is no owl-name field.
 - Step 5: the guided calibration and device test, steps 1–8 of section 8, with the ladder still running on the old calibration until the eyes-closed check passes. The ladder holds while the driver closes their eyes on request.
 - Step 6, device side: every line of section 6 and 8 in English and Korean (`src/bamnun/voice.py`), `POST /api/say/{line}`, voice-language ladder clips (`assets/voice/{lang}/`), and `tools/record_prompts.py --lang en|ko`.

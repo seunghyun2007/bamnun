@@ -20,8 +20,10 @@ Double-click `Bamnun_app.html`. It opens in any browser and plays a simulated dr
 - `build/` holds the build files:
   - `build.py` turns the screens into one HTML file.
   - `shell.html` is the phone frame, navigation, sound effects (Web Audio) and the Korean/English switching.
-  - `dyn.js` holds the interactive screens: work week, Ollie's style, wake-up ladder, device search and settings.
+  - `dyn.js` holds the interactive screens: name, vehicle, work week, wake-up ladder, permissions, emergency contact, device search, Ollie's voice language, guided calibration, Home, Trips, Insights and Settings.
   - `live.js` connects to the device's `/ws` and paints the live values; it also holds the demo driver.
+  - `api.js` is the device API for the screens: the profile and settings cached on the phone and sent to the device (queued while offline), REST calls, and the device's events (`say`, `calibration`, `trip`, `reminder`, `emergency`...). In the demo it answers by itself, with sample trips.
+  - `overlay.js` shows things over any screen: the emergency countdown, and short notes for Ollie's lines, break reminders and saved trips.
   - `ko.json` is the Korean translation, as an English → Korean text map. The `html` part covers sentences that contain bold or line breaks. Text with `{n}`-style placeholders is filled in by `BN_T`.
 
 ## Live data
@@ -70,6 +72,8 @@ npx cap open ios
 
 ## Notes
 
-- Screen order and navigation are set by `ORDER` in `build.py`.
+- Screen order and navigation are set by `ORDER` in `build.py`. Onboarding follows the spec: Welcome → Meet → Name → Vehicle → Work week → Wake-up ladder → Privacy → Permissions → Emergency contact → Connect device → Ollie's voice → Calibrate → All set.
+- A setup screen opened from Settings, Home or Camera goes back there when it's done, not on through onboarding.
+- **Emergency calls:** the app never dials 119, 112 or any real emergency number. The optional last step opens the phone's dialer with no number filled in, and Demo mode (on by default) sends nothing at all. Settings → Safety → "Try the emergency screen" shows it safely.
 - To add a translation, add the English text exactly as it appears on screen to `ko.json`.
 - Language (`bn-lang`), sound (`bn-sound`), sensitivity (`bn-sens`) and the device address (`bn-pi`) are saved in localStorage.

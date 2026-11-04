@@ -38,10 +38,9 @@ body{margin:0}a{color:#C4B5FD}a:hover{color:#F4EFE6}button{font:inherit;color:in
     <div aria-hidden="true" style="position:absolute;top:180px;left:30px;width:2px;height:2px;border-radius:50%;background:#fff;opacity:.4"></div>
     <div style="position:relative;display:flex;justify-content:space-between;align-items:flex-start">
       <div>
-        <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:32px;line-height:1">Good evening,<br>{name}</h1>
+        <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:32px;line-height:1" id="hHello">Good evening,<br>{name}</h1>
         <div style="display:flex;gap:6px;margin-top:8px;align-items:center;font-size:13px;color:#B3A6B4;font-weight:600">
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2A6 6 0 1 0 13.8 10 4.8 4.8 0 0 1 10.5 2.2z" fill="#C4B5FD"></path></svg><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2A6 6 0 1 0 13.8 10 4.8 4.8 0 0 1 10.5 2.2z" fill="#C4B5FD"></path></svg><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2A6 6 0 1 0 13.8 10 4.8 4.8 0 0 1 10.5 2.2z" fill="#C4B5FD"></path></svg><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2A6 6 0 1 0 13.8 10 4.8 4.8 0 0 1 10.5 2.2z" fill="#C4B5FD"></path></svg><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 2.2A6 6 0 1 0 13.8 10 4.8 4.8 0 0 1 10.5 2.2z" fill="rgba(255,255,255,.16)"></path></svg>
-          <span>4 rested nights</span>
+          <span id="hShift">Night shift</span>
         </div>
         <div style="display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:8px 12px 8px 10px;border-radius:99px;background:rgba(23,17,26,.6);font-size:13px;font-weight:600"><span data-live="conn-dot" style="width:8px;height:8px;border-radius:50%;background:#F8C4A4;box-shadow:0 0 0 4px rgba(123,216,143,.2)"></span><span data-live="conn">Bamnun 3F2A connected</span></div>
       </div>
@@ -106,38 +105,7 @@ body{margin:0}a{color:#C4B5FD}a:hover{color:#F4EFE6}button{font:inherit;color:in
     </section>
 
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 4px 0"><h2 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:22px;font-weight:800">Last trip</h2><a href="Trips.dc.html" style="font-weight:600;font-size:14px;text-decoration:none">All trips</a></div>
-    <section style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;overflow:hidden">
-      <div style="display:flex;gap:12px;align-items:center;padding:16px 16px 6px">
-        <span style="position:relative;width:42px;height:42px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.11);overflow:hidden"><img src="/_blob/e5ad4d3fd744c75caea7c6c78782a441" alt="" style="position:absolute;width:64px;left:-11px;top:-6px"></span>
-        <div style="flex-grow:1"><b style="display:block;font-size:15px">{name}</b><span style="font-size:12.5px;color:#B3A6B4">Yesterday · 11:40 PM · Gyeongbu Expressway</span></div>
-        <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4;background:rgba(255,255,255,.11);padding:4px 8px;border-radius:99px">Sample</span>
-      </div>
-      <h3 style="margin:6px 16px 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">Incheon to Daejeon</h3>
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:12px 16px 14px">
-        <div><span style="display:block;font-size:12px;color:#B3A6B4">Distance</span><b style="font-size:17px;white-space:nowrap">168 km</b></div>
-        <div><span style="display:block;font-size:12px;color:#B3A6B4">Time</span><b style="font-size:17px;white-space:nowrap">2h 14m</b></div>
-        <div><span style="display:block;font-size:12px;color:#B3A6B4">Alerts</span><b style="font-size:17px">2</b></div>
-        <div><span style="display:block;font-size:12px;color:#B3A6B4">Breaks</span><b style="font-size:17px">1</b></div>
-      </div>
-      <svg width="358" viewBox="0 0 360 200" role="img" aria-label="Route map from Incheon to Daejeon with two alert points" style="display:block;width:100%;height:auto;background:rgba(22,12,20,.5)">
-        <rect width="360" height="200" fill="rgba(22,12,20,.5)"></rect>
-        <path d="M0 40 C40 50 50 80 30 110 S10 170 0 190 Z" fill="rgba(168,132,232,.18)"></path>
-        <path d="M200 0 C190 30 210 60 240 70 S300 90 360 80 V0Z" fill="rgba(244,164,128,.12)"></path>
-        <path d="M120 200 C140 170 180 160 210 175 S260 200 270 200Z" fill="rgba(244,164,128,.12)"></path>
-        <g stroke="rgba(255,255,255,.06)" stroke-width="1.2" fill="none"><path d="M0 70H360M0 120H360M0 160H360M60 0V200M150 0V200M250 0V200M320 0V200"></path><path d="M0 20 L360 140M40 200 L300 0"></path></g>
-        <g stroke="rgba(255,255,255,.12)" stroke-width="3" fill="none" stroke-linecap="round"><path d="M10 150 C80 140 120 100 170 96 S260 60 350 40"></path><path d="M90 200 C110 150 130 110 190 70 S240 20 260 0"></path></g>
-        <path d="M34 154 C70 146 98 128 126 112 S176 96 206 86 S270 60 322 44" fill="none" stroke="#F49AC1" stroke-width="9" stroke-linecap="round" opacity=".2"></path>
-        <path d="M34 154 C70 146 98 128 126 112 S176 96 206 86 S270 60 322 44" fill="none" stroke="#F49AC1" stroke-width="4" stroke-linecap="round"></path>
-        <circle cx="34" cy="154" r="7" fill="#F8C4A4" stroke="rgba(22,12,20,.5)" stroke-width="3"></circle>
-        <g transform="translate(322 44)"><circle r="9" fill="#F4EFE6" stroke="rgba(22,12,20,.5)" stroke-width="3"></circle><path d="M-4 -4h4v4h-4zM0 0h4v4h-4z" fill="rgba(22,12,20,.5)"></path></g>
-        <circle cx="126" cy="112" r="11" fill="#A99BF0" opacity=".25"></circle><circle cx="126" cy="112" r="6" fill="#A99BF0" stroke="rgba(22,12,20,.5)" stroke-width="2"></circle>
-        <circle cx="236" cy="72" r="12" fill="#C4B5FD" opacity=".25"></circle><circle cx="236" cy="72" r="6.5" fill="#C4B5FD" stroke="rgba(22,12,20,.5)" stroke-width="2"></circle>
-        <rect x="138" y="118" width="74" height="20" rx="10" fill="#241A26" opacity=".85"></rect><text x="175" y="132" fill="#A99BF0" text-anchor="middle" font-family="Figtree, Arial" font-size="10.5" font-weight="700">Glance away</text>
-        <rect x="184" y="40" width="82" height="20" rx="10" fill="#241A26" opacity=".85"></rect><text x="225" y="54" fill="#C4B5FD" text-anchor="middle" font-family="Figtree, Arial" font-size="10.5" font-weight="700">Stage 1 · light</text>
-        <g font-family="Figtree, Arial" font-size="10" fill="#B3A6B4" font-weight="600"><text x="20" y="178">Incheon</text><text x="300" y="30">Daejeon</text><text x="150" y="190">Rest stop · Anseong</text></g>
-      </svg>
-      <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.16);font-size:13.5px;color:#B3A6B4"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F8C4A4" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12l5 5L20 6"></path></svg><span>Longest alert-free stretch <b style="color:#F4EFE6">1 h 32 m</b></span></div>
-    </section>
+    <section id="hTrip" style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:22px;overflow:hidden"></section>
   </div>
 
   <nav style="position:absolute;left:16px;right:16px;bottom:26px;display:flex;align-items:center;justify-content:space-between">

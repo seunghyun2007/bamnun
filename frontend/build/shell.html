@@ -86,7 +86,7 @@ const KO=/*__KO__*/;
 const DAYS=["M","T","W","T","F","S","S"],KDAYS=["월","화","수","목","금","토","일"];
 let LANG="en";try{LANG=localStorage.getItem("bn-lang")||"en"}catch(e){}
 window.BN_LANG=()=>LANG;
-window.BN_NAME=()=>{let n="";try{n=(localStorage.getItem("bn-name")||"").trim()}catch(e){}return n||BN_T("Driver");};
+window.BN_NAME=()=>{let n=window.BN_API?(BN_API.profile().name||""):"";if(!n)try{n=localStorage.getItem("bn-name")||""}catch(e){}n=n.trim();return n||BN_T("Driver");};
 function fillNames(node){const w=document.createTreeWalker(node,4);let t;const nm=BN_NAME();while(t=w.nextNode())if(t.data.includes("{name}"))t.data=t.data.split("{name}").join(nm);}
 window.BN_T=(s,v)=>{let o=LANG==="ko"&&KO.text[s]||s;if(v)for(const k in v)o=o.split("{"+k+"}").join(v[k]);return o;};
 const phone=document.getElementById("phone");
@@ -134,11 +134,23 @@ function go(name,opts={}){
   if(opts.keepScroll&&old)sc.scrollTop=old.scrollTop;
   cur=name;
   try{ history.replaceState(null,"","#"+name); }catch(e){}
-  if(DYN[name]) DYN[name](root,{go,setLang,rerender:()=>go(name,{instant:true,keepScroll:true})});
+  if(DYN[name]) try{ DYN[name](root,{go,forward,setLang,rerender:()=>go(name,{instant:true,keepScroll:true})}); }catch(err){ console.error(name,err); }
   if(window.BN_LIVE) BN_LIVE.paint();
   if(name==="Plan") setTimeout(()=>SFX.play("success"),350);
 }
 window.BN_GO=go;
+// A setup screen opened from the app (Settings, Home, Camera...) goes back
+// there when it's done, instead of carrying on through onboarding.
+const APP=["Home","Camera","Trips","Insights","Settings"];
+function route(to,isBack){
+  if(isBack&&ret&&cur!==ret){to=ret;ret=null;}
+  else if(!isBack&&ret&&!APP.includes(cur)&&!APP.includes(to)){to=ret;ret=null;}
+  else if(APP.includes(cur)&&!APP.includes(to))ret=cur;
+  else if(!isBack)ret=null;
+  return to;
+}
+function forward(to){ to=route(to,false); SFX.play("nav"); go(to); }
+window.BN_FORWARD=forward;
 phone.addEventListener("click",e=>{
   SFX.unlock();
   const owl=e.target.closest(".olw");
@@ -149,21 +161,19 @@ phone.addEventListener("click",e=>{
   if(a){
     e.preventDefault();
     const isBack=a.getAttribute("aria-label")==="Back"||a.dataset.back!==undefined;
-    let to=a.dataset.go;
-    if(isBack&&ret&&cur!==ret){to=ret;ret=null;}
-    else if(cur==="Settings"&&!isBack)ret="Settings";
-    else if(!isBack)ret=null;
+    const to=route(a.dataset.go,isBack);
     if(!lang)SFX.play(a.getAttribute("aria-label")==="Start trip"?"start":(isBack||ORDER.indexOf(to)<ORDER.indexOf(cur)?"back":"nav"));
     go(to,{back:isBack});
     return;
   }
   const b=e.target.closest("button");
   if(b){ if(b.getAttribute("role")==="switch")setTimeout(()=>SFX.play(b.getAttribute("aria-checked")==="true"?"on":"off"),0);
-         else if(b.hasAttribute("aria-pressed")||b.dataset.p||b.dataset.d||b.dataset.c)SFX.play("select"); else SFX.play("tap"); }
+         else if(b.hasAttribute("aria-pressed")||b.dataset.p||b.dataset.d||b.dataset.c||b.dataset.veh||b.dataset.vl)SFX.play("select"); else SFX.play("tap"); }
 });
 phone.addEventListener("submit",e=>e.preventDefault());
 const start=(location.hash||"").slice(1);
-go(ORDER.includes(start)?start:"Main",{instant:true});
+// After the rest of this script (live data, API) has loaded.
+setTimeout(()=>go(ORDER.includes(start)?start:"Main",{instant:true}),0);
 })();
 /*__LIVE__*/
 </script>

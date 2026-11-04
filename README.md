@@ -63,7 +63,8 @@ what the detector measures. To see real detection, run the device (section 4).
 | CO₂ reading and "open the window" prompt | Done. Needs `smbus2` on the Pi |
 | Demo mode on the device (keys fire each stage) | Done |
 | **Live data server** (`--serve`): app, `/api/health`, `/ws` | **Done.** Tested |
-| **Device API for the phone**: profile and settings saved on the Pi, guided calibration and device test, Ollie's lines in English and Korean, trips, insights, break reminder, emergency trigger | **Done, new.** Tested; the app screens are being connected to it |
+| **Device API for the phone**: profile and settings saved on the Pi, guided calibration and device test, Ollie's lines in English and Korean, trips, insights, break reminder, emergency trigger | **Done, new.** Tested |
+| **App screens connected to the device**: onboarding, voice language, guided calibration, Trips, Insights, Settings, emergency countdown (never dials a real emergency number) | **Done, new.** Tested in a browser, English and Korean |
 | **Live Home and Camera screens** in the app | **Done, new.** Tested in a browser |
 | Simulated driver, served (`tools/sim_server.py`) and in-app demo | **Done, new** |
 | Android and iOS app projects (Capacitor) | Created, not yet compiled (needs Android Studio, and a Mac for iOS) |

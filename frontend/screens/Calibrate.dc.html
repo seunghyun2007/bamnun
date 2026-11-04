@@ -2,49 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Calibrate your eyes</title>
+<title>Calibrate</title>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
-<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}</style>
+<style>
+body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d6f7f}
+.olw{position:relative;aspect-ratio:600/640}
+.ol-shadow{position:absolute;left:24%;right:24%;bottom:2%;height:5%;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(2px)}
+.ol-clip{position:absolute;inset:0}
+.ol-enter{position:absolute;inset:0;transform-origin:50% 96%;animation:olIn .8s cubic-bezier(.22,1,.36,1) both}
+.ol-loop{position:absolute;inset:0;transform-origin:50% 96%}
+.ol-loop img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ol-eye{position:absolute;width:18.6%;height:17.44%;border-radius:50%;overflow:hidden}
+.ol-lid{position:absolute;left:-4%;right:-4%;top:-4%;height:108%;background:#714330;border-bottom:.22em solid #1b1320;border-radius:0 0 45% 45%/0 0 22% 22%;transform:translateY(-112%);animation:olBlink 5s cubic-bezier(.4,0,.2,1) infinite}
+.a-think{animation:olThink 3.8s ease-in-out infinite}
+.ol-fx{position:absolute;pointer-events:none;line-height:1;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;color:#F4EFE6}
+.fx-q{animation:olQ 2.4s ease-in-out infinite}
+@keyframes olIn{0%{opacity:0;transform:translateY(14%) scale(.5,.42)}38%{opacity:1;transform:translateY(-5%) scale(1.07,.95)}58%{transform:translateY(0) scale(.95,1.05)}78%{transform:scale(1.02,.98)}100%{opacity:1;transform:none}}
+@keyframes olBlink{0%,90%,100%{transform:translateY(-112%)}93%,94.5%{transform:translateY(0)}}
+@keyframes olThink{0%,100%{transform:rotate(0) scale(1,1)}40%{transform:rotate(-3.5deg) scale(.99,1.015)}70%{transform:rotate(-2deg) scale(1,1)}}
+@keyframes olQ{0%,100%{transform:translateY(0) rotate(-10deg)}50%{transform:translateY(-.35em) rotate(10deg)}}
+
+.vc-card{position:relative;border-radius:22px;padding:16px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;border:2px solid transparent;transition:all .25s}
+.vc-glow{box-shadow:0 0 0 4px rgba(196,181,253,.35),0 0 34px rgba(196,181,253,.55)}
+.cal-ring{transition:stroke-dasharray .4s linear}
+.cal-row{display:flex;align-items:center;gap:12px;padding:7px 14px;font-size:14.5px;font-weight:600;color:#B3A6B4;transition:color .2s}
+.cal-row+.cal-row{border-top:1px solid rgba(255,255,255,.07)}
+.cal-dot{width:24px;height:24px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.11);font-size:13px;font-weight:800;color:#241A26}
+@keyframes calPulse{0%,100%{box-shadow:0 0 0 0 rgba(196,181,253,.5)}50%{box-shadow:0 0 0 6px rgba(196,181,253,0)}}
+.cal-now .cal-dot{background:#C4B5FD;animation:calPulse 1.4s ease-in-out infinite}
+</style>
 </helmet>
-<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
-    <a href="Pair.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:100%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+    <a href="Voice.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:92%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
   </div>
-  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center;text-wrap:balance">Let Ollie learn your eyes</h1>
-  <p style="margin:12px auto 0;max-width:30ch;text-align:center;color:#B3A6B4;font-size:15.5px;line-height:1.45">Sit in your driving position. Look straight ahead for 12 seconds and blink normally.</p>
-  <div style="position:relative;width:250px;height:250px;margin:20px auto 0;display:grid;place-items:center">
-    <svg width="250" height="250" viewBox="0 0 250 250" aria-hidden="true" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="125" cy="125" r="118" fill="none" stroke="rgba(255,255,255,.11)" stroke-width="8"></circle><circle cx="125" cy="125" r="118" fill="none" stroke="#C4B5FD" stroke-width="8" stroke-linecap="round" stroke-dasharray="741.4" stroke-dashoffset="430"></circle></svg>
-    <div style="position:relative;width:214px;height:214px;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,#3d4a42 0%,#1e2620 70%)">
-      <svg width="214" height="214" viewBox="0 0 214 214" role="img" aria-label="Infrared camera view with face landmarks">
-        <ellipse cx="107" cy="104" rx="56" ry="70" fill="#56645a"></ellipse>
-        <path d="M51 96 C 50 40, 164 40, 163 96 C 160 70, 140 52, 107 52 C 74 52, 54 70, 51 96Z" fill="#2c352f"></path>
-        <rect x="60" y="170" width="94" height="60" rx="30" fill="#46524a"></rect>
-        <ellipse cx="85" cy="102" rx="11" ry="5" fill="#1b211d"></ellipse><ellipse cx="129" cy="102" rx="11" ry="5" fill="#1b211d"></ellipse>
-        <circle cx="87" cy="101" r="1.6" fill="#fff" opacity=".9"></circle><circle cx="131" cy="101" r="1.6" fill="#fff" opacity=".9"></circle>
-        <path d="M100 128 q7 4 14 0" stroke="#2c352f" stroke-width="3" fill="none" stroke-linecap="round"></path>
-        <g fill="#F5B5C8" opacity=".9"><circle cx="72" cy="102" r="1.5"></circle><circle cx="78" cy="96" r="1.5"></circle><circle cx="86" cy="94" r="1.5"></circle><circle cx="94" cy="97" r="1.5"></circle><circle cx="98" cy="102" r="1.5"></circle><circle cx="92" cy="107" r="1.5"></circle><circle cx="84" cy="108" r="1.5"></circle><circle cx="76" cy="106" r="1.5"></circle><circle cx="116" cy="102" r="1.5"></circle><circle cx="120" cy="97" r="1.5"></circle><circle cx="128" cy="94" r="1.5"></circle><circle cx="136" cy="96" r="1.5"></circle><circle cx="142" cy="102" r="1.5"></circle><circle cx="138" cy="106" r="1.5"></circle><circle cx="130" cy="108" r="1.5"></circle><circle cx="122" cy="107" r="1.5"></circle><circle cx="107" cy="118" r="1.5"></circle><circle cx="100" cy="130" r="1.5"></circle><circle cx="114" cy="130" r="1.5"></circle><circle cx="66" cy="130" r="1.5"></circle><circle cx="148" cy="130" r="1.5"></circle><circle cx="80" cy="160" r="1.5"></circle><circle cx="134" cy="160" r="1.5"></circle><circle cx="107" cy="168" r="1.5"></circle></g>
-        <rect x="0" y="92" width="214" height="34" fill="#F5B5C8" opacity=".12"></rect>
+  <div style="display:flex;justify-content:center;position:relative;margin-top:-4px">
+    <div style="position:relative;width:150px;height:150px">
+      <svg viewBox="0 0 170 170" width="150" height="150" aria-hidden="true" style="position:absolute;inset:0;transform:rotate(-90deg)">
+        <circle cx="85" cy="85" r="78" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="8"></circle>
+        <circle id="cRing" class="cal-ring" cx="85" cy="85" r="78" fill="none" stroke="url(#cGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 490"></circle>
+        <defs><linearGradient id="cGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C4B5FD"></stop><stop offset="1" stop-color="#F9A8D4"></stop></linearGradient></defs>
       </svg>
+      <div class="olw" style="position:absolute;left:23px;top:20px;width:104px;font-size:10.4px">
+        <div class="ol-shadow"></div>
+        <div class="ol-clip"><div class="ol-enter"><div class="ol-loop a-think">
+          <img id="cOwl" src="/_blob/4af7029f76e815daac75989af4aba986" alt="Ollie the owl thinking">
+        </div></div></div>
+      </div>
+      <span id="cCount" style="position:absolute;right:-8px;bottom:6px;min-width:44px;padding:5px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:14px;text-align:center;opacity:0;transition:opacity .2s"></span>
     </div>
-    <span style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);background:#F4EFE6;color:#241A26;border-radius:99px;padding:6px 14px;font-weight:700;font-size:14px;white-space:nowrap">7 s left</span>
+    <p id="cSay" style="position:absolute;left:50%;top:-6px;transform:translateX(18px);width:max-content;max-width:190px;margin:0;background:#F4EFE6;color:#241A26;border-radius:16px 16px 16px 4px;padding:8px 12px;font-weight:700;font-size:13px;line-height:1.25;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .25s;left:auto;right:0;top:-10px;transform:none;max-width:150px"></p>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:26px">
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">2</b><span style="font-size:12px;color:#B3A6B4">Blinks</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">0.27</b><span style="font-size:12px;color:#B3A6B4">Open-eye level</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">2°</b><span style="font-size:12px;color:#B3A6B4">Head angle</span></div>
+  <h1 id="cTitle" style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:34px;line-height:1.02;text-align:center;text-wrap:balance;font-size:30px;margin-top:8px">Let Ollie learn your eyes</h1>
+  <p id="cSub" style="margin:6px auto 0;max-width:32ch;text-align:center;color:#B3A6B4;font-size:15px;line-height:1.4;min-height:42px">About a minute. Sit in your driving position, then tap Start.</p>
+  <div id="cAsk" style="display:none;gap:10px;justify-content:center;margin-top:10px">
+    <button type="button" data-ans="yes" style="min-width:110px;padding:13px 20px;border:0;border-radius:99px;background:#7BD88F;color:#241A26;font-weight:800;font-size:15.5px">Yes</button>
+    <button type="button" data-ans="no" style="min-width:110px;padding:13px 20px;border:0;border-radius:99px;background:rgba(255,255,255,.14);color:#F4EFE6;font-weight:800;font-size:15.5px">No</button>
   </div>
-  <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#B3A6B4;font-size:13.5px;line-height:1.4;display:flex;gap:10px;align-items:flex-start">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F8C4A4" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg>
-    <span>Ollie treats your eyes as closed at <b style="color:#F4EFE6">65% of your own open level</b>, so naturally narrow eyes are never mistaken for sleep.</span>
-  </div>
-  <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
-    <a href="Plan.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+  <div id="cList" style="margin-top:12px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"></div>
+  <p id="cHint" style="margin:8px 4px 0;font-size:13px;color:#B3A6B4;line-height:1.4;text-align:center"></p>
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:18px 22px 34px;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(to top,rgba(23,17,26,.95) 45%,rgba(23,17,26,0))">
+    <button type="button" id="cGo" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5);border:0">Start</button>
+    <a id="cLater" href="Plan.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14.5px;padding:6px 10px;text-decoration:none">Do this later</a>
   </div>
 </div>
 </x-dc>

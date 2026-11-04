@@ -40,11 +40,13 @@
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         tz_min: -new Date().getTimezoneOffset() }));
       paint();
+      if (window.BN_API) BN_API.onConnect();
     };
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch (er) { return; }
       if (m.type === "snapshot") last = m;
       else if (m.type === "alert" && last) last = Object.assign({}, last, { stage: m.stage, stage_name: m.stage_name });
+      if (m.type !== "snapshot" && window.BN_API) BN_API.emit(m);
       paint();
     };
     ws.onclose = () => { conn = "closed"; paint(); later(); };
@@ -217,6 +219,9 @@
     }
   }
 
-  window.BN_LIVE = { paint, state: () => last, demo: DEMO };
+  window.BN_LIVE = { paint, state: () => last, demo: DEMO, address: piAddress,
+    connected: () => conn === "open" && !DEMO,
+    // Point the app at another device (Settings, or a found device).
+    use: (addr) => { try { localStorage.setItem("bn-pi", addr); } catch (e) {} if (ws) try { ws.close(); } catch (e) {} } };
   if (DEMO) demo(); else connect();
 })();

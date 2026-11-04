@@ -18,7 +18,7 @@ from bamnun.features import FeatureFrame  # noqa: E402
 from bamnun.predictor import (  # noqa: E402
     RestPlanner, theil_sen_slope, two_process_alertness,
 )
-from bamnun.state import StateEstimator, _ramp  # noqa: E402
+from bamnun.state import COMPONENTS, StateEstimator, _ramp  # noqa: E402
 
 
 STATE_CFG = {
@@ -32,6 +32,14 @@ STATE_CFG = {
     ],
     "recovery_hysteresis": 0.08,
     "no_face_grace_s": 1.5,
+    # These tests pin the level mechanics (dwell, hysteresis, ladder) on an
+    # instantaneous score, with the sub-score ranges they were written
+    # against. The smoothing and the newer signals have their own tests in
+    # tests/test_gradual.py.
+    "score_rise_tau_s": 0.0,
+    "score_fall_tau_s": 0.0,
+    "ranges": {"perclos": [0.05, 0.30], "blink_duration": [0.15, 0.45],
+               "microsleep": [0.0, 2.0], "yawn": [0.0, 12.0], "head_nod": [2.0, 10.0]},
 }
 
 ALERT_CFG = {
@@ -99,8 +107,8 @@ def test_component_breakdown_is_exposed():
     """The poster needs per-term contributions, so they must be reported."""
     est = StateEstimator(STATE_CFG)
     s = est.update(ff(t=1.0, perclos=0.175), calibrated=True)
-    assert set(s.components) == {"perclos", "blink_duration", "microsleep",
-                                 "yawn", "head_nod"}
+    assert set(s.components) == set(COMPONENTS)
+    assert set(s.signals) == set(COMPONENTS)
     assert s.components["perclos"] == pytest.approx(0.5, abs=1e-6)
     assert s.score == pytest.approx(0.35 * 0.5, abs=1e-6)
 

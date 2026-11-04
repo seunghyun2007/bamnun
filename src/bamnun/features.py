@@ -938,17 +938,51 @@ class FeatureExtractor:
         self.perclos_fraction = float(features_cfg.get("perclos_baseline_fraction", 0.80))
         self.calibrator = Calibrator(calib_cfg)
         self.calibration = Calibration()
+        self.candidate: Optional[Calibration] = None
+        self.hold = False
 
     # -- calibration passthrough ------------------------------------------- #
 
-    def start_calibration(self, t: float) -> None:
+    def start_calibration(self, t: float, hold: bool = False) -> None:
+        """Start a calibration.
+
+        ``hold`` is the guided recalibration from the phone (SPEC.md,
+        section 8): with a calibration already in place, detection carries on
+        with the old one while the new one is measured, and the result waits
+        in ``candidate`` until the eyes-closed check passes and the caller
+        commits it. Without a calibration to fall back on, ``hold`` changes
+        nothing: there is nothing to keep running on.
+        """
+        self.hold = bool(hold and self.calibration.complete)
+        self.candidate = None
         self.calibrator.start(t)
-        self.ear_ewma.reset()
-        self.blink.reset()
-        self.perclos_window.clear()
+        if not self.hold:
+            self.ear_ewma.reset()
+            self.blink.reset()
+            self.perclos_window.clear()
+
+    def cancel_calibration(self) -> None:
+        """Stop measuring; whatever calibration was in place stays."""
+        self.calibrator._t0 = None
+        self.candidate = None
+        self.hold = False
+
+    def commit_candidate(self) -> bool:
+        if self.candidate is None:
+            return False
+        self.calibration = self.candidate
+        self.candidate = None
+        self.hold = False
+        return True
 
     @property
     def calibrating(self) -> bool:
+        """Calibrating with no usable baseline: detection is paused."""
+        return self.calibrator.active and not self.hold
+
+    @property
+    def measuring(self) -> bool:
+        """A calibration is being measured, paused or not."""
         return self.calibrator.active
 
     def set_calibration(self, cal: Calibration) -> None:
@@ -975,7 +1009,11 @@ class FeatureExtractor:
             self.calibrator.feed(t, ear_raw, mar, pose, gaze, iod)
             cal = self.calibrator.finish(t)
             if cal is not None:
-                self.calibration = cal
+                if self.hold:
+                    self.candidate = cal
+                else:
+                    self.calibration = cal
+        if self.calibrator.active and not self.hold:
             # During calibration report raw values and no alarms.
             return FeatureFrame(
                 t=t, face_found=True, ear_raw=ear_raw, ear=ear_raw,

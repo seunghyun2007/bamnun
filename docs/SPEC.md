@@ -295,11 +295,18 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 8. Live Home and Camera screens, trips, insights (from the earlier plan).
 
 **Done early** (branch `live-camera`), viewed in a browser rather than the Capacitor app:
-- Step 2: the Pi server, `/api/health`, and the `/ws` snapshot and `alert` stream. Commands from the phone come later.
+- Step 2: the Pi server, `/api/health`, and the `/ws` snapshot and `alert` stream.
 - The live parts of step 8: the Home "Right now", camera tile, cab air and wake-up step cards, and the Camera screen, including the device's live video.
 - The Privacy screen says video goes only to the driver's phone and never online, matching section 0.
 - A simulated driver (`tools/sim_server.py`), so the app can be developed without a camera.
 - A **demo mode** inside the app: a simulated 2½-minute drive played by the page itself, so the live screens can be seen with nothing installed. It starts only when the app is opened as a file (`frontend/Bamnun_app.html`) or with `?demo` in the address. The connection chip says "Demo · simulated driver", so the real app never shows made-up numbers when it loses the Pi.
+
+**Device side done**, and the app screens are connected to it (name, vehicle, work week, ladder, permissions in the browser, emergency contact, device check, voice language, guided calibration, Home, Trips, Insights, Settings, the emergency countdown), in English and Korean. The Kakao route screen is built (map, search, directions through the device at `/api/route`, rest areas, Ollie's stop) and needs only the two keys in `frontend/.env`. Still to do: Bluetooth search and Wi-Fi join (native), and native notifications.
+- Step 3: profile and settings in SQLite on the Pi (`runs/bamnun.db`), `GET/PUT /api/profile` and `/api/settings`, vehicle defaults, and the settings applied to the running ladder (mint and voice toggles, sensitivity, volume, CO₂ prompt). The owl is always called Ollie: there is no owl-name field.
+- Step 5: the guided calibration and device test, steps 1–8 of section 8, with the ladder still running on the old calibration until the eyes-closed check passes. The ladder holds while the driver closes their eyes on request.
+- Step 6, device side: every line of section 6 and 8 in English and Korean (`src/bamnun/voice.py`), `POST /api/say/{line}`, voice-language ladder clips (`assets/voice/{lang}/`), and `tools/record_prompts.py --lang en|ko`.
+- Step 7b, device side: the emergency trigger (stage 4 for 20 s with no response), the `emergency` event, `emergency_check` on the speaker, and the outcome saved to the trip. The emergency switch is off and Demo is on by default. **This build never dials 119 or any real emergency number**: the phone only opens the dialer.
+- Step 8, device side: trips (auto start and end, breaks, alerts, alert-free time), `/api/trips`, `/api/insights`, and the break reminder.
 
 ## 11. Open questions
 

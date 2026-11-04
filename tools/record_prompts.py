@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Record the spoken prompts with the INMP441 and save them in assets/voice/.
+"""Record Ollie's lines with the INMP441 and save them in assets/voice/<lang>/.
 
-    python3 tools/record_prompts.py                    # every prompt, in order
-    python3 tools/record_prompts.py --only open_window # just one
-    python3 tools/record_prompts.py --list
+    python3 tools/record_prompts.py --lang en              # every line, in English
+    python3 tools/record_prompts.py --lang ko              # every line, in Korean
+    python3 tools/record_prompts.py --lang ko --only stage4
+    python3 tools/record_prompts.py --list                 # what's recorded, both languages
+
+The lines and their wording live in src/bamnun/voice.py (docs/SPEC.md,
+sections 2, 6 and 8), so the app, the device and this tool all agree.
 
 For each prompt: the phrase is printed, a chime plays, the mic records for
 --seconds, a second chime marks the end, and the clip is trimmed, levelled and
@@ -28,20 +32,36 @@ import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT_DIR = ROOT / "assets" / "voice"
+OUT_DIR = ROOT / "assets" / "voice"     # one folder per language below this
 BEEP = ROOT / "assets" / "chime.wav"
 CAPTURE = "plughw:CARD=sndrpigooglevoi,DEV=0"
 RATE = 48000
 
-# name -> (when it plays, suggested phrase). Say it however suits the demo.
-PROMPTS = {
-    "open_window": ("CO2 above the limit", "Open the window, the air is stale."),
-    "stage3": ("stage 3, after the slow chime", "You're getting drowsy. Find a rest stop."),
-    "stage4": ("stage 4, after the looming beeps", "Wake up! Pull over now."),
-    "rest_soon": ("rest planner says stop soon", "Plan a break in the next few minutes."),
-    "calibrate": ("calibration starts", "Look straight ahead and blink normally."),
-    "calibrated": ("calibration finished", "Calibration done. Drive safely."),
+
+def _load_lines() -> dict:
+    """voice.LINES, loaded by path so this stays runnable without the venv."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "bamnun_voice", ROOT / "src" / "bamnun" / "voice.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.LINES
+
+
+LINES = _load_lines()
+WHEN = {
+    "greet": "voice screen opens",
+    "sample": "a language card is tapped",
+    "stage3": "stage 3, after the slow chime",
+    "stage4": "stage 4, after the looming beeps",
+    "rest_soon": "rest planner says stop soon",
+    "break_due": "break interval reached",
+    "open_window": "CO2 above the limit",
+    "emergency_check": "emergency countdown starts",
 }
+# name -> (when it plays, English, Korean)
+PROMPTS = {k: (WHEN.get(k, "calibration and device test"), en, ko)
+           for k, (en, ko) in LINES.items()}
 
 FRAME_S = 0.02                # 20 ms analysis frames
 SPEECH_REL = 0.12             # a frame is speech above this fraction of the loudest
@@ -102,8 +122,9 @@ def play(path: Path) -> None:
     subprocess.run(["aplay", "-q", str(path)], check=False)
 
 
-def record_one(name: str, seconds: float, playback: bool) -> Path:
-    when, phrase = PROMPTS[name]
+def record_one(name: str, lang: str, seconds: float, playback: bool) -> Path:
+    when, en, ko = PROMPTS[name]
+    phrase = ko if lang == "ko" else en
     print(f"\n[{name}]  plays when: {when}")
     print(f'  say: "{phrase}"', flush=True)
     with tempfile.TemporaryDirectory() as tmp:
@@ -116,7 +137,8 @@ def record_one(name: str, seconds: float, playback: bool) -> Path:
         chans = read_channels(raw)
     speech = max(chans, key=lambda c: sum(v * v for v in c))
     clip = trim_and_level(speech)
-    out = OUT_DIR / f"{name}.wav"
+    out = OUT_DIR / lang / f"{name}.wav"
+    out.parent.mkdir(parents=True, exist_ok=True)
     write_stereo(out, clip)
     print(f"  saved {out.relative_to(ROOT)} ({len(clip) / RATE:.2f}s)")
     if len(clip) / RATE > 2.5:
@@ -128,19 +150,25 @@ def record_one(name: str, seconds: float, playback: bool) -> Path:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    p.add_argument("--lang", choices=["en", "ko"],
+                   help="which language to record (required unless --list)")
     p.add_argument("--only", action="append", choices=sorted(PROMPTS),
-                   help="record just this prompt (repeatable)")
+                   help="record just this line (repeatable)")
     p.add_argument("--seconds", type=float, default=3.0)
     p.add_argument("--no-playback", action="store_true")
     p.add_argument("--list", action="store_true")
     args = p.parse_args(argv)
     if args.list:
-        for name, (when, phrase) in PROMPTS.items():
-            have = "x" if (OUT_DIR / f"{name}.wav").exists() else " "
-            print(f"[{have}] {name:12s} {when:34s} \"{phrase}\"")
+        print("en ko")
+        for name, (when, en, ko) in PROMPTS.items():
+            have = " ".join("x " if (OUT_DIR / lang / f"{name}.wav").exists() else "  "
+                            for lang in ("en", "ko"))
+            print(f"{have} {name:16s} {when:34s} \"{en}\" / \"{ko}\"")
         return 0
+    if args.lang is None:
+        p.error("--lang en or --lang ko is required")
     for name in args.only or list(PROMPTS):
-        record_one(name, args.seconds, playback=not args.no_playback)
+        record_one(name, args.lang, args.seconds, playback=not args.no_playback)
     return 0
 
 

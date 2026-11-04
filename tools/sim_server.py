@@ -13,6 +13,12 @@ eyelid signal is synthetic, from tools/simulate.py, compressed so the driver
 gets sleepy within the run. Each drive opens with a short calibration and
 includes a few seconds with nobody in the seat, so every screen state shows.
 
+The phone's commands work too, through the same Controller the device
+uses: profile and settings, the guided calibration (the simulated driver
+does as Ollie says, so "close your eyes" passes), the device test, Ollie's
+lines, trips, Insights and the emergency trigger. Trips go to their own
+database, runs/sim.db, so they never mix with a real device's.
+
 Every actuator is replaced by a logging stub, so running this on the Pi
 cannot fire the real mister, light or speakers.
 """
@@ -28,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from bamnun.alerts import EscalationPolicy                 # noqa: E402
+from bamnun.control import Controller                      # noqa: E402
+from bamnun.store import Store                             # noqa: E402
 from bamnun.features import Calibration, FeatureExtractor, FeatureFrame  # noqa: E402
 from bamnun.server import ServerThread                     # noqa: E402
 from bamnun.session import load_config                     # noqa: E402
@@ -78,7 +86,49 @@ def feature_frame(extractor: FeatureExtractor, t: float, ear: float, mar: float,
     )
 
 
-def drive(hub: Hub, minutes: float, calibrate_s: float, seed: int) -> None:
+class SimCalibration:
+    """The guided calibration's view of a driver who does as asked.
+
+    The look-ahead step "measures" for the usual 12 s and always succeeds;
+    the eyes-closed check then sees the synthetic eyelids shut, because
+    ``drive`` closes them while the step is running.
+    """
+
+    DURATION_S = 12.0
+
+    def __init__(self) -> None:
+        self.t0 = None
+        self.t = 0.0
+
+    def start(self, t: float) -> None:
+        self.t0 = t
+
+    def cancel(self) -> None:
+        self.t0 = None
+
+    def progress(self, t: float) -> float:
+        return 0.0 if self.t0 is None else min(1.0, (t - self.t0) / self.DURATION_S)
+
+    def ready(self) -> bool:
+        return self.t0 is not None and self.t - self.t0 >= self.DURATION_S
+
+    def failures(self) -> int:
+        return 0
+
+    def failure(self) -> str:
+        return ""
+
+    def open_level(self) -> float:
+        return 0.30
+
+    def closed_fraction(self) -> float:
+        return 0.65
+
+    def commit(self) -> None:
+        self.t0 = None
+
+
+def drive(hub: Hub, store: Store, minutes: float, calibrate_s: float, seed: int) -> None:
     cfg = load_config()
     for spec in cfg["alerts"]["actuators"].values():
         spec["type"] = "null"
@@ -87,6 +137,9 @@ def drive(hub: Hub, minutes: float, calibrate_s: float, seed: int) -> None:
                                           complete=True, n_samples=999))
     estimator = StateEstimator(cfg["state"])
     policy = EscalationPolicy(cfg["alerts"])
+    sim_cal = SimCalibration()
+    control = Controller(hub, store, policy, estimator=estimator, calibration=sim_cal,
+                         trip_cfg=cfg.get("trips"))
     total = minutes * 60.0
     away = (0.12 * total, 0.12 * total + 5.0)     # driver out of view for 5 s
     stage = 0
@@ -102,6 +155,12 @@ def drive(hub: Hub, minutes: float, calibrate_s: float, seed: int) -> None:
             time.sleep(delay)
 
         calibrating = t < calibrate_s
+        sim_cal.t = t
+        step = control.guided.step
+        if step == "close":
+            ear = 0.06          # the driver closes their eyes when asked
+        elif step in ("position", "look"):
+            yaw = pitch = 0.0   # and sits still looking ahead
         if calibrating:
             ff = FeatureFrame(t=t, face_found=True)
             state = DriverState(t=t, calibrated=False)
@@ -109,12 +168,18 @@ def drive(hub: Hub, minutes: float, calibrate_s: float, seed: int) -> None:
             ff = (FeatureFrame(t=t, face_found=False) if away[0] <= t < away[1]
                   else feature_frame(extractor, t, ear, mar, yaw, pitch))
             state = estimator.update(ff, calibrated=True)
-            decision = policy.update(state)
-            if decision.stage != stage:
+            decision = policy.update(state) if not control.holds_ladder(t) else None
+            if decision is not None and decision.stage != stage:
                 hub.emit(alert_event(decision, stage))
                 print(f"{int(t) // 60:2d}m{int(t) % 60:02d}s  stage {stage} -> "
                       f"{decision.stage} ({decision.stage_name})", flush=True)
                 stage = decision.stage
+
+        co2 = 600.0 + 1100.0 * t / total
+        control.tick(t, face=bool(ff.face_found), calibrated=not calibrating,
+                     eye_closed=bool(ff.eye_closed) if ff.face_found and not calibrating else None,
+                     microsleep=bool(ff.microsleep_now),
+                     ear_raw=ear if ff.face_found else None, co2_ppm=co2)
 
         if t - last_publish >= PUBLISH_PERIOD_S:
             last_publish = t
@@ -125,7 +190,8 @@ def drive(hub: Hub, minutes: float, calibrate_s: float, seed: int) -> None:
                 cal_progress=t / calibrate_s if calibrating else 0.0,
                 trip_s=t, fps=FPS, last_blink_s=extractor.blink.last_blink_s,
                 # A cabin slowly going stale, so the CO2 card moves too.
-                co2_ppm=600.0 + 1100.0 * t / total, co2_age_s=2.0))
+                co2_ppm=co2, co2_age_s=2.0))
+    control.close()
     policy.close()
 
 
@@ -138,15 +204,18 @@ def main() -> int:
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--once", action="store_true", help="stop after one drive")
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--db", default=str(Path(__file__).resolve().parents[1] / "runs" / "sim.db"),
+                    help="where the simulated device keeps its profile and trips")
     args = ap.parse_args()
 
     hub = Hub()
-    server = ServerThread(hub, args.host, args.port).start()
+    store = Store(args.db)
+    server = ServerThread(hub, args.host, args.port, store=store).start()
     print(f"open http://localhost:{args.port}  (Ctrl+C to stop)", flush=True)
     seed = args.seed
     try:
         while True:
-            drive(hub, args.minutes, args.calibrate_s, seed)
+            drive(hub, store, args.minutes, args.calibrate_s, seed)
             if args.once:
                 break
             seed += 1
@@ -154,6 +223,7 @@ def main() -> int:
         pass
     finally:
         server.stop()
+        store.close()
     return 0
 
 

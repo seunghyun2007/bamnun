@@ -2,43 +2,57 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Add a route</title>
+<title>Plan your route</title>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
-<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d6f7f}
-.rt-map{position:relative;height:300px;border-radius:22px;overflow:hidden;background:#241A26;border:1px solid rgba(255,255,255,.09)}
-.rt-msg{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;color:#B3A6B4;font-size:14px;line-height:1.45;z-index:2;background:#241A26}
-.rt-row{display:flex;align-items:center;gap:12px;padding:11px 14px;color:#F4EFE6;text-decoration:none;width:100%;border:0;background:transparent;text-align:left;font:inherit;cursor:pointer}
-.rt-row+.rt-row{border-top:1px solid rgba(255,255,255,.08)}
-.rt-pin{position:relative;transform:translateY(-50%);padding:4px 8px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.rt-pin.pick{background:#C4B5FD}
+<style>
+body{margin:0}button{font:inherit;color:inherit;cursor:pointer}input::placeholder{color:#8d7f8f}
+.mp-page{position:absolute;inset:0;overflow:hidden;background:#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif}
+.mp-map{position:absolute;inset:0}
+.mp-msg{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:#B3A6B4;font-size:14.5px;line-height:1.45;z-index:3;background:#17111A}
+.mp-glass{background:rgba(28,20,31,.92);border:1px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 12px 34px rgba(0,0,0,.45)}
+.mp-top{position:absolute;left:10px;right:10px;top:14px;z-index:4;border-radius:22px;padding:10px}
+.mp-back{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#F4EFE6;flex-shrink:0;text-decoration:none}
+.mp-in{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.1);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none}
+.mp-in:focus{border-color:#C4B5FD}
+.mp-pinbtn{width:40px;height:40px;flex-shrink:0;border-radius:12px;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#C4B5FD}
+.mp-pinbtn[aria-pressed=true]{background:#C4B5FD;color:#241A26}
+.mp-list{position:absolute;left:10px;right:10px;z-index:4;border-radius:18px;overflow:hidden;max-height:330px;overflow-y:auto}
+.mp-row{display:flex;align-items:center;gap:12px;padding:11px 14px;width:100%;border:0;background:transparent;text-align:left;color:#F4EFE6}
+.mp-row+.mp-row{border-top:1px solid rgba(255,255,255,.08)}
+.mp-sheet{position:absolute;left:0;right:0;bottom:0;z-index:4;border-radius:26px 26px 0 0;padding:10px 16px 26px;max-height:62%;overflow-y:auto}
+.mp-grab{width:40px;height:5px;border-radius:9px;background:rgba(255,255,255,.22);margin:0 auto 10px}
+.mp-cta{width:100%;padding:16px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:16px}
+.mp-cta[disabled]{opacity:.4}
+.mp-fab{position:absolute;right:12px;z-index:4;width:46px;height:46px;border-radius:50%;border:0;display:grid;place-items:center;color:#F4EFE6}
+.mp-cross{position:absolute;left:50%;top:50%;z-index:3;width:44px;height:58px;margin:-58px 0 0 -22px;pointer-events:none;display:none;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));transition:transform .15s}
+.mp-cross.lift{transform:translateY(-10px)}
+.mp-cross::after{content:"";position:absolute;left:50%;bottom:-4px;width:10px;height:4px;margin-left:-5px;border-radius:50%;background:rgba(0,0,0,.45)}
+.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.mp-pin.pick{background:#C4B5FD}
+.mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
+.mp-row b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
 </helmet>
-<div style="width:390px;min-height:844px;box-sizing:border-box;position:relative;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(80% 45% at 0% 70%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 60%),radial-gradient(80% 45% at 100% 80%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0;padding:56px 16px 120px">
-  <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:10px;padding:0 6px">
-    <a href="Plan.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:80%;font-size:24px">Plan your route</h1>
+<div class="mp-page" id="rPage">
+  <div class="mp-map" id="rMap"></div>
+  <div class="mp-msg" id="rMapMsg">Loading the map…</div>
+  <svg class="mp-cross" id="rCross" viewBox="0 0 44 58" aria-hidden="true"><path d="M22 56C22 56 4 34 4 21a18 18 0 0 1 36 0c0 13-18 35-18 35z" fill="#C4B5FD" stroke="#241A26" stroke-width="2.5"></path><circle cx="22" cy="21" r="7" fill="#241A26"></circle></svg>
+  <div class="mp-top mp-glass" id="rTop">
+    <div style="display:flex;gap:8px;align-items:center">
+      <a href="Home.dc.html" aria-label="Back" class="mp-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;min-width:0">
+        <div style="display:flex;gap:6px;align-items:center"><span aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:#F8C4A4;flex-shrink:0"></span><label for="rtFrom" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">From</label><input id="rtFrom" class="mp-in" autocomplete="off" placeholder="Starting point"><button type="button" class="mp-pinbtn" data-pickon="from" aria-pressed="false" aria-label="Pick the start on the map"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg></button></div>
+        <div style="display:flex;gap:6px;align-items:center"><span aria-hidden="true" style="width:10px;height:10px;background:#C4B5FD;flex-shrink:0"></span><label for="rtTo" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Where to</label><input id="rtTo" class="mp-in" autocomplete="off" placeholder="Where to?"><button type="button" class="mp-pinbtn" data-pickon="to" aria-pressed="false" aria-label="Pick the destination on the map"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg></button></div>
+      </div>
+    </div>
   </div>
-  <div class="rt-map"><div id="rMap" style="position:absolute;inset:0"></div><div id="rMapMsg" class="rt-msg">Loading the map…</div></div>
-  <div style="position:relative;display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px 12px 12px 40px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
-    <span aria-hidden="true" style="position:absolute;left:18px;top:28px;width:10px;height:10px;border-radius:50%;background:#F8C4A4"></span>
-    <span aria-hidden="true" style="position:absolute;left:22px;top:42px;height:32px;border-left:2px dotted #7d6f7f"></span>
-    <span aria-hidden="true" style="position:absolute;left:18px;bottom:28px;width:10px;height:10px;background:#F4EFE6"></span>
-    <label for="rtFrom" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">From</label>
-    <input id="rtFrom" autocomplete="off" placeholder="Starting point" style="padding:12px 14px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.11);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none;width:100%;box-sizing:border-box">
-    <label for="rtTo" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Where to</label>
-    <input id="rtTo" autocomplete="off" placeholder="Where to?" style="padding:12px 14px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.11);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none;width:100%;box-sizing:border-box;border-color:#C4B5FD">
-  </div>
-  <p id="rListHead" style="margin:16px 6px 8px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4"></p>
-  <div id="rList" style="display:none;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"></div>
-  <div id="rSum"></div>
-  <div style="position:fixed;left:0;right:0;bottom:0;padding:18px 22px 30px;display:flex;justify-content:center;background:linear-gradient(to top,rgba(23,17,26,.96) 50%,rgba(23,17,26,0));z-index:5">
-    <button type="button" id="rSet" disabled style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:200px;padding:17px 30px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:.4">Set route</button>
-  </div>
+  <div class="mp-list mp-glass" id="rList" hidden></div>
+  <button type="button" class="mp-fab mp-glass" id="rLocate" aria-label="My location" style="bottom:250px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></button>
+  <div class="mp-sheet mp-glass" id="rSheet"><div class="mp-grab"></div><div id="rSum"></div></div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>

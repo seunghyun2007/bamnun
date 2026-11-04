@@ -1,6 +1,6 @@
 import re, json, base64, sys, os
 D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
-ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Ladder","Privacy","Permissions","Contact","Pair","Voice","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
+ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Ladder","Privacy","Permissions","Contact","Pair","Voice","Calibrate","Plan","Route","Drive","Home","Camera","Trips","Insights","Settings"]
 BLOB = {
  "bb73e1b39dabf3b35d036c39c5cdd1c1":"idle","be4e6418a0a3f416c7aca695e46d9667":"hello","4af7029f76e815daac75989af4aba986":"thinking",
  "fa546fa5fa5789063fdee0a2beebd5b2":"sleepy","57efe0ac85b17a5178828ea07e413fad":"wake","f6f6ffbf7935cbf40e40727534b41f50":"celebrate",

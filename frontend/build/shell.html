@@ -31,6 +31,11 @@ a,button{-webkit-tap-highlight-color:transparent}
 @keyframes olPoke{0%{transform:none}30%{transform:scale(1.08,.9)}60%{transform:scale(.96,1.06)}100%{transform:none}}
 .hint{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:var(--muted);font-size:12.5px;pointer-events:none}
 .phone.full~.hint{display:none}
+/* Map pins and the position dot: shared by Route, Drive and the Home card. */
+.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.mp-pin.pick{background:#C4B5FD}
+.mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
+@keyframes livePulse{0%,100%{opacity:1}50%{opacity:.35}}
 /*__STYLES__*/
 </style>
 </head>
@@ -141,7 +146,7 @@ function go(name,opts={}){
 window.BN_GO=go;
 // A setup screen opened from the app (Settings, Home, Camera...) goes back
 // there when it's done, instead of carrying on through onboarding.
-const APP=["Home","Camera","Trips","Insights","Settings"];
+const APP=["Home","Camera","Trips","Insights","Settings","Drive"];
 function route(to,isBack){
   if(isBack&&ret&&cur!==ret){to=ret;ret=null;}
   else if(!isBack&&ret&&!APP.includes(cur)&&!APP.includes(to)){to=ret;ret=null;}

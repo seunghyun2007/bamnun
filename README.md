@@ -65,6 +65,7 @@ what the detector measures. To see real detection, run the device (section 4).
 | **Live data server** (`--serve`): app, `/api/health`, `/ws` | **Done.** Tested |
 | **Device API for the phone**: profile and settings saved on the Pi, guided calibration and device test, Ollie's lines in English and Korean, trips, insights, break reminder, emergency trigger | **Done, new.** Tested |
 | **App screens connected to the device**: onboarding, voice language, guided calibration, Trips, Insights, Settings, emergency countdown (never dials a real emergency number) | **Done, new.** Tested in a browser, English and Korean |
+| **Gradual drowsiness score (0–100)** from squint, PERCLOS, blink length, slow blinks, lid speed, blink rate, microsleeps, yawns and nods, smoothed, with one shared state label; real camera on the Home tile and a 16:9 Camera screen with full screen | **Done, new.** Tested on a laptop webcam; tuning tools in section 8 |
 | **Live Home and Camera screens** in the app | **Done, new.** Tested in a browser |
 | Simulated driver, served (`tools/sim_server.py`) and in-app demo | **Done, new** |
 | Android and iOS app projects (Capacitor) | Created, not yet compiled (needs Android Studio, and a Mac for iOS) |
@@ -430,6 +431,8 @@ Where each threshold comes from (published, physical, or our choice):
 | `python tools/bench.py --seconds 30 --source picamera` | per-stage timing and frame rate |
 | `python tools/measure_glance_zones.py` | measure the mirror zones in the real cab |
 | `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic (`--list`, `--only NAME`) |
+| `python tools/record_session.py` | record a webcam session for tuning, with on-screen prompts (normal, squint, slow blinks, looking down) that mark each stretch |
+| `python tools/replay_session.py runs/recordings/<time>` | run the real pipeline over a recording: every signal and the score per frame to CSV, a summary per marked stretch, `--set state.weights.squint=0.35` to try a threshold in seconds, `--plot` for a chart |
 | `python tools/make_chime.py` | regenerate the alert tones in `assets/` |
 | `python tools/render_overlay_demo.py` | the overlay in every state, as one image |
 | `python tools/make_icon.py` | the desktop icon |

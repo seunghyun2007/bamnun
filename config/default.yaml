@@ -52,6 +52,12 @@ features:
   # wearing glasses.
   ear_closed_fraction: 0.65
   ear_reopen_fraction: 0.75        # hysteresis: must exceed this to count as open
+  # "Really shut": a closed eye's EAR is about a third of its open value, so
+  # below 40% of the driver's open level the lids are closed, not squinting.
+  # Microsleeps and PERCLOS use this; blinks still use ear_closed_fraction.
+  # Before this, any closure below 65% for 0.5 s was a microsleep, so a hard
+  # squint jumped the ladder straight to its top stage.
+  ear_shut_fraction: 0.40
   ear_smoothing_alpha: 0.4         # EWMA on raw EAR, 1.0 = no smoothing
 
   # PERCLOS: proportion of time the eye opening is below this fraction of the
@@ -66,14 +72,38 @@ features:
   # closed) the same sessions sit at a 1-2% median, inside the 0-5% alert
   # baseline the four-stage scheme assumes. Measure closed EAR per driver
   # before quoting this as true P80.
-  perclos_baseline_fraction: 0.50
+  #
+  # Now 0.40, the same "really shut" line as ear_shut_fraction. At 0.50 a
+  # hard squint (eyes ~half open) counted as fully closed on every frame, so
+  # PERCLOS hit 100% and the ladder jumped to the top. Squinting is scored on
+  # its own now (openness below), gradually.
+  perclos_baseline_fraction: 0.40
   perclos_window_s: 60.0
+
+  # Squint: the typical eye openness over the last openness_window_s, as a
+  # percentile of ear / calibrated open EAR. The 60th percentile ignores
+  # blinks (short dips, ~3% of frames) but follows a held squint.
+  openness_window_s: 45.0
+  openness_percentile: 60.0
+  # Head pitched down past this (degrees, relative to the calibrated straight
+  # ahead; positive = down) is a look at the dashboard. Lids lower naturally
+  # when looking down, so those frames are left out of squint and PERCLOS.
+  look_down_pitch_deg: 12.0
 
   blink:
     min_duration_s: 0.05           # below this is landmark noise, not a blink
     max_normal_duration_s: 0.40    # above this the closure is a "long closure"
-    microsleep_duration_s: 0.50    # >= this is scored as a microsleep event
+    microsleep_duration_s: 0.50    # really shut this long = microsleep: straight to the top stage
     rate_window_s: 60.0
+    slow_blink_s: 0.30             # a blink this long or longer is "slow" (normal 0.10-0.15 s)
+    min_blinks_for_stats: 5        # fewer blinks than this in the window = no blink averages yet
+    max_blink_stat_s: 1.0          # longer "closures" are held squints, kept out of blink averages
+    eyes_closed_label_s: 0.30      # shut this long shows "Eyes closed"; a normal blink never does
+    # Head pitched down (look_down_pitch_deg): looking at a phone or keyboard
+    # closes the lids almost fully, so a microsleep needs this long shut
+    # instead of microsleep_duration_s. A head dropping with the eyes shut
+    # still gets there quickly.
+    microsleep_looking_down_s: 1.5
 
   yawn:
     mar_threshold: 0.60            # mouth aspect ratio
@@ -145,23 +175,50 @@ calibration:
 
 state:
   # Weights for the fused drowsiness score (sum need not be 1; it is normalised).
+  # Squint and PERCLOS carry most of it: both are eye-closure measures, the
+  # best single predictors in the literature. The blink-shape signals catch
+  # the early, gradual signs. See docs/thresholds.md.
   weights:
-    perclos: 0.35
-    blink_duration: 0.20
-    microsleep: 0.25
-    yawn: 0.10
-    head_nod: 0.10
+    squint: 0.28
+    perclos: 0.20
+    blink_duration: 0.15
+    slow_blinks: 0.12
+    lid_speed: 0.06
+    blink_rate: 0.02
+    microsleep: 0.09
+    yawn: 0.04
+    head_nod: 0.04
+  # Each signal maps linearly onto 0-1 between these two values (in its own
+  # units), and is clamped outside them.
+  ranges:
+    perclos: [0.03, 0.20]          # share of 60 s really shut
+    squint: [0.10, 0.40]           # 1 - typical openness; 0.10 = normal variation
+    blink_duration: [0.15, 0.35]   # s, measured at the blink threshold; normal 0.10-0.15 s
+    slow_blinks: [0.10, 0.50]      # share of recent blinks >= slow_blink_s
+    lid_speed: [0.10, 0.30]        # s from deepest point back to open
+    blink_rate: [24.0, 40.0]       # per minute; normal ~15-20
+    microsleep: [0.0, 2.0]         # events per 60 s
+    yawn: [0.0, 12.0]              # per hour
+    head_nod: [2.0, 10.0]          # degrees pitch std over 10 s
+  # The score follows the raw value with these time constants: up in seconds,
+  # down more slowly, so it neither flickers nor drops the moment the eyes
+  # open wide. A microsleep sets it to at least microsleep_score at once.
+  score_rise_tau_s: 6.0
+  score_fall_tau_s: 20.0
+  microsleep_score: 0.90
   # Four drowsiness stages after the KSS/PERCLOS stratification in the team
   # research doc: KSS 6 / 7 / 8 / 9 at PERCLOS 5 / 10 / 15 / 20 %. A level is
   # entered on EITHER the fused score or PERCLOS alone (min_perclos), with a
   # dwell to avoid flapping. Microsleeps (>= 0.5 s closure) jump straight to
   # the top level regardless.
+  # Score thresholds on the smoothed 0-1 score (the app shows it x100).
+  # Level 1 fires ladder stage 1 (blue light), and so on up.
   levels:
     - {name: alert,     min_score: 0.00, dwell_s: 0.0}
-    - {name: a_bit,     min_score: 0.30, min_perclos: 0.05, dwell_s: 10.0}
+    - {name: a_bit,     min_score: 0.25, min_perclos: 0.05, dwell_s: 5.0}
     - {name: drowsy,    min_score: 0.45, min_perclos: 0.10, dwell_s: 3.0}
-    - {name: very,      min_score: 0.60, min_perclos: 0.15, dwell_s: 2.0}
-    - {name: extreme,   min_score: 0.75, min_perclos: 0.20, dwell_s: 1.0}
+    - {name: very,      min_score: 0.65, min_perclos: 0.15, dwell_s: 2.0}
+    - {name: extreme,   min_score: 0.82, min_perclos: 0.20, dwell_s: 1.0}
   recovery_hysteresis: 0.08        # must drop this far below to de-escalate
   perclos_hysteresis: 0.02         # same, for the PERCLOS route
   no_face_grace_s: 1.5             # eyes-not-visible tolerated this long
@@ -285,6 +342,13 @@ air:
   rearm_drop_ppm: 200
   actuator: open_window
 
+# The Camera screen's video (only encoded while someone watches, on its own
+# thread). 640 px is sharp on a phone held upright and light on Wi-Fi.
+video:
+  width: 640
+  quality: 80                  # JPEG quality, 0-100
+  max_fps: 30                  # at most this; the camera's own rate is the real limit
+
 logging:
   dir: runs
   csv_hz: 10.0                 # per-frame features are downsampled to this
@@ -297,6 +361,9 @@ ui:
   draw_eyes: true
   draw_gauges: true
   window_scale: 0.75
+  # The preview window is redrawn at most this often. Drawing it every frame
+  # slowed detection from ~34 to ~13 fps on a laptop; 15 still looks smooth.
+  window_max_fps: 15
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.

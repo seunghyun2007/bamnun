@@ -8,6 +8,24 @@
   const STAGES = ["", "Blue light", "Mint mist", "Chime and voice", "Rising alarm"];
   const STAGE_COLOURS = ["#F8C4A4", "#A99BF0", "#F5B5C8", "#C4B5FD", "#F48FB1"];
   const CO2_PROMPT = 1500;
+  // The driver's state in one word, decided on the device (SPEC.md, 13), and
+  // its colour on the app's lavender -> pink scale.
+  const LABEL = {
+    alert: ["Alert", "#D9CEFF"], a_bit: ["A bit tired", "#C4B5FD"], drowsy: ["Drowsy", "#E2A8EC"],
+    very: ["Very drowsy", "#F9A8D4"], eyes_closed: ["Eyes closed", "#F48FB1"],
+    away: ["Looking away", "#FFB547"], no_face: ["No face", "#B3A6B4"],
+  };
+  const SIGNALS = {
+    squint: ["Squint", (v) => Math.round(v * 100) + "%"],
+    perclos: ["Eyes shut, last min", (v) => (v * 100).toFixed(1) + "%"],
+    blink_duration: ["Blink length", (v) => (v ? v.toFixed(2) + " s" : "–")],
+    slow_blinks: ["Slow blinks", (v) => Math.round(v * 100) + "%"],
+    lid_speed: ["Lid reopening", (v) => (v ? v.toFixed(2) + " s" : "–")],
+    blink_rate: ["Blinks / min", (v) => Math.round(v)],
+    microsleep: ["Microsleeps, last min", (v) => Math.round(v)],
+    yawn: ["Yawns / h", (v) => v.toFixed(1)],
+    head_nod: ["Head nodding", (v) => v.toFixed(1) + "°"],
+  };
   let ws = null, last = null, conn = "connecting", retry = 0;
   // Demo: a simulated driver inside the page, so the live screens can be seen
   // with nothing installed. Only ever on request (?demo, or opening the file
@@ -86,6 +104,9 @@
         stage, stage_name: ["none", "light", "scent", "chime", "emergency"][stage],
         kss: 1 + 7 * Math.min(1, drowsy), distracted: yaw > 25, off_road: face ? yaw > 25 : null,
         yaw: face ? yaw : null, co2_ppm: 620 + 9 * t, co2_age_s: 2, trip_s: 1800 + t, fps: 30,
+        drowsiness: face && t >= 6 ? Math.round(100 * Math.min(0.95, drowsy * 0.9)) : null,
+        label: !face ? "no_face" : t < 6 ? "alert" : stage === 4 && closed ? "eyes_closed" : yaw > 25 ? "away"
+          : ["alert", "a_bit", "drowsy", "very", "very"][stage],
       };
       paint();
     }, 200);
@@ -119,12 +140,41 @@
     watching: ["Watching", "Ollie is watching your eyes."],
   };
 
-  function eyesBadge(s, v) {
-    if (v === "offline" || v === "connecting" || v === "nocam") return [dash, "rgba(255,255,255,.16)", "#F4EFE6"];
+  function chip(s, v) {
+    if (v === "offline" || v === "connecting" || v === "nocam") return [T("Not connected"), "rgba(255,255,255,.16)", "#F4EFE6"];
     if (s.calibrating) return [T("Calibrating"), "#C4B5FD", "#241A26"];
-    if (!s.face) return [T("No face"), "rgba(255,255,255,.16)", "#F4EFE6"];
-    if (s.eye_closed) return [T("Eyes closed"), "#F48FB1", "#241A26"];
-    return [T("Eyes open"), "#F8C4A4", "#241A26"];
+    const [text, colour] = LABEL[s.label] || LABEL[s.face ? "alert" : "no_face"];
+    return [T(text), colour, "#241A26"];
+  }
+
+  // The Home tile shows the video cropped around the face: scale so the face
+  // (with some room) fills the tile, centre it, and never show past an edge.
+  function cropTo(img, box) {
+    const tile = img.parentElement, tw = tile.clientWidth, th = tile.clientHeight;
+    const vw = img.naturalWidth, vh = img.naturalHeight;
+    if (!tw || !vw) return;
+    const cover = Math.max(tw / vw, th / vh);
+    let k = cover, cx = 0.5, cy = 0.5;
+    if (box) {
+      cx = box[0] + box[2] / 2; cy = box[1] + box[3] / 2;
+      k = Math.max(cover, Math.min(tw / (box[2] * vw * 1.9), th / (box[3] * vh * 1.6)));
+    }
+    let x = tw / 2 - cx * vw * k, y = th / 2 - cy * vh * k;
+    x = Math.min(0, Math.max(tw - vw * k, x)); y = Math.min(0, Math.max(th - vh * k, y));
+    const tf = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) scale(${k.toFixed(4)})`;
+    if (Math.abs((img._k || 0) - k) > 0.02 || Math.abs((img._x || 0) - x) > 4 || Math.abs((img._y || 0) - y) > 4) {
+      img.style.transform = tf; img._k = k; img._x = x; img._y = y;
+    }
+  }
+
+  function signalRows(s) {
+    const sig = s.signals || {};
+    return Object.keys(SIGNALS).map((k) => {
+      const [name, fmt] = SIGNALS[k], [val, part] = sig[k] || [0, 0];
+      return `<div style="display:grid;grid-template-columns:1fr auto 74px;gap:10px;align-items:center;font-size:13px">
+        <span style="color:#B3A6B4">${T(name)}</span><b>${fmt(val || 0)}</b>
+        <span style="position:relative;height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, (part || 0) / 30 * 100).toFixed(0)}%;background:#C4B5FD;border-radius:6px"></i></span></div>`;
+    }).join("") + `<p style="margin:4px 0 0;font-size:11.5px;color:#B3A6B4">${T("Bars: each signal's share of the score, in points.")}</p>`;
   }
 
   function paint() {
@@ -153,9 +203,18 @@
       text("trip", Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"));
     } else text("trip", dash);
 
-    // Eyes badge, on both screens.
-    const [eyes, bg, fg] = eyesBadge(s, v);
-    text("eyes", eyes); css("eyes", "background", bg); css("eyes", "color", fg);
+    // The state chip, on both screens: the device's own label.
+    const [label, bg, fg] = chip(s, v);
+    text("state-chip", label); css("state-chip", "background", bg); css("state-chip", "color", fg);
+    text("cam-off-text", T(conn === "connecting" && !s ? "Connecting…" : v === "nocam" ? "No camera" : "Not connected"));
+
+    // Drowsiness score and its breakdown (Camera screen).
+    const score = live && s.drowsiness != null ? s.drowsiness : null;
+    text("score", score == null ? dash : String(score));
+    css("score-bar", "width", (score || 0) + "%");
+    text("score-label", score == null ? dash : T((LABEL[s.label] || LABEL.alert)[0]));
+    text("score-stage", !live ? dash : s.stage ? T("Wake-up step {n}: {name}", { n: s.stage, name: T(STAGES[s.stage]) }) : T("No wake-up step running"));
+    for (const el of all("signals")) if (!el.hidden && live && s.signals) el.innerHTML = signalRows(s);
 
     // Cab air.
     const ppm = live ? s.co2_ppm : null;
@@ -182,11 +241,10 @@
       css("owl-eye", "display", img === IMG.idle ? "" : "none");
     }
 
-    // Camera screen video, straight from the device, only while this screen
-    // is open: leaving the screen removes the <img>, which ends the stream,
-    // and the Pi stops encoding. The drawing below stays as the fallback for
-    // the demo, the simulated device, or a stream that fails.
-    for (const img of all("video")) {
+    // Video straight from the device, only while a screen with it is open:
+    // leaving the screen removes the <img>, which ends the stream, and the
+    // device stops encoding. Not connected shows a plain grey box instead.
+    for (const img of [...all("video"), ...all("video-thumb")]) {
       const want = live && s.video && !DEMO && !img.dataset.failed;
       if (want && !img.getAttribute("src")) {
         img.onerror = () => { img.dataset.failed = "1"; img.removeAttribute("src"); paint(); };
@@ -197,16 +255,20 @@
       }
       const showing = want && img.naturalWidth > 0;
       img.style.display = showing ? "block" : "none";
-      css("face-drawing", "visibility", showing ? "hidden" : "visible");
+      const box = img.parentElement;
+      if (img.dataset.live === "video-thumb") {
+        img.style.width = img.naturalWidth + "px"; img.style.height = img.naturalHeight + "px";
+        if (showing) cropTo(img, s.face_box);
+      } else if (s && s.video_size && box) {
+        box.style.aspectRatio = s.video_size[0] + "/" + s.video_size[1];
+      }
+      // visibility, not display: the boxes keep their own centred layout.
+      for (const off of box ? box.querySelectorAll('[data-live="cam-off"]') : []) off.style.visibility = showing ? "hidden" : "visible";
+      // Offline, the box says so itself: no chip, no frame rate.
+      for (const c of box ? box.querySelectorAll('[data-live="state-chip"],[data-live="fps"]') : []) c.style.visibility = live ? "visible" : "hidden";
     }
 
-    // Camera screen: the drawn eyes follow the measured openness.
-    const eo = live ? s.eye_open : null;
-    attr("pupil", "ry", eo == null ? 8 : Math.max(0.8, Math.min(10, 8 * eo)).toFixed(1));
-    attr("pupil", "opacity", eo == null ? 0.35 : 1);
-    attr("glint", "opacity", eo != null && eo > 0.45 ? 0.9 : 0);
-    attr("eye-box", "stroke", eo == null ? "rgba(255,255,255,.25)" : s.eye_closed ? "#F48FB1" : "#A99BF0");
-    text("fps", live ? T("Infrared") + " · " + Math.round(s.fps) + " fps" : T("Infrared") + " · " + dash);
+    text("fps", live ? Math.round(s.fps) + " fps" : dash);
     text("last-blink", live && s.last_blink_s != null ? s.last_blink_s.toFixed(2) + " s" : dash);
     if (!live || !s.face) {
       text("road", T("No face in view")); text("road-note", dash);
@@ -219,7 +281,7 @@
     }
   }
 
-  window.BN_LIVE = { paint, state: () => last, demo: DEMO, address: piAddress,
+  window.BN_LIVE = { paint, state: () => last, demo: DEMO, address: piAddress, reconnect: () => { if (DEMO) return; try { ws && ws.close(); } catch (e) {} },
     connected: () => conn === "open" && !DEMO,
     // Point the app at another device (Settings, or a found device).
     use: (addr) => { try { localStorage.setItem("bn-pi", addr); } catch (e) {} if (ws) try { ws.close(); } catch (e) {} } };

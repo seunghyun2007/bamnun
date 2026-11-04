@@ -34,6 +34,9 @@ def ff(t=0.0, **kw) -> FeatureFrame:
     return FeatureFrame(**base)
 
 
+# Level mechanics on an instantaneous score; smoothing is tested on its own.
+NO_SMOOTH = {"score_rise_tau_s": 0.0, "score_fall_tau_s": 0.0}
+
 LEVELS = [
     {"name": "alert", "min_score": 0.00, "dwell_s": 0.0},
     {"name": "a_bit", "min_score": 0.30, "min_perclos": 0.05, "dwell_s": 2.0},
@@ -56,7 +59,7 @@ def _quiet_policy_cfg():
 
 
 def test_perclos_alone_enters_a_level_after_its_dwell():
-    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS})
+    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS, **NO_SMOOTH, **NO_SMOOTH})
     # PERCLOS 7 % ramps to a tiny score, far below min_score 0.30.
     s = est.update(ff(t=0.0, perclos=0.07), calibrated=True)
     assert s.score < 0.30 and s.level == 0
@@ -65,7 +68,7 @@ def test_perclos_alone_enters_a_level_after_its_dwell():
 
 
 def test_perclos_route_has_its_own_hysteresis():
-    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS,
+    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS, **NO_SMOOTH,
                           "perclos_hysteresis": 0.02})
     for t in (0.0, 2.5):
         s = est.update(ff(t=t, perclos=0.07), calibrated=True)
@@ -77,7 +80,7 @@ def test_perclos_route_has_its_own_hysteresis():
 
 
 def test_levels_without_a_perclos_gate_behave_as_before():
-    est = StateEstimator({"weights": {"perclos": 1.0},
+    est = StateEstimator({"weights": {"perclos": 1.0}, **NO_SMOOTH,
                           "levels": [{"name": "alert", "min_score": 0.0},
                                      {"name": "mild", "min_score": 0.5}]})
     s = est.update(ff(t=0.0, perclos=0.10), calibrated=True)

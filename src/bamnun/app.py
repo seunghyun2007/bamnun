@@ -18,6 +18,7 @@ import sys
 import time
 from collections import deque
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -33,6 +34,7 @@ from .predictor import RestPlanner
 from .session import SessionLogger, load_config, repo_root
 from .state import DriverState, StateEstimator
 from .store import Store
+from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
 
 console = Console()
@@ -40,7 +42,6 @@ console = Console()
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.
 PUBLISH_PERIOD_S = 0.1
 HEALTH_PERIOD_S = 1.0
-VIDEO_PERIOD_S = 0.1        # Camera screen video, about 10 fps, only while watched
 log = logging.getLogger("bamnun")
 
 
@@ -124,9 +125,16 @@ class Monitor:
         # costs the same with or without --serve; only the server is optional.
         self.hub = Hub()
         self.hub.video_capable = True
+        self.hub.video_size = list(self.source.resolution) if self.source.resolution else None
+        vcfg = self.cfg.get("video") or {}
+        self.video = VideoEncoder(self.hub, width=int(vcfg.get("width", 640)),
+                                  quality=int(vcfg.get("quality", 80)),
+                                  max_fps=float(vcfg.get("max_fps", 30)))
         self.server = None
         self._last_publish = -1e9
         self._last_video = -1e9
+        self._last_window = -1e9
+        self._window_period = 1.0 / max(1.0, float(self.cfg["ui"].get("window_max_fps", 15)))
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -294,7 +302,7 @@ class Monitor:
 
     def _publish(self, now: float, ff: FeatureFrame, state: DriverState,
                  calibrating: bool, progress: float, fps: float,
-                 trip_s: float) -> None:
+                 trip_s: float, lms=None) -> None:
         if now - self._last_publish < PUBLISH_PERIOD_S:
             return
         self._last_publish = now
@@ -307,7 +315,7 @@ class Monitor:
             calibrated=self.features.calibration.complete,
             calibrating=calibrating, cal_progress=progress, trip_s=trip_s,
             fps=fps, last_blink_s=self.features.blink.last_blink_s,
-            co2_ppm=air.ppm, co2_age_s=co2_age))
+            co2_ppm=air.ppm, co2_age_s=co2_age, face_box=face_box(lms)))
         if now - self._last_health >= HEALTH_PERIOD_S:
             self._last_health = now
             self.hub.set_health(self._health())
@@ -322,12 +330,8 @@ class Monitor:
             co2_ppm=self.air.ppm)
 
     def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
-        """Encode a Camera-screen frame, but only while someone is watching."""
-        if not self.hub.wants_video() or now - self._last_video < VIDEO_PERIOD_S:
-            return
-        self._last_video = now
-        from .viz import video_frame
-        self.hub.publish_frame(video_frame(image, lms, ff.eye_closed))
+        """Hand the frame to the encoder thread, only while someone watches."""
+        self.video.offer(image, lms, ff.shut_now or ff.microsleep_now)
 
     # ----------------------------------------------------------------- #
 
@@ -446,10 +450,17 @@ class Monitor:
             last = now
             fps = sum(self._fps) / len(self._fps)
             self._guarded(self._publish, now, ff, state, calibrating, progress,
-                          fps, frame.timestamp - t_start)
+                          fps, frame.timestamp - t_start, lms)
             self._guarded(self._publish_video, now, frame.image, lms, ff)
 
-            if self.show_window and cv2 is not None:
+            # The laptop preview window is drawn at most window_max_fps times a
+            # second. Drawing and showing it every frame cost more than face
+            # tracking itself (34 fps without it, 13 with it on a laptop), and
+            # the app's video can only be as fast as detection.
+            draw_window = (self.show_window and cv2 is not None
+                           and now - self._last_window >= self._window_period)
+            if draw_window:
+                self._last_window = now
                 from .viz import draw_overlay
                 canvas = draw_overlay(
                     frame.image, lms, ff, state, plan=self._plan,
@@ -510,6 +521,7 @@ class Monitor:
             self.server.stop()
         if self.store is not None:
             self.store.close()
+        self.video.close()
         self.logger.close()
         self.policy.close()
         self.air.close()
@@ -522,6 +534,17 @@ class Monitor:
         except Exception:
             pass
         console.print("[bold]stopped[/]")
+
+
+def face_box(lms) -> Optional[list[float]]:
+    """The face's bounding box as fractions of the frame, for the Home tile."""
+    if lms is None or not getattr(lms, "ok", False):
+        return None
+    w, h = lms.image_size
+    xs, ys = lms.points[:, 0], lms.points[:, 1]
+    x0, y0 = max(0.0, float(xs.min()) / w), max(0.0, float(ys.min()) / h)
+    x1, y1 = min(1.0, float(xs.max()) / w), min(1.0, float(ys.max()) / h)
+    return [x0, y0, x1 - x0, y1 - y0]
 
 
 def main(argv=None) -> int:

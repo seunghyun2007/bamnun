@@ -563,6 +563,12 @@ class BlinkEvent:
     duration_s: float
     min_ear: float
     kind: str  # "blink" | "long_closure" | "microsleep"
+    # Time from the deepest point of the closure back to open. Drowsy lids
+    # reopen slowly (Johns 2007), so this rises before blinks get long.
+    reopen_s: float = 0.0
+    # False when the driver was looking down or away during it: kept for the
+    # record, but not used for the blink averages.
+    judged: bool = True
 
 
 class BlinkTracker:
@@ -576,6 +582,20 @@ class BlinkTracker:
         self.max_normal = float(bl.get("max_normal_duration_s", 0.40))
         self.microsleep = float(bl.get("microsleep_duration_s", 0.50))
         self.rate_window = float(bl.get("rate_window_s", 60.0))
+        # "Really shut", below the blink threshold. A microsleep needs the
+        # eye this far closed for microsleep_duration_s; a hard squint sits
+        # between the two and must NOT jump the ladder to the top.
+        self.shut_fraction = float(features_cfg.get("ear_shut_fraction", 0.40))
+        self.slow_blink_s = float(bl.get("slow_blink_s", 0.30))
+        self.min_blinks = int(bl.get("min_blinks_for_stats", 5))
+        self.shut_label_s = float(bl.get("eyes_closed_label_s", 0.30))
+        self.max_stat_s = float(bl.get("max_blink_stat_s", 1.0))
+        # With the head pitched down (dashboard, phone, keyboard) the lids
+        # can close almost completely without sleep, so a microsleep needs
+        # the eyes shut longer. A head dropping with the eyes shut still
+        # passes this quickly.
+        self.microsleep_down = float(bl.get("microsleep_looking_down_s", 1.5))
+        self._down = False
 
         self._closed = False
         self._closure_start: Optional[float] = None
@@ -586,6 +606,11 @@ class BlinkTracker:
         # reopen can finalise it rather than record the same closure twice.
         self._latched_event: Optional[BlinkEvent] = None
         self.ongoing_closure_s = 0.0
+        self._closure_min_t: Optional[float] = None
+        self._tainted = False
+        self._shut_since: Optional[float] = None
+        self._max_shut_s = 0.0
+        self.ongoing_shut_s = 0.0
         # Duration of the most recent ordinary blink, for the app's Camera
         # screen. Long closures and microsleeps are reported elsewhere.
         self.last_blink_s: Optional[float] = None
@@ -596,28 +621,59 @@ class BlinkTracker:
         self._microsleep_latched = False
         self._latched_event = None
         self.ongoing_closure_s = 0.0
+        self._closure_min_t = None
+        self._shut_since = None
+        self._max_shut_s = 0.0
+        self.ongoing_shut_s = 0.0
         self.last_blink_s = None
         self._events.clear()
 
-    def update(self, t: float, ear: float, ear_open: float) -> Optional[BlinkEvent]:
-        """Feed one smoothed EAR sample. Returns a completed event, if any."""
+    def update(self, t: float, ear: float, ear_open: float,
+               ignore: bool = False, looking_down: bool = False) -> Optional[BlinkEvent]:
+        """Feed one smoothed EAR sample. Returns a completed event, if any.
+
+        ``ignore``: the eyes can't be judged right now (looking down or away).
+        A closure that touches such a frame is kept out of the blink averages.
+        """
+        if ignore and self._closed:
+            self._tainted = True
+        self._down = looking_down
+        need = self.microsleep_down if looking_down else self.microsleep
         close_th = ear_open * self.closed_fraction
         open_th = ear_open * self.reopen_fraction
+        shut_th = ear_open * self.shut_fraction
         event: Optional[BlinkEvent] = None
+
+        # Really shut, tracked on its own: it decides microsleeps.
+        if 0.0 < ear < shut_th:
+            if self._shut_since is None:
+                self._shut_since = t
+            self.ongoing_shut_s = t - self._shut_since
+        else:
+            self._shut_since = None
+            self.ongoing_shut_s = 0.0
 
         if not self._closed:
             if 0.0 < ear < close_th:
                 self._closed = True
                 self._closure_start = t
                 self._closure_min_ear = ear
+                self._closure_min_t = t
+                self._max_shut_s = self.ongoing_shut_s
+                self._tainted = ignore
                 self._microsleep_latched = False
                 self._latched_event = None
         else:
-            self._closure_min_ear = min(self._closure_min_ear, ear)
+            if ear < self._closure_min_ear:
+                self._closure_min_ear = ear
+                self._closure_min_t = t
+            self._max_shut_s = max(self._max_shut_s, self.ongoing_shut_s)
             self.ongoing_closure_s = t - (self._closure_start or t)
             if ear > open_th:
                 start = self._closure_start if self._closure_start is not None else t
                 dur = t - start
+                reopen = t - (self._closure_min_t if self._closure_min_t is not None else t)
+                deep = self._max_shut_s
                 self._closed = False
                 self._closure_start = None
                 self.ongoing_closure_s = 0.0
@@ -634,22 +690,26 @@ class BlinkTracker:
                     ev.end_t = t
                     ev.duration_s = dur
                     ev.min_ear = self._closure_min_ear
-                    ev.kind = self._classify(dur)
+                    ev.kind = self._classify(dur, deep)
+                    ev.reopen_s = reopen
                     event = ev
                     self._latched_event = None
                 elif dur >= self.min_duration:
                     event = BlinkEvent(
                         start_t=start, end_t=t, duration_s=dur,
                         min_ear=self._closure_min_ear,
-                        kind=self._classify(dur),
+                        kind=self._classify(dur, deep), reopen_s=reopen,
+                        judged=not (self._tainted or ignore),
                     )
                     self._events.append(event)
                     if event.kind == "blink":
                         self.last_blink_s = dur
 
-        # Latch a microsleep DURING the closure so the alert can fire now.
+        # Latch a microsleep DURING the closure so the alert can fire now. It
+        # takes the eye REALLY shut (below shut_fraction) for the whole
+        # microsleep time; a squint below the blink threshold doesn't count.
         if self._closed and not self._microsleep_latched and \
-                self.ongoing_closure_s >= self.microsleep:
+                self.ongoing_shut_s >= need:
             self._microsleep_latched = True
             start = self._closure_start if self._closure_start is not None else t
             event = BlinkEvent(
@@ -664,8 +724,9 @@ class BlinkTracker:
             self._events.popleft()
         return event
 
-    def _classify(self, dur: float) -> str:
-        if dur >= self.microsleep:
+    def _classify(self, dur: float, shut_s: Optional[float] = None) -> str:
+        shut_s = dur if shut_s is None else shut_s
+        if dur >= self.microsleep and shut_s >= self.microsleep:
             return "microsleep"
         if dur > self.max_normal:
             return "long_closure"
@@ -679,16 +740,45 @@ class BlinkTracker:
 
     @property
     def microsleep_in_progress(self) -> bool:
-        """Eye shut right now, past the configured microsleep threshold."""
-        return self._closed and self.ongoing_closure_s >= self.microsleep
+        """Eye really shut right now, past the configured microsleep threshold."""
+        need = self.microsleep_down if self._down else self.microsleep
+        return self._closed and self.ongoing_shut_s >= need
+
+    @property
+    def shut_now(self) -> bool:
+        """Shut for longer than a normal blink: the app's "Eyes closed"."""
+        return self.ongoing_shut_s >= self.shut_label_s
+
+    def _recent_blinks(self) -> list[BlinkEvent]:
+        # Normal and slow blinks; microsleeps are scored on their own. A
+        # closure longer than max_blink_stat_s is a held squint or a look
+        # down, not a blink, and would wreck the averages.
+        return [e for e in self._events if e.kind in ("blink", "long_closure")
+                and e.judged and e.duration_s <= self.max_stat_s]
+
+    def slow_blink_fraction(self) -> float:
+        """Share of recent blinks lasting slow_blink_s or more (0 with too few)."""
+        b = self._recent_blinks()
+        if len(b) < self.min_blinks:
+            return 0.0
+        return sum(1 for e in b if e.duration_s >= self.slow_blink_s) / len(b)
+
+    def mean_reopen_s(self) -> float:
+        """Average lid reopening time of recent blinks (0 with too few)."""
+        b = self._recent_blinks()
+        if len(b) < self.min_blinks:
+            return 0.0
+        return float(np.mean([e.reopen_s for e in b]))
 
     def blink_rate_per_min(self) -> float:
         n = sum(1 for e in self._events if e.kind == "blink")
         return n * 60.0 / self.rate_window
 
     def mean_blink_duration_s(self) -> float:
-        d = [e.duration_s for e in self._events if e.kind == "blink"]
-        return float(np.mean(d)) if d else 0.0
+        # Slow blinks (long_closure) count: they ARE the drowsy trend. Below
+        # min_blinks the average is too noisy to score, so it reads 0.
+        d = [e.duration_s for e in self._recent_blinks()]
+        return float(np.mean(d)) if len(d) >= self.min_blinks else 0.0
 
     def microsleep_count(self) -> int:
         return sum(1 for e in self._events if e.kind == "microsleep")
@@ -891,6 +981,16 @@ class FeatureFrame:
     # than re-derived downstream from ongoing_closure_s against a second copy
     # of the same number.
     microsleep_now: bool = False
+    # Shut longer than a normal blink right now (the app's "Eyes closed").
+    shut_now: bool = False
+    # Typical eye openness over the last openness_window_s, relative to the
+    # driver's calibrated open level (1.0 = normal). A squint lowers it.
+    openness: float = 1.0
+    slow_blink_fraction: float = 0.0
+    mean_reopen_s: float = 0.0
+    # Head pitched down (dashboard, cluster): left out of the squint and
+    # PERCLOS windows, because lids lower naturally when looking down.
+    looking_down: bool = False
     perclos: float = 0.0
     blink_rate_per_min: float = 0.0
     mean_blink_duration_s: float = 0.0
@@ -935,7 +1035,10 @@ class FeatureExtractor:
         self.yawn = YawnTracker(features_cfg)
         self.head = HeadTracker(features_cfg)
         self.perclos_window = TimeWindow(float(features_cfg.get("perclos_window_s", 60.0)))
-        self.perclos_fraction = float(features_cfg.get("perclos_baseline_fraction", 0.80))
+        self.perclos_fraction = float(features_cfg.get("perclos_baseline_fraction", 0.40))
+        self.openness_window = TimeWindow(float(features_cfg.get("openness_window_s", 45.0)))
+        self.openness_percentile = float(features_cfg.get("openness_percentile", 60.0))
+        self.look_down_pitch = float(features_cfg.get("look_down_pitch_deg", 12.0))
         self.calibrator = Calibrator(calib_cfg)
         self.calibration = Calibration()
         self.candidate: Optional[Calibration] = None
@@ -960,6 +1063,7 @@ class FeatureExtractor:
             self.ear_ewma.reset()
             self.blink.reset()
             self.perclos_window.clear()
+            self.openness_window.clear()
 
     def cancel_calibration(self) -> None:
         """Stop measuring; whatever calibration was in place stays."""
@@ -990,6 +1094,14 @@ class FeatureExtractor:
 
     # -- main entry point --------------------------------------------------- #
 
+    def openness(self) -> float:
+        """Typical openness over the window: a high percentile, so blinks
+        (short dips) barely move it but a held squint does."""
+        v = self.openness_window.values()
+        if len(v) < 10:
+            return 1.0
+        return float(np.percentile(v, self.openness_percentile))
+
     def update(self, t: float, landmarks) -> FeatureFrame:
         if landmarks is None or not landmarks.ok:
             return FeatureFrame(t=t, face_found=False)
@@ -1004,7 +1116,16 @@ class FeatureExtractor:
         pose = solve_head_pose(pts, landmarks.image_size)
         gaze = gaze_offset(pts)
         iod = interocular_px(pts)
+        return self.measure(t, ear_raw, mar, pose, gaze, iod)
 
+    def measure(self, t: float, ear_raw: float, mar: float, pose: HeadPose,
+                gaze: tuple[float, float, bool] = (0.0, 0.0, False),
+                iod: float = 120.0) -> FeatureFrame:
+        """Everything after the landmark geometry, for one frame with a face.
+
+        Split out so tests and tools/replay_session.py can drive the real
+        trackers with synthetic or cached measurements.
+        """
         if self.calibrator.active:
             self.calibrator.feed(t, ear_raw, mar, pose, gaze, iod)
             cal = self.calibrator.finish(t)
@@ -1026,15 +1147,24 @@ class FeatureExtractor:
         ear = self.ear_ewma.update(ear_raw)
         ear_norm = ear / cal.ear_open if cal.ear_open > 1e-6 else 1.0
 
-        event = self.blink.update(t, ear, cal.ear_open)
-        self.perclos_window.push(t, ear_norm)
-        perclos = self.perclos_window.time_fraction_below(self.perclos_fraction)
-        self.yawn.update(t, mar)
-
         yaw = pose.yaw - cal.yaw_zero
         pitch = pose.pitch - cal.pitch_zero
         roll = pose.roll - cal.roll_zero
         off_road = self.head.update(t, yaw, pitch, pose.valid)
+        # Looking down lowers the lids without any drowsiness, and a turned
+        # head distorts the eye shape. While either lasts, closures don't
+        # count as blinks, the time counts as open for PERCLOS, and it's left
+        # out of the squint window. Microsleeps still count: shut eyes with
+        # the head dropping is exactly what they are for.
+        looking_down = bool(pose.valid and pitch > self.look_down_pitch)
+        unreliable = looking_down or off_road
+        event = self.blink.update(t, ear, cal.ear_open, ignore=unreliable,
+                                  looking_down=looking_down)
+        self.perclos_window.push(t, 1.0 if unreliable else ear_norm)
+        if not unreliable:
+            self.openness_window.push(t, ear_norm)
+        perclos = self.perclos_window.time_fraction_below(self.perclos_fraction)
+        self.yawn.update(t, mar)
 
         return FeatureFrame(
             t=t,
@@ -1045,6 +1175,11 @@ class FeatureExtractor:
             eye_closed=self.blink.is_closed,
             ongoing_closure_s=self.blink.ongoing_closure_s,
             microsleep_now=self.blink.microsleep_in_progress,
+            shut_now=self.blink.shut_now,
+            openness=self.openness(),
+            slow_blink_fraction=self.blink.slow_blink_fraction(),
+            mean_reopen_s=self.blink.mean_reopen_s(),
+            looking_down=looking_down,
             perclos=perclos,
             blink_rate_per_min=self.blink.blink_rate_per_min(),
             mean_blink_duration_s=self.blink.mean_blink_duration_s(),

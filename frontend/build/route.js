@@ -180,17 +180,29 @@ DYN.Route = function (root, ctx) {
     if (!left) { searching = false; return paintSummary(); }
     probes.forEach((pr, k) => setTimeout(() => {
       if (!alive()) return;
-      places.keywordSearch('휴게소', (data, status) => {
+      places.keywordSearch('고속도로휴게소', (data, status) => {
         if (!alive()) return;
         if (status === K.services.Status.OK) for (const p of data) {
-          if (!/휴게소/.test(p.place_name) || /주유소|충전소|약국|식당|편의점|정류장/.test(p.place_name)) continue;
+          // Only the rest areas themselves: Kakao tags them
+          // "교통,수송 > 휴게소 > 고속도로휴게소"; the cafés, toilets, fuel and
+          // parking inside them have other categories.
+          if (!/고속도로휴게소$/.test(p.category_name || '')) continue;
           const q = { lat: +p.y, lng: +p.x };
           let best = Infinity, bi = 0;
-          for (let i = 0; i < pts.length; i += 2) { const d = hav(q, pts[i]); if (d < best) { best = d; bi = i; } }
+          for (let i = 0; i < pts.length; i++) { const d = hav(q, pts[i]); if (d < best) { best = d; bi = i; } }
           if (best > 1500) continue;
-          const base = p.place_name.replace(/\s*\(.*\)\s*$/, '');
+          // Most come in pairs, one per direction. Korea drives on the
+          // right, so ours is the one on the right of the line.
+          const a0 = pts[Math.max(0, bi - 1)], a1 = pts[Math.min(pts.length - 1, bi + 1)];
+          const cross = (a1.lng - a0.lng) * (q.lat - a0.lat) - (a1.lat - a0.lat) * (q.lng - a0.lng);
+          const right = cross < 0 || /양방향/.test(p.place_name);
+          // One-direction rest areas on the far side serve the other carriageway.
+          if (!right && /방향/.test(p.place_name)) continue;
+          // "문막휴게소 서창방향", "여주휴게소(강릉방향)" -> "문막휴게소", "여주휴게소"
+          const base = p.place_name.replace(/(?:\s+|\s*\()[가-힣·]+방향\)?\s*$/, '').trim();
           const prev = seen.get(base);
-          if (!prev || best < prev.off) seen.set(base, { lat: q.lat, lng: q.lng, name: p.place_name, short: base.replace(/휴게소$/, ''), off: best, along: cum[bi], id: p.id });
+          if (!prev || (right && !prev.right) || (right === prev.right && best < prev.off))
+            seen.set(base, { lat: q.lat, lng: q.lng, name: p.place_name, short: base.replace(/휴게소$/, ''), off: best, along: cum[bi], id: p.id, right });
         }
         if (--left === 0) {
           searching = false;

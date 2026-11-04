@@ -33,22 +33,22 @@ from .features import FeatureFrame
 # Defaults only; config state.ranges overrides each one. Sources and reasoning
 # are in docs/thresholds.md.
 RANGES: dict[str, tuple[float, float]] = {
-    "perclos": (0.03, 0.20),          # share of 60 s really shut (< ear_shut_fraction)
-    "squint": (0.10, 0.40),           # 1 - typical openness over 45 s
-    "blink_duration": (0.15, 0.35),   # s, mean of recent blinks
-    "slow_blinks": (0.10, 0.50),      # share of recent blinks >= slow_blink_s
-    "lid_speed": (0.10, 0.30),        # s, mean lid reopening time
-    "blink_rate": (24.0, 40.0),       # per minute
-    "microsleep": (0.0, 2.0),         # events per 60 s
-    "yawn": (0.0, 12.0),              # per hour
-    "head_nod": (2.0, 10.0),          # degrees pitch std over 10 s
+    # All on the driver's personal scale (SPEC.md, 15); see docs/thresholds.md.
+    "heavy_lids": (0.15, 0.45),       # 1 - typical openness over 45 s
+    "perclos": (0.03, 0.15),          # P80: share of reliable time with openness <= 20 %
+    "blink_duration": (0.17, 0.30),   # s: recent median minus the driver's normal, + 0.12
+    "long_blinks": (1.0, 5.0),        # 0.3-0.5 s blinks per minute
+    "lid_speed": (1.3, 2.3),          # reopening AVR / the driver's normal
+    "nods": (0.0, 2.0),               # head nods in the last 2 minutes
+    "microsleep": (0.0, 2.0),         # per minute
+    "yawn": (0.0, 18.0),              # per hour (3 in 10 min saturates)
+    "blink_rate": (1.5, 2.5),         # rate / the driver's normal rate
 }
 # Kept as names for anything that imported them.
 PERCLOS_RANGE = RANGES["perclos"]
 BLINK_DURATION_RANGE = RANGES["blink_duration"]
 MICROSLEEP_RANGE = RANGES["microsleep"]
 YAWN_RATE_RANGE = RANGES["yawn"]
-PITCH_STD_RANGE = RANGES["head_nod"]
 
 # The fused sub-scores, in a fixed order. The session CSV takes its columns
 # from this, so a frame with no face (and so no components) cannot leave them
@@ -57,7 +57,7 @@ COMPONENTS = tuple(RANGES)
 
 # The driver's state in one word, decided here so the app and the laptop
 # overlay can't disagree (docs/SPEC.md, section 13).
-LABELS = ("alert", "a_bit", "drowsy", "very", "eyes_closed", "away", "no_face")
+LABELS = ("alert", "a_bit", "drowsy", "very", "eyes_closed", "head_drop", "away", "no_face")
 LEVEL_LABELS = ("alert", "a_bit", "drowsy", "very", "very")
 
 
@@ -125,6 +125,9 @@ class StateEstimator:
         self.rise_tau = float(cfg.get("score_rise_tau_s", 6.0))
         self.fall_tau = float(cfg.get("score_fall_tau_s", 20.0))
         self.microsleep_floor = float(cfg.get("microsleep_score", 0.90))
+        # A detected nod is a late sign of drowsiness (rater schemes put
+        # head nodding at "very drowsy"), so it lifts the score at once.
+        self.nod_floor = float(cfg.get("nod_score", 0.50))
         self._smooth: Optional[float] = None
         self._smooth_t: Optional[float] = None
         self._label = "alert"
@@ -174,28 +177,25 @@ class StateEstimator:
     @staticmethod
     def _signals(f: FeatureFrame) -> dict[str, float]:
         """The raw value behind each component, in its own units."""
+        base = getattr(f, "blink_baseline_s", 0.12) or 0.12
+        rate0 = getattr(f, "blink_rate_baseline", 17.0) or 17.0
         return {
+            "heavy_lids": max(0.0, 1.0 - f.openness),
             "perclos": f.perclos,
-            "squint": max(0.0, 1.0 - f.openness),
-            "blink_duration": f.mean_blink_duration_s,
-            "slow_blinks": f.slow_blink_fraction,
-            "lid_speed": f.mean_reopen_s,
-            "blink_rate": f.blink_rate_per_min,
+            # Re-anchored on a typical 0.12 s blink, so the range reads in
+            # ordinary seconds whatever this driver's own normal is.
+            "blink_duration": (f.mean_blink_duration_s - base + 0.12) if f.mean_blink_duration_s > 0 else 0.0,
+            "long_blinks": getattr(f, "long_blinks_per_min", 0.0),
+            "lid_speed": getattr(f, "reopen_ratio", 1.0),
+            "nods": float(getattr(f, "nod_count", 0)),
             "microsleep": float(f.microsleep_count),
             "yawn": f.yawn_rate_per_hour,
-            "head_nod": f.pitch_std,
+            "blink_rate": (f.blink_rate_per_min / rate0) if f.blink_rate_per_min > 0 else 0.0,
         }
 
     def _components(self, f: FeatureFrame) -> dict[str, float]:
         sig = self._signals(f)
-        out = {k: _ramp(sig[k], *self.ranges[k]) for k in COMPONENTS}
-        # Blink averages read 0 until there are enough blinks; 0 must not
-        # count as "fast", it means "no evidence yet".
-        if f.mean_blink_duration_s <= 0.0:
-            out["blink_duration"] = 0.0
-        if f.mean_reopen_s <= 0.0:
-            out["lid_speed"] = 0.0
-        return out
+        return {k: _ramp(sig[k], *self.ranges[k]) for k in COMPONENTS}
 
     def _smoothed(self, t: float, raw: float) -> float:
         if self._smooth is None or self._smooth_t is None:
@@ -211,6 +211,8 @@ class StateEstimator:
         return self._smooth
 
     def _label_for(self, f: FeatureFrame, level: int, distracted: bool) -> str:
+        if getattr(f, "head_drop", False):
+            return "head_drop"
         if f.microsleep_now or f.shut_now:
             return "eyes_closed"
         if distracted or f.off_road:
@@ -280,6 +282,25 @@ class StateEstimator:
     def update(self, f: FeatureFrame, calibrated: bool = True) -> DriverState:
         t = f.t
 
+        if not f.face_found and getattr(f, "head_drop", False):
+            # The face went down with the head (SPEC.md, 15): a nod, and after
+            # head_drop_microsleep_s a microsleep. Never "no face".
+            self._face_lost_since = None
+            score = self._last_score
+            if f.microsleep_now:
+                score = max(score, self.microsleep_floor)
+            score = max(score, self.nod_floor)
+            self._smooth = score
+            self._smooth_t = t
+            level, level_name = self._resolve_level(t, score, force_top=f.microsleep_now,
+                                                    perclos=0.0)
+            self._last_score = score
+            self._label = "head_drop"
+            return DriverState(t=t, score=score, raw_score=score, label="head_drop",
+                               level=level, level_name=level_name, kss=1.0 + 8.0 * score,
+                               microsleep_now=f.microsleep_now, face_lost=True, face_lost_s=0.0,
+                               confidence=0.5, calibrated=calibrated)
+
         if not f.face_found:
             if self._face_lost_since is None:
                 self._face_lost_since = t
@@ -348,6 +369,9 @@ class StateEstimator:
         # features.blink.microsleep_duration_s, so editing the config moved
         # the event classification but not the alert trigger.
         microsleep_now = f.microsleep_now
+        if getattr(f, "nodding", False):
+            score = max(score, self.nod_floor)
+            self._smooth = score
         if microsleep_now:
             score = max(score, self.microsleep_floor)
             self._smooth = score

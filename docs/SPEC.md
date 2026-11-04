@@ -438,3 +438,49 @@ Every threshold is in `config/default.yaml` with a comment, and the reasoning an
 **Tuning tools**
 - `tools/record_session.py` records a webcam session to a video file, with timestamps, and lets you press keys to mark what you were doing (squinting, slow blinks, looking down).
 - `tools/replay_session.py` runs the real pipeline over a recording, as fast as it can, with any config override, and writes every signal, the score and the level per frame to CSV, plus a summary per marked stretch.
+
+---
+
+## 15. Detection that learns the driver (branch `detection-software`)
+
+The audit and the before/after numbers are in `docs/detection-audit.md`. Decisions made on this branch:
+
+**Personal eye scale.** Eye openness is a 0–100 % scale between the driver's own calibrated closed level (0 %) and their normal open level (100 %, the median of the look-ahead step). Every eye threshold is on this scale, so small eyes, big eyes and glasses behave the same.
+- Eye aspect ratio (EAR) is the width-weighted mean of both eyes, corrected for head yaw and pitch relative to the calibrated neutral. An eye much narrower than the other (turned away, covered, at the frame edge) is dropped.
+- MediaPipe blendshapes are on. `eyeBlink` gives a second, independent openness on the same personal scale (its open and closed levels are calibrated too). The two are averaged; if they disagree strongly (glare, landmark error) the frame is unreliable.
+
+**Unreliable frames** are left out of every eye signal (and out of PERCLOS's time base): head down past the calibrated wobble, yaw or pitch beyond ±30 %, face at the frame edge, face too small, a smile, laugh, talking or a yawn, the 1 s after a sudden lighting change, and EAR/blendshape disagreement. Blinks inside them don't count either. A microsleep is still possible during them, but needs longer (looking down 1.5 s, expression 1.0 s).
+
+**Eye signals** (all relative to the driver's calibration):
+- Heavy lids: typical openness over 45 s.
+- PERCLOS: P80 (openness ≤ 20 %) over 60 s.
+- Blink duration at half amplitude, with sub-frame crossing times; compared with the driver's own normal blink.
+- Long blinks: 0.3–0.5 s, counted per minute.
+- Lid speed: amplitude–velocity ratio of reopening, compared with the driver's normal.
+- Blink rate: change from the driver's normal (small weight).
+
+**Head nods.** Pitch relative to the calibrated neutral. A nod is a drop of at least `nod_depth_deg` (and well past the driver's wobble), at a slow-to-moderate speed with the eyes heavy or closed, followed by a fast recovery (a jerk back up) — or a face lost within 0.6 s of a downward movement. A face lost that way is "Head dropping", never "No face", and after 0.5 s it counts as a microsleep (top stage). A deliberate look at the dashboard (fast, eyes open, no jerk) is not a nod.
+
+**Expressions.** With blendshapes: `mouthSmile` / `cheekSquint` mark a smile or laugh, `jawOpen` above its threshold for 1 s marks a yawn, jaw movement at speech rate marks talking. Without blendshapes: mouth width relative to the calibrated rest, and MAR, do the same.
+
+**Score.** Weighted sub-scores (heavy lids, PERCLOS, blink duration, long blinks, lid speed, nods, microsleeps, yawns, blink rate), smoothed (up over seconds, down more slowly), shown 0–100. Every anchor sits beyond the driver's normal variation, so an alert, calibrated driver scores about 0–10. Levels and the ladder mapping are as in section 14. The microsleep bypass is kept: shut (≤ 25 % openness, confirmed by blendshapes when available) for 0.5 s → top stage at once.
+
+**Time-of-day risk is separate.** The camera score reflects only what the camera sees. The rest planner's two-process estimate (hours awake, time of day) is sent as `time_risk` (`low`, `medium`, `high`) and shown on its own line on the Camera screen. It never changes the score or the ladder.
+
+**New label** `head_drop` ("Head dropping" / "고개 떨굼"), between `away` and `eyes_closed` in priority.
+
+**Calibration** (guided, from the phone):
+1. Position: hints until the face is centred, close enough, lit, facing the camera, still.
+2. Look ahead (15 s, extended up to 25 s for blinks): learns the open-level distribution (EAR and eyeBlink), normal blink duration and rate, neutral head pose and its wobble, face size, brightness and the mouth at rest.
+3. Close your eyes (3 s): learns the closed level.
+4. Quality checks, each with a plain reason, redoing the step that failed (up to twice): steady face, light, distance, at least 3 blinks, open and closed clearly apart.
+5. Summary: eye size (small/medium/large), open and closed levels, normal blink (ms and per minute), neutral head pose and wobble, and the quality checks.
+6. Device test: speaker, chime, light, mist, as before.
+
+It is saved per driver as `runs/drivers/<driver>/calibration.json` (the driver is the profile name; "default" when there is none) and loaded at start-up. The start-up auto-calibration (no phone) only runs the look-ahead step and estimates the closed level from population data, marked as estimated; the guided calibration replaces it.
+
+**Calibration screen.** The live camera is the main element, with a face-guide oval. One step at a time: Ollie with one big instruction, a progress ring for that step, a check animation when it passes, then it slides away and the next appears. Live hints (Move closer, Move back, Too dark, Too bright, Face the camera, Hold still) appear on the video. The device-test steps use the same style with Yes / No. The summary shows what was learned.
+
+**Frame rate.** Detection runs on the camera loop at the camera's rate (≥ 25–30 fps on a laptop webcam in normal light), and the snapshot reports the capture rate and the processing capacity separately. The phone video is encoded on its own thread (section 13). Pi plan: 640×480 or 1536×864 binned at 30 fps from the camera, `landmarks.input_width: 640`, blendshapes on (about 2 ms); if processing drops below 25 fps, turn the preview off first, then blendshapes.
+
+**Validation.** `src/bamnun/scenarios.py` simulates every case (alert, talking, smiling/laughing, mirror/dashboard/phone glances, head turns, yawning, glasses glare, lighting changes, face partly out, one eye hidden; slow blinks, heavy eyelids, head nods, microsleeps, progressive drowsiness) for four eye types at 30 and 15 fps. `tools/evaluate_detection.py` reports detection rate, false alarms per hour, reaction time and resting score; `tests/test_detection_eval.py` runs a subset every time and fails if a drowsy case is missed or a not-drowsy case alarms. `tools/record_session.py --script` runs a 10-minute labelled webcam protocol; its recordings are evaluated the same way.

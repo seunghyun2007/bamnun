@@ -443,3 +443,42 @@ def test_an_alert_still_going_counts_in_the_live_trip(store):
     run(tr, 0, 10, face=True, calibrated=True, stage=0)
     run(tr, 10, 20, face=True, calibrated=True, stage=3)
     assert tr.live(20)["summary"]["alerts"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Kakao route (section 9)
+# --------------------------------------------------------------------------- #
+
+
+def test_kakao_directions_are_summarised_for_the_app():
+    from bamnun import kakao
+    data = {"routes": [{"result_code": 0, "summary": {"distance": 390000, "duration": 16200, "fare": {"toll": 21000}},
+                        "sections": [{"roads": [{"vertexes": [126.7, 37.4, 126.8, 37.3]},
+                                                {"vertexes": [128.9, 35.1]}]}]}]}
+    r = kakao.summarise(data)
+    assert r == {"distance_m": 390000, "duration_s": 16200, "toll_won": 21000,
+                 "path": [[126.7, 37.4], [126.8, 37.3], [128.9, 35.1]]}
+    assert len(kakao.thin([[i, i] for i in range(5000)], 100)) == 100
+    with pytest.raises(kakao.KakaoError):
+        kakao.summarise({"routes": [{"result_code": 104, "result_msg": "too close"}]})
+
+
+def test_kakao_needs_a_key_and_points_in_korea(tmp_path, monkeypatch):
+    from bamnun import kakao
+    with pytest.raises(kakao.KakaoError, match="REST key"):
+        kakao.directions("126.7,37.4", "129.0,35.1", rest_key="")
+    with pytest.raises(ValueError):
+        kakao.parse_point("2.35,48.85")          # Paris
+    env = tmp_path / ".env"
+    env.write_text("# keys\nKAKAO_JS_KEY = 'abc'\nKAKAO_REST_KEY=xyz\n", encoding="utf-8")
+    assert kakao.read_env(env) == {"KAKAO_JS_KEY": "abc", "KAKAO_REST_KEY": "xyz"}
+
+
+def test_api_route_reports_a_missing_key(api, monkeypatch):
+    from bamnun import kakao
+    hub, client = api
+    monkeypatch.setattr(kakao, "key", lambda name: "")
+    assert client.get("/api/config").json() == {"kakao_js_key": None, "kakao_directions": False}
+    r = client.get("/api/route?origin=126.7,37.4&destination=129.0,35.1")
+    assert r.status_code == 503 and "REST key" in r.json()["detail"]
+    assert client.get("/api/route?origin=x&destination=129.0,35.1").status_code == 422

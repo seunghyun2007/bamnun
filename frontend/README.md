@@ -36,6 +36,20 @@ Double-click `Bamnun_app.html`. It opens in any browser and plays a simulated dr
 
 It reconnects by itself, and the Home chip shows Connecting… / Bamnun connected / Not connected. The demo driver runs only when the file is opened from disk or the address has `?demo`; it never stands in for a lost connection.
 
+## Kakao map (Route screen)
+
+The Route screen uses Kakao Maps, place search and Kakao Mobility directions. Put both keys from [Kakao Developers](https://developers.kakao.com) in `frontend/.env` (not in git):
+
+```
+KAKAO_JS_KEY=your JavaScript key
+KAKAO_REST_KEY=your REST API key
+```
+
+- In Kakao Developers → your app → Platform → Web, register every address the app is opened from, e.g. `http://localhost:8000` and `http://10.42.0.1:8000`. Turn on **Kakao Map** for the app (Product settings).
+- The JS key is public by design and only works from registered addresses. The build puts it into `www/index.html` only; `Bamnun_app.html` stays key-free and asks the device.
+- The REST key stays on the device: the app calls `GET /api/route` and the device calls Kakao. Restart the device program after editing `.env`.
+- Kakao's routing is car routing: truck height and weight limits aren't checked, and the screen says so.
+
 ## Rebuild
 
 Run these from this folder.

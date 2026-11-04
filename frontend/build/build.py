@@ -70,6 +70,7 @@ for name in ORDER:
 
 shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="utf-8").read()
 dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
+dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "route.js"), encoding="utf-8").read()
 live = open(os.path.join(os.path.dirname(__file__), "live.js"), encoding="utf-8").read()
 live += chr(10) + open(os.path.join(os.path.dirname(__file__), "api.js"), encoding="utf-8").read()
 live += chr(10) + open(os.path.join(os.path.dirname(__file__), "overlay.js"), encoding="utf-8").read()
@@ -83,8 +84,22 @@ html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
 # it opens from disk, from the Pi or in Capacitor with nothing beside it.
 FONTS = os.path.join(os.path.dirname(__file__), "..", "fonts")
 html = re.sub(r"url\(fonts/([\w.-]+\.woff2)\)", lambda m: "url(data:font/woff2;base64," + base64.b64encode(open(os.path.join(FONTS, m.group(1)), "rb").read()).decode() + ")", html)
+# The Kakao map key (public, but locked to registered web addresses) goes only
+# into builds under www/, which are not in git. Bamnun_app.html stays key-free
+# and asks the device (/api/config). The secret REST key never goes in at all.
+ENV = {}
+try:
+    for line in open(os.path.join(os.path.dirname(__file__), "..", ".env"), encoding="utf-8"):
+        if "=" in line and not line.strip().startswith("#"):
+            k, v = line.split("=", 1)
+            ENV[k.strip()] = v.strip().strip("'\"")
+except OSError:
+    pass
 # OUT may list several paths separated by commas; all get the same build.
 for out in OUT.split(","):
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    open(out, "w", encoding="utf-8", newline="\n").write(html)
+    page = html
+    if ENV.get("KAKAO_JS_KEY") and "www" in os.path.normpath(out).split(os.sep):
+        page = page.replace("<script>", "<script>window.BN_KAKAO_JS=" + json.dumps(ENV["KAKAO_JS_KEY"]) + ";", 1)
+    open(out, "w", encoding="utf-8", newline="\n").write(page)
 print("ok", len(html))

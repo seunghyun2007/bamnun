@@ -49,7 +49,7 @@
       const r = await fetch(base() + path, { method, signal: ctl.signal,
         headers: body === undefined ? {} : { "Content-Type": "application/json" },
         body: body === undefined ? undefined : JSON.stringify(body) });
-      if (!r.ok) throw new Error(method + " " + path + " " + r.status);
+      if (!r.ok) { let d = ""; try { d = (await r.json()).detail; } catch (e) {} throw new Error(typeof d === "string" && d ? d : method + " " + path + " " + r.status); }
       return r.status === 204 ? null : r.json();
     } finally { clearTimeout(timer); }
   }

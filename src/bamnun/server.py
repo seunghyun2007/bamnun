@@ -44,6 +44,7 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
+from . import kakao
 from .session import repo_root
 from .store import InvalidUpdate, Store
 from .telemetry import Hub
@@ -238,6 +239,28 @@ def create_app(hub: Hub, www: Optional[Path] = None,
         if range not in RANGES:
             raise HTTPException(422, f"range must be one of {tuple(RANGES)}")
         return insights(need_store(), range, tz_min=hub.tz_min if tz is None else tz)
+
+    # -- route (section 9) -------------------------------------------------- #
+
+    @app.get("/api/config")
+    def config() -> dict[str, Any]:
+        """Public settings for the app: the Kakao map key, if there is one."""
+        return {"kakao_js_key": kakao.key("KAKAO_JS_KEY") or None,
+                "kakao_directions": bool(kakao.key("KAKAO_REST_KEY"))}
+
+    @app.get("/api/route")
+    def route(origin: str, destination: str, vehicle: str = "car") -> dict[str, Any]:
+        """Driving directions from Kakao Mobility; the REST key stays here.
+
+        A plain ``def``: FastAPI runs it on a worker thread, so the wait for
+        Kakao holds up neither the event loop nor the camera loop.
+        """
+        try:
+            return kakao.directions(origin, destination, kakao.CAR_TYPE.get(vehicle, 1))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        except kakao.KakaoError as exc:
+            raise HTTPException(503 if isinstance(exc, kakao.NoKey) else 502, str(exc)) from None
 
     # -- emergency (section 9b) -------------------------------------------- #
 

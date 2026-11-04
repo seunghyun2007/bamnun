@@ -1,0 +1,207 @@
+[
+  {
+    "case": "alert",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 1.1,
+    "p90_score": 11.1,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "talking",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 2.5,
+    "rest_score": 5.9,
+    "p90_score": 29.9,
+    "time_flagged": 4.3
+  },
+  {
+    "case": "smiling_laughing",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 4.9,
+    "rest_score": 4.7,
+    "p90_score": 32.5,
+    "time_flagged": 6.9
+  },
+  {
+    "case": "mirror_glances",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 2.0,
+    "p90_score": 15.3,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "dashboard_glances",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 4.7,
+    "p90_score": 23.3,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "phone_glances",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 7.2,
+    "rest_score": 7.9,
+    "p90_score": 42.0,
+    "time_flagged": 21.4
+  },
+  {
+    "case": "head_turns",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 1.7,
+    "p90_score": 18.7,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "yawning",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 4.2,
+    "p90_score": 14.5,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "glasses_glare",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 2.4,
+    "rest_score": 7.6,
+    "p90_score": 25.0,
+    "time_flagged": 3.6
+  },
+  {
+    "case": "lighting_change",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 0.0,
+    "rest_score": 1.8,
+    "p90_score": 18.3,
+    "time_flagged": 0.0
+  },
+  {
+    "case": "face_partly_out",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 2.4,
+    "rest_score": 0.8,
+    "p90_score": 26.5,
+    "time_flagged": 9.3
+  },
+  {
+    "case": "one_eye_hidden",
+    "drowsy": false,
+    "detection": null,
+    "missed_eyes": [],
+    "reaction_s": null,
+    "false_alarms_h": 2.4,
+    "rest_score": 3.2,
+    "p90_score": 26.1,
+    "time_flagged": 3.8
+  },
+  {
+    "case": "slow_blinks",
+    "drowsy": true,
+    "detection": 1.0,
+    "missed_eyes": [],
+    "reaction_s": 38.0,
+    "false_alarms_h": null,
+    "rest_score": 33.3,
+    "p90_score": 40.0,
+    "time_flagged": 67.4
+  },
+  {
+    "case": "heavy_eyelids",
+    "drowsy": true,
+    "detection": 0.875,
+    "missed_eyes": [
+      "medium@30fps"
+    ],
+    "reaction_s": 46.8,
+    "false_alarms_h": null,
+    "rest_score": 23.6,
+    "p90_score": 48.9,
+    "time_flagged": 56.4
+  },
+  {
+    "case": "head_nods",
+    "drowsy": true,
+    "detection": 0.0,
+    "missed_eyes": [
+      "glasses@15fps",
+      "glasses@30fps",
+      "large@15fps",
+      "large@30fps",
+      "medium@15fps",
+      "medium@30fps",
+      "small@15fps",
+      "small@30fps"
+    ],
+    "reaction_s": null,
+    "false_alarms_h": null,
+    "rest_score": 12.0,
+    "p90_score": 30.0,
+    "time_flagged": 6.6
+  },
+  {
+    "case": "microsleep",
+    "drowsy": true,
+    "detection": 0.41304347826086957,
+    "missed_eyes": [
+      "glasses@15fps",
+      "glasses@30fps",
+      "medium@15fps",
+      "medium@30fps",
+      "small@15fps",
+      "small@30fps"
+    ],
+    "reaction_s": 0.8,
+    "false_alarms_h": null,
+    "rest_score": 13.3,
+    "p90_score": 81.7,
+    "time_flagged": 33.5
+  },
+  {
+    "case": "progressive",
+    "drowsy": true,
+    "detection": 1.0,
+    "missed_eyes": [],
+    "reaction_s": 159.7,
+    "false_alarms_h": null,
+    "rest_score": 5.0,
+    "p90_score": 39.1,
+    "time_flagged": 20.6
+  }
+]

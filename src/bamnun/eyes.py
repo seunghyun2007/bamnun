@@ -43,6 +43,19 @@ def _cfg(d: Optional[dict], key: str, default):
     return type(default)(v) if isinstance(default, (int, float)) and not isinstance(default, bool) else v
 
 
+def face_brightness(image, points) -> Optional[float]:
+    """Mean grey level of the face box, sampled sparsely (about 0.2 ms)."""
+    try:
+        h, w = image.shape[:2]
+        x0, y0 = int(max(0, points[:, 0].min())), int(max(0, points[:, 1].min()))
+        x1, y1 = int(min(w, points[:, 0].max())), int(min(h, points[:, 1].max()))
+        if x1 - x0 < 8 or y1 - y0 < 8:
+            return None
+        return float(image[y0:y1:6, x0:x1:6].mean())
+    except Exception:  # noqa: BLE001 - brightness is advisory
+        return None
+
+
 # --------------------------------------------------------------------------- #
 # One frame's measurements
 # --------------------------------------------------------------------------- #
@@ -255,6 +268,7 @@ class Conditions:
                 self._slow_b = x.brightness
             if abs(x.brightness - self._slow_b) > self.light_jump:
                 self._light_until = t + self.light_hold
+                self._slow_b = x.brightness      # the new light is the new normal
             a = 1.0 - math.exp(-dt / 2.0) if dt > 0 else 0.0
             self._slow_b += (x.brightness - self._slow_b) * a
 
@@ -316,6 +330,8 @@ class BlinkDetector:
         self._judged = True
         self._armed = True
         self.closed = False
+        # The most recent ordinary blink, for the Camera screen.
+        self.last_blink_s: Optional[float] = None
 
     def update(self, t: float, o: Optional[float], reliable: bool) -> Optional[Blink]:
         if o is None:
@@ -350,6 +366,8 @@ class BlinkDetector:
                         else "long" if half_s >= self.long_s else "blink")
                 ev = Blink(start, up_at, half_s, depth, avr, self._judged, kind)
                 self.events.append(ev)
+                if kind in ("blink", "long"):
+                    self.last_blink_s = half_s
                 self.closed = False
                 self._armed = False
                 self._closing_at = None
@@ -453,6 +471,8 @@ class NodDetector:
         self._drop: Optional[dict] = None
         self.head_drop_since: Optional[float] = None
         self.wobble = 2.0
+        self.max_drop_s = _cfg(cfg, "nod_max_drop_s", 4.0)
+        self._prev_pitch: Optional[float] = None
 
     def _speed(self, t: float, span: float = 0.15) -> float:
         """Pitch speed, deg/s (positive = going down), over the last span."""
@@ -474,8 +494,12 @@ class NodDetector:
         ev = None
         need = max(self.depth_deg, self.wobble_k * self.wobble)
         d = self._drop
+        prev, self._prev_pitch = self._prev_pitch, pitch
         if d is None:
-            if pitch > self.start_deg and self._speed(t) > 0:
+            # A drop starts only by crossing down OUT of the neutral band, so
+            # its whole descent is seen; a head already held down (reading a
+            # phone) never starts one.
+            if prev is not None and prev <= self.start_deg < pitch and self._speed(t) > 0:
                 d = self._drop = {"t0": t, "p0": pitch, "max": pitch, "t_max": t,
                                   "heavy": 0, "n": 0, "speed": self._speed(t)}
         if d is not None:
@@ -501,7 +525,8 @@ class NodDetector:
                     ev = Nod(t, depth, d["speed"], up, heavy, False)
                     self.events.append(ev)
                 self._drop = None
-            elif pitch < self.start_deg * 0.5 or t - d["t_max"] > self.recover_s:
+            elif (pitch < self.start_deg * 0.5 or t - d["t_max"] > self.recover_s
+                  or t - d["t0"] > self.max_drop_s):
                 self._drop = None
         while self.events and self.events[0].t < t - self.window:
             self.events.popleft()
@@ -541,7 +566,7 @@ class Calibration:
     """What the calibration learned about this driver."""
 
     ear_open: float = 0.30          # median EAR, eyes normally open, pose-corrected
-    ear_closed: float = 0.10        # EAR with the eyes shut
+    ear_closed: float = 0.0         # EAR with the eyes shut (0 = estimate from ear_open)
     ear_p10: float = 0.27
     ear_p90: float = 0.33
     ear_std: float = 0.02
@@ -568,6 +593,10 @@ class Calibration:
     complete: bool = False
     version: int = 2
     quality: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.ear_closed <= 0:
+            self.ear_closed = self.ear_open * 0.33
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -701,11 +730,17 @@ class Calibrator:
     # -- look ahead ----------------------------------------------------------- #
 
     def start(self, t: float) -> None:
+        """(Re)start the look-ahead. A failure's code and reason stay readable
+        until the next calibration is started from outside (``reset``)."""
         self._t0 = t
         self._rows = []
         self._seen = 0
         self._closed = None
+
+    def reset(self) -> None:
+        self.attempts = 0
         self.failure_code = None
+        self.last_failure = None
 
     def feed(self, t: float, ear: float, mar: float, pose, gaze: tuple[float, float, bool],
              iod: float, x: Optional[EyeInputs] = None) -> None:

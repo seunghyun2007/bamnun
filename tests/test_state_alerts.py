@@ -23,7 +23,7 @@ from bamnun.state import COMPONENTS, StateEstimator, _ramp  # noqa: E402
 
 STATE_CFG = {
     "weights": {"perclos": 0.35, "blink_duration": 0.20, "microsleep": 0.25,
-                "yawn": 0.10, "head_nod": 0.10},
+                "yawn": 0.10, "nods": 0.10},
     "levels": [
         {"name": "alert", "min_score": 0.00, "dwell_s": 0.0},
         {"name": "mild", "min_score": 0.35, "dwell_s": 3.0},
@@ -39,7 +39,7 @@ STATE_CFG = {
     "score_rise_tau_s": 0.0,
     "score_fall_tau_s": 0.0,
     "ranges": {"perclos": [0.05, 0.30], "blink_duration": [0.15, 0.45],
-               "microsleep": [0.0, 2.0], "yawn": [0.0, 12.0], "head_nod": [2.0, 10.0]},
+               "microsleep": [0.0, 2.0], "yawn": [0.0, 12.0], "nods": [0.0, 2.0]},
 }
 
 ALERT_CFG = {
@@ -88,7 +88,7 @@ def test_weights_are_normalised():
 def test_fully_alert_driver_scores_near_zero():
     est = StateEstimator(STATE_CFG)
     s = est.update(ff(t=1.0, perclos=0.02, mean_blink_duration_s=0.13,
-                      pitch_std=1.0), calibrated=True)
+                      nod_count=0), calibrated=True)
     assert s.score < 0.05
     assert s.level == 0
     assert s.kss < 1.5
@@ -97,7 +97,7 @@ def test_fully_alert_driver_scores_near_zero():
 def test_high_perclos_raises_score_and_kss():
     est = StateEstimator(STATE_CFG)
     s = est.update(ff(t=1.0, perclos=0.30, mean_blink_duration_s=0.45,
-                      microsleep_count=2, pitch_std=10.0,
+                      microsleep_count=2, nod_count=2,
                       yawn_rate_per_hour=12.0), calibrated=True)
     assert s.score == pytest.approx(1.0, abs=1e-6)
     assert s.kss == pytest.approx(9.0, abs=1e-6)
@@ -143,7 +143,7 @@ def test_dwell_time_is_enforced_before_escalation():
 def test_hysteresis_prevents_flapping_on_the_way_down():
     est = StateEstimator(STATE_CFG)
     hi = dict(perclos=0.30, mean_blink_duration_s=0.45, microsleep_count=2,
-              yawn_rate_per_hour=12.0, pitch_std=10.0)
+              yawn_rate_per_hour=12.0, nod_count=2)
     t = 0.0
     for _ in range(12):
         s = est.update(ff(t=t, **hi), calibrated=True)
@@ -151,10 +151,10 @@ def test_hysteresis_prevents_flapping_on_the_way_down():
     assert s.level == 3
     # Nudge the score into the hysteresis band: below level 3's 0.75 entry
     # threshold but not yet below 0.75 - 0.08. It must stay at level 3.
-    # 0.35 + 0.20 + 0.25*0.5 + 0 + 0.10*0.125 = 0.6875
+    # 0.35 + 0.20 + 0.25*0.5 + 0 + 0 = 0.675
     s = est.update(ff(t=t, perclos=0.30, mean_blink_duration_s=0.45,
-                      microsleep_count=1, pitch_std=3.0), calibrated=True)
-    assert s.score == pytest.approx(0.6875, abs=1e-6)
+                      microsleep_count=1, nod_count=0), calibrated=True)
+    assert s.score == pytest.approx(0.675, abs=1e-6)
     assert 0.67 < s.score < 0.75
     assert s.level == 3, "de-escalated without clearing the hysteresis band"
     # Now push it clearly below the band and it should fall.
@@ -168,7 +168,7 @@ def test_escalation_climbs_one_stage_per_cooldown():
     pol = EscalationPolicy(ALERT_CFG)
     est = StateEstimator(STATE_CFG)
     hi = dict(perclos=0.30, mean_blink_duration_s=0.45, microsleep_count=2,
-              yawn_rate_per_hour=12.0, pitch_std=10.0)
+              yawn_rate_per_hour=12.0, nod_count=2)
 
     # 5 s of frames at 20 Hz. Level reaches 3 after the 1 s dwell, but only
     # the first stage may have fired: stage 1's cooldown is 45 s.
@@ -320,7 +320,7 @@ def test_suppressed_actuators_are_reported_not_silently_dropped():
     pol = EscalationPolicy(ALERT_CFG)
     est = StateEstimator(STATE_CFG)
     hi = dict(perclos=0.30, mean_blink_duration_s=0.45, microsleep_count=2,
-              yawn_rate_per_hour=12.0, pitch_std=10.0)
+              yawn_rate_per_hour=12.0, nod_count=2)
     t, suppressed_seen = 0.0, False
     for _ in range(40):
         s = est.update(ff(t=t, **hi), calibrated=True)
@@ -353,7 +353,7 @@ def test_de_escalation_stands_the_thermal_down():
     thermal = next(a for a in pol.actuators.values()
                    if isinstance(a, PeltierFanActuator))
     hi = dict(perclos=0.30, mean_blink_duration_s=0.45, microsleep_count=2,
-              yawn_rate_per_hour=12.0, pitch_std=10.0)
+              yawn_rate_per_hour=12.0, nod_count=2)
     t = 0.0
     for _ in range(8):
         pol.update(est.update(ff(t=t, **hi), calibrated=True))
@@ -376,7 +376,7 @@ def test_de_escalation_does_not_immediately_re_fire():
     pol = EscalationPolicy(ALERT_CFG)
     est = StateEstimator(STATE_CFG)
     hi = dict(perclos=0.30, mean_blink_duration_s=0.45, microsleep_count=1,
-              pitch_std=3.0)
+              nod_count=0)
     t = 0.0
     # Closure in progress -> override to the top stage.
     for _ in range(10):

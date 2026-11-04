@@ -589,6 +589,8 @@ class FeatureExtractor:
         self.hold = bool(hold and self.calibration.complete)
         self.candidate = None
         self._closing = False
+        self.calibrator.failure_code = None
+        self.calibrator.last_failure = None
         self.calibrator.start(t)
         if not self.hold:
             self._reset_live()
@@ -754,8 +756,11 @@ class FeatureExtractor:
         self.nods.wobble = cal.pitch_wobble
         nod = self.nods.update(t, pitch, o) if pose.valid else None
 
-        # Blinks (all frames tracked; only reliable ones count).
-        ev = self.blinks.update(t, o, reliable)
+        # Blinks (all frames tracked; only reliable ones count). Measured
+        # from where the lids currently rest: with heavy lids at 55 % a blink
+        # still closes from 55 % to 0, and must still be seen and timed.
+        rest = max(self._open_cache[1], 0.35)
+        ev = self.blinks.update(t, None if o is None else o / rest, reliable)
 
         # Shut eyes and the microsleep bypass.
         shut = o is not None and o <= self.shut_level
@@ -779,7 +784,10 @@ class FeatureExtractor:
 
         # PERCLOS and heavy lids over reliable time.
         self.perclos_meter.push(t, o, reliable)
-        if reliable and not self.blinks.closed:
+        # Every reliable frame: blinks are ~3 % of frames and the median
+        # ignores them, while a held squint (which keeps the blink detector
+        # "closed") must count.
+        if reliable:
             self._open.append((t, o))
         while self._open and self._open[0][0] < t - self.open_window_s:
             self._open.popleft()

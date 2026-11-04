@@ -314,7 +314,7 @@ class Monitor:
             stage_name=str(self.policy.stages[self.policy.stage].get("name", "")),
             calibrated=self.features.calibration.complete,
             calibrating=calibrating, cal_progress=progress, trip_s=trip_s,
-            fps=fps, last_blink_s=self.features.blink.last_blink_s,
+            fps=fps, last_blink_s=self.features.blinks.last_blink_s,
             co2_ppm=air.ppm, co2_age_s=co2_age, face_box=face_box(lms)))
         if now - self._last_health >= HEALTH_PERIOD_S:
             self._last_health = now

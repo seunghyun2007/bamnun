@@ -98,6 +98,7 @@ features:
     nod_max_drop_speed_deg_s: 45.0 # drops slower than this are nod-like (a deliberate look down is faster) ...
     nod_recovery_speed_deg_s: 60.0 # ... and the head must come back up at least this fast (the jerk)
     nod_recovery_window_s: 2.5     # the jerk must come within this of the lowest point
+    nod_max_drop_s: 4.0            # a drop still going after this long is a deliberate look down, not a nod
     nod_window_s: 120.0            # nods counted over this window for the score
     head_drop_lost_window_s: 0.6   # face lost within this of a downward movement = the head dropped
     head_drop_min_speed_deg_s: 8.0 # ... if it was going down at least this fast

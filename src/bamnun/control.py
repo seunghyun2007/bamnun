@@ -81,7 +81,7 @@ def set_volume(level: str) -> None:
 
 
 class FeatureCalibration:
-    """The guided flow's view of the real FeatureExtractor."""
+    """The guided flow's view of the real FeatureExtractor (SPEC.md, 15)."""
 
     def __init__(self, features, on_commit: Optional[Callable[[], None]] = None) -> None:
         self.f = features
@@ -108,12 +108,21 @@ class FeatureCalibration:
     def failure(self) -> str:
         return str(self.f.calibrator.last_failure or "")
 
-    def open_level(self) -> float:
-        cal = self.f.candidate or self.f.calibration
-        return float(cal.ear_open)
+    def failure_code(self) -> str:
+        return str(self.f.calibrator.failure_code or "")
 
-    def closed_fraction(self) -> float:
-        return float(self.f.blink.closed_fraction)
+    def start_closed(self, t: float) -> None:
+        self.f.start_closed(t)
+
+    def finish_closed(self) -> tuple[bool, str, str]:
+        return self.f.finish_closed()
+
+    def hint(self) -> str:
+        return self.f.calibrator.hint
+
+    def summary(self) -> dict:
+        cal = self.f.candidate or self.f.calibration
+        return cal.summary() if cal is not None else {}
 
     def commit(self) -> None:
         self.f.commit_candidate()
@@ -143,10 +152,9 @@ STEP_KEYS = [s.key for s in STEPS]
 POSITION_STEADY_S = 2.0
 NO_FACE_NAG_S = 15.0
 POSITION_GIVE_UP_S = 90.0
-CLOSE_LEAD_S = 1.5         # the line plays before the eyes are checked
-CLOSE_WINDOW_S = 4.0
-CLOSE_NEEDED_S = 0.25
-LOOK_MAX_FAILURES = 2
+CLOSE_LEAD_S = 1.5         # the line plays before the eyes are measured
+CLOSE_WINDOW_S = 3.0       # eyes closed for this long (the first 0.7 s is them closing)
+STEP_TRIES = 3             # a failed look-ahead or eyes-closed step is redone up to twice
 # The ladder holds while the driver closes their eyes on request, and a
 # moment after, or the calibration itself would set off the alarm.
 CLOSE_HOLD_AFTER_S = 2.0
@@ -174,6 +182,11 @@ class GuidedCalibration:
         self._last_progress_emit = -1e9
         self._answer: Optional[bool] = None
         self.started_wall: Optional[float] = None
+        self.reason = ""           # a plain sentence when a step needs redoing
+        self.summary: Optional[dict] = None
+        self._tries = 0
+        self._closed_started = False
+        self._last_hint = ""
         self._close_left_at: Optional[float] = None
 
     def holds_ladder(self, t: float) -> bool:
@@ -188,11 +201,19 @@ class GuidedCalibration:
 
     def state(self, t: Optional[float] = None) -> dict[str, Any]:
         prog = None
-        if self.active and self.step == "look" and t is not None:
-            prog = round(self.cal.progress(t), 3)
+        if self.active and t is not None:
+            if self.step == "look":
+                prog = round(self.cal.progress(t), 3)
+            elif self.step == "close":
+                prog = round(max(0.0, min(1.0, (t - self._entered - CLOSE_LEAD_S) / CLOSE_WINDOW_S)), 3)
+            elif self.step == "position" and self._face_since is not None:
+                prog = round(min(1.0, (t - self._face_since) / POSITION_STEADY_S), 3)
+        hint = getattr(self.cal, "hint", lambda: "")()
         return {"type": "calibration", "active": self.active, "step": self.step,
                 "index": self.idx, "steps": STEP_KEYS, "results": dict(self.results),
-                "progress": prog, "message": self.message,
+                "progress": prog, "message": self.message, "reason": self.reason,
+                "hint": hint if self.active and self.step in ("position", "look", "close") else "",
+                "summary": self.summary,
                 "ask": bool(self.active and STEPS[self.idx].ask)}
 
     def start(self, t: float) -> None:
@@ -200,7 +221,8 @@ class GuidedCalibration:
             self.cal.cancel()
         self.active = True
         self.results = {}
-        self._look_retried = False
+        self.summary = None
+        self._tries = 0
         self.started_wall = time.time()
         self._enter(0, t)
 
@@ -221,16 +243,20 @@ class GuidedCalibration:
     def _enter(self, idx: int, t: float, message: str = "") -> None:
         if self.active and self.step == "close" and STEP_KEYS[idx] != "close":
             self._close_left_at = t
+        if message != "retry":
+            self._tries = 0         # a fresh step; a retry keeps its count
         self.idx = idx
         self._entered = t
         self._answer = None
         self.message = message
+        if not message:
+            self.reason = ""
         step = STEPS[idx]
         self.say(step.line)
         if step.key == "look":
             self.cal.start(t)
         elif step.key == "close":
-            self._closed_s = 0.0
+            self._closed_started = False
         elif step.key == "position":
             self._face_since = None
             self._last_nag = t
@@ -259,8 +285,13 @@ class GuidedCalibration:
         key = self.step
         since = t - self._entered
 
+        hint = getattr(self.cal, "hint", lambda: "")()
+        if hint != self._last_hint and key in ("position", "look", "close"):
+            self._last_hint = hint
+            self.emit(self.state(t))
+
         if key == "position":
-            if face:
+            if face and not hint:
                 self._face_since = self._face_since if self._face_since is not None else t
                 if t - self._face_since >= POSITION_STEADY_S:
                     self.results["position"] = "ok"
@@ -278,27 +309,41 @@ class GuidedCalibration:
             if self.cal.ready():
                 self.results["look"] = "ok"
                 self._enter(2, t)
-            elif self.cal.failures() >= LOOK_MAX_FAILURES:
-                self._fail(t, "look", self.cal.failure() or "tracking")
+            elif self.cal.failures() > self._tries:
+                # The calibrator found a problem (too dark, moving, no face)
+                # and restarted the step: say why, and give up after 3 tries.
+                self._tries = self.cal.failures()
+                self.reason = self.cal.failure()
+                if self._tries >= STEP_TRIES:
+                    self._fail(t, "look", getattr(self.cal, "failure_code", lambda: "")() or "tracking")
+                else:
+                    self.message = "retry"
+                    self.say("cal_look")
+                    self.emit(self.state(t))
             elif t - self._last_progress_emit >= 0.5:
                 self._last_progress_emit = t
                 self.emit(self.state(t))
         elif key == "close":
-            if since >= CLOSE_LEAD_S and face and ear_raw is not None:
-                if ear_raw < self.cal.open_level() * self.cal.closed_fraction():
-                    self._closed_s += dt
-            if self._closed_s >= CLOSE_NEEDED_S:
-                self.results["close"] = "ok"
-                self.cal.commit()
-                self._enter(3, t)
-            elif since >= CLOSE_LEAD_S + CLOSE_WINDOW_S:
-                if not self._look_retried:
-                    # Section 8: repeat the look-ahead step once, then fail.
-                    self._look_retried = True
-                    self.cal.cancel()
-                    self._enter(1, t, message="retry")
+            if since >= CLOSE_LEAD_S and not self._closed_started:
+                self._closed_started = True
+                self.cal.start_closed(t)
+            if since >= CLOSE_LEAD_S + CLOSE_WINDOW_S:
+                ok, code, why = self.cal.finish_closed()
+                if ok:
+                    self.results["close"] = "ok"
+                    self.summary = self.cal.summary()
+                    self.cal.commit()
+                    self._enter(3, t)
                 else:
-                    self._fail(t, "close", "closure_not_seen")
+                    self._tries += 1
+                    self.reason = why
+                    if self._tries >= STEP_TRIES:
+                        self._fail(t, "close", code or "separation")
+                    else:
+                        self._enter(2, t, message="retry")
+            elif t - self._last_progress_emit >= 0.5:
+                self._last_progress_emit = t
+                self.emit(self.state(t))
         elif STEPS[self.idx].ask and self._answer is not None:
             self.results[key] = "ok" if self._answer else "fail"
             self._enter(self.idx + 1, t)

@@ -40,13 +40,15 @@ def stub_policy() -> EscalationPolicy:
 class FakeCal:
     """A calibration that is ready a set time after it starts."""
 
-    def __init__(self, ready_after=12.0, fails=0):
+    def __init__(self, ready_after=12.0, fails=0, closed_ok=True):
         self.t0 = None
         self.t = 0.0
         self.ready_after = ready_after
         self.committed = 0
         self.cancelled = 0
         self._fails = fails
+        self.closed_ok = closed_ok
+        self.closed_started = 0
 
     def start(self, t):
         self.t0 = t
@@ -67,11 +69,22 @@ class FakeCal:
     def failure(self):
         return "no face detected at all"
 
-    def open_level(self):
-        return 0.30
+    def failure_code(self):
+        return "no_face"
 
-    def closed_fraction(self):
-        return 0.65
+    def start_closed(self, t):
+        self.closed_started += 1
+
+    def finish_closed(self):
+        if self.closed_ok:
+            return True, "", ""
+        return False, "separation", "Ollie couldn't tell your open and closed eyes apart."
+
+    def hint(self):
+        return ""
+
+    def summary(self):
+        return {"eye_size": "medium", "blink_ms": 120}
 
     def commit(self):
         self.committed += 1
@@ -274,8 +287,9 @@ def test_guided_calibration_walks_every_step():
     assert c.guided.step == "look"
     tick(12.5)
     assert c.guided.step == "close"
-    tick(2.0, ear=0.05)
-    assert c.guided.step == "speaker" and cal.committed == 1
+    tick(4.6, ear=0.05)
+    assert c.guided.step == "speaker" and cal.committed == 1 and cal.closed_started == 1
+    assert c.guided.summary == {"eye_size": "medium", "blink_ms": 120}
     for step, ok in (("speaker", True), ("chime", True), ("light", False), ("mist", True)):
         assert c.guided.step == step
         hub.command({"cmd": "cal_answer", "step": step, "ok": ok})
@@ -288,18 +302,20 @@ def test_guided_calibration_walks_every_step():
     assert set(STEP_KEYS) - {"done"} <= steps
 
 
-def test_eyes_that_never_close_repeat_the_look_step_once_then_fail():
-    cal = FakeCal(ready_after=0.0)
+def test_eyes_not_separable_redo_the_closed_step_twice_then_fail():
+    cal = FakeCal(ready_after=0.0, closed_ok=False)
     hub, policy, c = make_controller(cal=cal)
     hub.command({"cmd": "cal_start"})
     t = 0.0
-    while t < 30 and (c.guided.active or t < 1):
+    while t < 40 and (c.guided.active or t < 1):
         cal.t = t
         c.tick(t, face=True, calibrated=True, eye_closed=False, microsleep=False, ear_raw=0.3)
         t += 0.05
     assert not c.guided.active
     assert c.guided.results["close"] == "fail" and cal.committed == 0
-    assert any(e.get("message") == "retry" for e in events(hub, "calibration"))
+    assert cal.closed_started == 3, "the eyes-closed step is tried three times"
+    retries = [e for e in events(hub, "calibration") if e.get("message") == "retry"]
+    assert retries and "apart" in retries[-1]["reason"]
 
 
 def test_cancel_keeps_the_old_calibration():

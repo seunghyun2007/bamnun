@@ -38,7 +38,8 @@ def build_snapshot(ff, state, *, stage: int, stage_name: str, calibrated: bool,
                    calibrating: bool, cal_progress: float, trip_s: float,
                    fps: float, last_blink_s: Optional[float] = None,
                    co2_ppm: Optional[float] = None,
-                   co2_age_s: Optional[float] = None) -> dict[str, Any]:
+                   co2_age_s: Optional[float] = None,
+                   face_box: Optional[list[float]] = None) -> dict[str, Any]:
     """One frame's state as plain JSON-ready values. Field list: SPEC.md, section 1.
 
     Ocular values are ``None`` unless they were actually measured on this
@@ -63,6 +64,13 @@ def build_snapshot(ff, state, *, stage: int, stage_name: str, calibrated: bool,
         "level_name": str(state.level_name),
         "score": _r(state.score, 3),
         "kss": _r(state.kss, 1),
+        # The same score as 0-100, and the driver's state in one word, decided
+        # here so every screen and the laptop overlay agree (SPEC.md, 13).
+        "drowsiness": int(round(100 * float(state.score))) if measured else None,
+        "label": ("no_face" if not face else "alert") if calibrating else str(getattr(state, "label", "alert")),
+        "signals": ({k: [_r(v, 3), _r(state.contributions.get(k, 0.0) * 100, 1)]
+                     for k, v in getattr(state, "signals", {}).items()} or None) if measured else None,
+        "face_box": [_r(x, 3) for x in face_box] if face_box and face else None,
         "distracted": bool(state.distracted),
         "distraction_reason": str(state.distraction_reason),
         "yaw": _r(ff.yaw, 1) if face and ff.pose_valid else None,
@@ -109,6 +117,7 @@ class Hub:
         # Live video for the Camera screen. ``video_capable`` says a real
         # camera feeds this Hub (false for the simulated driver).
         self.video_capable = False
+        self.video_size: Optional[list[int]] = None
         self._jpeg: Optional[bytes] = None
         self._jpeg_seq = 0
         self._viewers = 0
@@ -189,7 +198,7 @@ class Hub:
             return None
         age = time.monotonic() - at
         return dict(snap, age_s=round(age, 2), stale=age > STALE_AFTER_S,
-                    video=self.video_capable)
+                    video=self.video_capable, video_size=self.video_size)
 
     def health(self) -> dict[str, Any]:
         with self._lock:

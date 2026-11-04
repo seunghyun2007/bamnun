@@ -24,6 +24,8 @@ Double-click `Bamnun_app.html`. It opens in any browser and plays a simulated dr
   - `live.js` connects to the device's `/ws` and paints the live values; it also holds the demo driver.
   - `api.js` is the device API for the screens: the profile and settings cached on the phone and sent to the device (queued while offline), REST calls, and the device's events (`say`, `calibration`, `trip`, `reminder`, `emergency`...). In the demo it answers by itself, with sample trips.
   - `overlay.js` shows things over any screen: the emergency countdown, and short notes for Ollie's lines, break reminders and saved trips.
+  - `route.js` is the Kakao map: Route, the live Home card and Drive.
+  - `camera.js` is the Camera screen: the Signals panel, Retry, and full screen in landscape (`@capacitor/screen-orientation` on the phone, CSS rotation in a browser).
   - `ko.json` is the Korean translation, as an English → Korean text map. The `html` part covers sentences that contain bold or line breaks. Text with `{n}`-style placeholders is filled in by `BN_T`.
 
 ## Live data

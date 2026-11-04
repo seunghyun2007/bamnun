@@ -36,7 +36,7 @@ REST (JSON):
 | POST | `/api/say/{line}` | play one of Ollie's recorded lines on the device speaker, in the saved voice language |
 | POST | `/api/test/{part}` | fire one part for the device test: `speaker`, `chime`, `blue_light`, `mist`, `alarm` |
 | GET | `/api/trips` · `/api/trips/{id}` | trip history |
-| GET | `/video` | live camera as MJPEG (about 10 frames per second, 480 px wide, eye outlines drawn on), for the Camera screen only |
+| GET | `/video` | live camera as MJPEG at up to the camera's frame rate (about 30 per second on a laptop webcam), 640 px wide, eye outlines drawn on. Encoded on its own thread, only while someone watches, so it never slows detection |
 
 WebSocket `/ws`, server → phone messages (JSON with `type`):
 
@@ -53,6 +53,10 @@ WebSocket `/ws`, server → phone messages (JSON with `type`):
   | `microsleep` | the eyes have been shut for 0.5 s or more, right now |
   | `stage`, `stage_name` | wake-up ladder stage, 0–4, and its config name |
   | `level`, `level_name`, `score`, `kss` | drowsiness level, fused score 0–1, and the display-only KSS estimate 1–9 |
+  | `drowsiness` | the same smoothed score as 0–100, for the Camera screen (section 13) |
+  | `label` | the driver's state in one word, decided on the device so every screen and the laptop overlay agree: `alert`, `a_bit`, `drowsy`, `very`, `eyes_closed`, `away`, `no_face` (section 13) |
+  | `signals` | the separate drowsiness signals and their share of the score, for the debug panel (section 14) |
+  | `face_box` | where the face is in the video, as `[x, y, w, h]` fractions of the frame; `null` with no face. The Home tile crops the video to it |
   | `distracted`, `distraction_reason` | eyes-off-road channel |
   | `yaw`, `off_road` | head turn in degrees (negative = driver's left), and whether it's outside the safe zone |
   | `calibrated`, `calibrating`, `cal_progress` | calibration state; progress is 0–1 |
@@ -61,6 +65,7 @@ WebSocket `/ws`, server → phone messages (JSON with `type`):
   | `fps` | camera frames processed per second |
   | `age_s`, `stale` | how old this snapshot is; `stale` is true after 2 s, meaning the camera loop has stopped sending |
   | `video` | the device has a camera picture to stream at `/video` (false on the simulated device) |
+  | `video_size` | the camera's `[width, height]`, so the app can show the video in its real aspect ratio |
 
 - `alert`: stage changed, with stage, reason and timestamp. Sent immediately.
 - `calibration`: step changes and progress (section 6).
@@ -306,6 +311,7 @@ Ollie never calls the police directly. Drowsiness alone isn't an emergency, a fa
 - Step 5: the guided calibration and device test, steps 1–8 of section 8, with the ladder still running on the old calibration until the eyes-closed check passes. The ladder holds while the driver closes their eyes on request.
 - Step 6, device side: every line of section 6 and 8 in English and Korean (`src/bamnun/voice.py`), `POST /api/say/{line}`, voice-language ladder clips (`assets/voice/{lang}/`), and `tools/record_prompts.py --lang en|ko`.
 - Step 7b, device side: the emergency trigger (stage 4 for 20 s with no response), the `emergency` event, `emergency_check` on the speaker, and the outcome saved to the trip. The emergency switch is off and Demo is on by default. **This build never dials 119 or any real emergency number**: the phone only opens the dialer.
+- Section 13 and 14: real camera on the Home tile and Camera screen, one shared state label, a smoother 30 fps stream, and the gradual drowsiness score (branch `app-camera-page`).
 - Step 8, device side: trips (auto start and end, breaks, alerts, alert-free time), `/api/trips`, `/api/insights`, and the break reminder.
 
 ## 11. Open questions
@@ -370,3 +376,65 @@ A free Apple ID can run the app on your own iPhone, but the app expires after 7 
 - Hotspot capability, for joining the Pi's Wi-Fi from inside the app. Confirm against Apple's capability table before paying. Until then, use the manual Wi-Fi fallback in section 7.
 - Critical Alerts entitlement.
 - TestFlight, App Store, and installing on teammates' iPhones.
+
+---
+
+## 13. Camera (Home tile and Camera screen)
+
+**The driver's state, one word.** The device decides it and sends it as `label`; the app and the laptop overlay show the same thing, so they can't disagree. In order of priority:
+
+| Label | English | Korean | When |
+|---|---|---|---|
+| `no_face` | No face | 얼굴 없음 | no face in view |
+| `away` | Looking away | 다른 곳을 봄 | head or eyes off the road past the glance limit |
+| `eyes_closed` | Eyes closed | 눈 감김 | eyes shut for longer than a normal blink (0.3 s), or a microsleep |
+| `very` | Very drowsy | 매우 졸림 | drowsiness level 3 or 4 |
+| `drowsy` | Drowsy | 졸림 | level 2 |
+| `a_bit` | A bit tired | 조금 피곤 | level 1 |
+| `alert` | Alert | 또렷함 | level 0 |
+
+Colours run along the app's lavender → pink scale: Alert peach-lavender, then deeper lavender, pink, and the strongest pink for Eyes closed. No face and Looking away are neutral grey and amber. A normal blink never shows "Eyes closed".
+
+**Home tile**
+- The real camera video fills the tile, cropped around the face (`face_box`), never stretched.
+- The state chip sits on the video.
+- Not connected: a plain grey tile that says "Not connected" / "연결 안 됨". No drawn face.
+
+**Camera screen**
+- The video keeps its real shape (16:9): in portrait it spans the full width, with the stats underneath.
+- The eye outlines are drawn on the same frame they were measured on, after scaling, so they sit exactly on the eyes.
+- The live drowsiness score (0–100) and the label are shown under the video, with a "Signals" toggle that opens a debug panel listing each signal and its share of the score.
+- An expand icon in the top-right corner of the video opens it full screen in landscape. On the phone this uses `@capacitor/screen-orientation` to rotate; in a browser the video is rotated with CSS. A close icon in the same corner goes back.
+- Not connected: a grey box that says "Not connected" with a Retry button.
+
+**Video stream**
+- Up to the camera's frame rate, 640 px wide, JPEG quality 80.
+- The camera loop only hands the latest frame and its eye points to the encoder thread (about 1 ms); drawing, scaling and JPEG encoding happen there. If the encoder falls behind it skips frames; detection never waits for it.
+
+## 14. Gradual drowsiness
+
+Drowsiness builds up gradually, so the score does too. A little squinting or a few slow blinks raise it a little; only sustained or strong signs climb the ladder. Looking-away detection is unchanged.
+
+**Signals** (all relative to the driver's own calibrated open-eye level, so glasses and narrow eyes aren't mistaken for squinting):
+
+| Signal | What it measures | Drowsy direction |
+|---|---|---|
+| Squint | average eye openness over the last 45 s, blinks left out | partly closed eyes |
+| PERCLOS | share of the last 60 s with the eyes really shut (below 35 % of the driver's open level) | more |
+| Blink duration | average length of recent normal blinks | longer (normal 0.10–0.15 s) |
+| Slow blinks | share of recent blinks lasting 0.3 s or more | more |
+| Lid speed | how long the eyelid takes to reopen after a blink | slower |
+| Blink rate | blinks per minute | well above normal |
+| Microsleeps, yawns, head nods | as before | more |
+
+Frames where the driver looks down (head pitched down or eyes lowered, e.g. at the dashboard) are left out of the squint and PERCLOS windows, because eyelids naturally lower when looking down.
+
+**Score.** The signals are weighted and summed into a raw score, which is smoothed so it rises over seconds and falls more slowly, and shown as 0–100. Levels use the smoothed score with a dwell on the way up and hysteresis on the way down, so they don't flicker. Level 1 fires ladder stage 1 (blue light), and so on up.
+
+**Safety bypass, kept.** Eyes really shut (below 35 % of open) for 0.5 s or more is a microsleep: the score jumps to at least 90 and the ladder goes straight to its top stage. A hard squint is not a microsleep any more; before, anything below 65 % open for 0.5 s was.
+
+Every threshold is in `config/default.yaml` with a comment, and the reasoning and sources are in `docs/thresholds.md`.
+
+**Tuning tools**
+- `tools/record_session.py` records a webcam session to a video file, with timestamps, and lets you press keys to mark what you were doing (squinting, slow blinks, looking down).
+- `tools/replay_session.py` runs the real pipeline over a recording, as fast as it can, with any config override, and writes every signal, the score and the level per frame to CSV, plus a summary per marked stretch.

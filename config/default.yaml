@@ -244,11 +244,11 @@ alerts:
       refractory_s: 8.0
     warn:
       type: audio
-      files: [assets/chime_slow.wav, assets/voice/stage3.wav]
+      files: [assets/chime_slow.wav, "assets/voice/{lang}/stage3.wav"]
       refractory_s: 12.0
     alarm:
       type: audio
-      files: [assets/looming.wav, assets/voice/stage4.wav]
+      files: [assets/looming.wav, "assets/voice/{lang}/stage4.wav"]
       refractory_s: 8.0
     scent:
       type: atomizer
@@ -262,18 +262,18 @@ alerts:
     # Spoken cues outside the ladder. Missing recordings are skipped.
     open_window:
       type: audio
-      file: assets/voice/open_window.wav
+      file: "assets/voice/{lang}/open_window.wav"
       refractory_s: 300.0
     rest_voice:
       type: audio
-      file: assets/voice/rest_soon.wav
+      file: "assets/voice/{lang}/rest_soon.wav"
       refractory_s: 900.0
     calibrate_voice:
       type: audio
-      file: assets/voice/calibrate.wav
+      file: "assets/voice/{lang}/cal_look.wav"
     calibrated_voice:
       type: audio
-      file: assets/voice/calibrated.wav
+      file: "assets/voice/{lang}/cal_done.wav"
 
 # Cabin CO2 (SCD41 on I2C). Fires the open_window prompt once per excursion.
 air:
@@ -297,3 +297,16 @@ ui:
   draw_eyes: true
   draw_gauges: true
   window_scale: 0.75
+
+# Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
+# section 0). The phone caches a copy and pushes changes over the API.
+storage:
+  db: runs/bamnun.db
+
+# A trip starts when a calibrated driver is first seen, or when the phone
+# says so. An empty seat for break_min_s is a break (and resets the break
+# reminder); for end_after_s it ends the trip.
+trips:
+  auto_start: true
+  break_min_s: 180
+  end_after_s: 900

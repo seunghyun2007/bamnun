@@ -62,12 +62,13 @@ what the detector measures. To see real detection, run the device (section 4).
 | Four-stage wake-up ladder | Done, tested. Runs on the real parts on the Pi, as logging stubs elsewhere |
 | CO₂ reading and "open the window" prompt | Done. Needs `smbus2` on the Pi |
 | Demo mode on the device (keys fire each stage) | Done |
-| **Live data server** (`--serve`): app, `/api/health`, `/ws` | **Done, new.** Tested |
+| **Live data server** (`--serve`): app, `/api/health`, `/ws` | **Done.** Tested |
+| **Device API for the phone**: profile and settings saved on the Pi, guided calibration and device test, Ollie's lines in English and Korean, trips, insights, break reminder, emergency trigger | **Done, new.** Tested; the app screens are being connected to it |
 | **Live Home and Camera screens** in the app | **Done, new.** Tested in a browser |
 | Simulated driver, served (`tools/sim_server.py`) and in-app demo | **Done, new** |
 | Android and iOS app projects (Capacitor) | Created, not yet compiled (needs Android Studio, and a Mac for iOS) |
-| Voice prompts | Recording tool done; recordings not in the repo |
-| Trips, insights, settings sync, calibration from the phone, Bluetooth setup, route, emergency contact | Not started. Planned in `docs/SPEC.md`, section 10 |
+| Voice prompts | Every line written in English and Korean (`src/bamnun/voice.py`); recording tool done (`--lang en\|ko`); recordings not in the repo |
+| Bluetooth setup, Kakao route, phone-side emergency SMS and call | Not started. Planned in `docs/SPEC.md`, section 10 |
 | Validation on real IR footage from several drivers | Not started |
 
 ---
@@ -142,7 +143,13 @@ without touching the rest.
 ### The phone link
 
 - The Pi runs a small FastAPI server on its own thread. It serves the app at
-  `/`, the device's status at `/api/health`, and a live stream at `/ws`.
+  `/`, the device's status at `/api/health`, a live stream at `/ws`, and a
+  REST API for the driver's profile, settings, calibration and trips.
+- The Pi keeps the master copy of the profile, settings and trips, in SQLite
+  (`runs/bamnun.db`), so it behaves the same with the phone off.
+- Anything the phone asks the device to *do* (play a line, test a part, start
+  a calibration) is queued and picked up by the camera loop on its next frame
+  (`src/bamnun/control.py`); the answer comes back over `/ws`.
 - The camera loop never waits for it. It drops its latest numbers into a
   shared "hub" (`src/bamnun/telemetry.py`) and moves on; the server reads from
   the hub at its own pace. A crashed server, a slow phone or no phone at all
@@ -347,9 +354,40 @@ The server sends JSON messages with a `type`:
 
 - **`alert`**, as soon as the stage changes: `stage`, `stage_name`,
   `previous`, `reason`, `fired` (the parts that went off), `time`.
+- **`say`**: Ollie said a line on the device: `line`, `lang`, `text`, and
+  `result` (`played`, or `simulated` when that clip isn't recorded yet).
+- **`calibration`**: the guided calibration moved on: `step` (`position`,
+  `look`, `close`, `speaker`, `chime`, `light`, `mist`), `progress`, `ask`
+  (waiting for Yes / No), `results`, `message` (`no_face`, `retry`, `done`,
+  `cancelled`), and `failed` if it stopped.
+- **`test_result`**: `part` and `result` (`ok`, `simulated`, `missing`, `error`).
+- **`trip`**: `event` `started` or `ended`, with the `summary` when it ends.
+- **`reminder`**: `kind` `break_due`, after the break interval.
+- **`emergency`**: no response 20 s into the alarm: `id`, `reason`
+  (`eyes_closed` or `no_face`), `contact_name`, `demo`. The phone runs the
+  countdown and reports back with `POST /api/emergency/{id}`.
 
-The phone sends `{"type": "hello", "time": <ms>, "lang": "en", "tz": "..."}`
-on connecting, because the Pi has no reliable clock.
+The phone sends `{"type": "hello", "time": <ms>, "lang": "en", "tz": "Asia/Seoul",
+"tz_min": 540}` on connecting, because the Pi has no reliable clock. Trip times
+and the Insights hours use it.
+
+### REST
+
+| Method | Path | What it does |
+|---|---|---|
+| GET / PUT | `/api/profile` | name, vehicle, work week, voice and app language. PUT sends only the fields that change; a new vehicle also sets its volume and break defaults |
+| GET / PUT | `/api/settings` | ladder toggles (`mint`, `voice`), sensitivity, volume, break interval, CO₂ prompt, emergency contact and demo switch |
+| POST | `/api/calibration/start` · `cancel` · `answer` | guided calibration; `answer` is `{"step": "speaker", "ok": true}` |
+| GET | `/api/calibration` | where the calibration is now |
+| POST | `/api/say/{line}?lang=ko` | play one of Ollie's lines on the device (`GET /api/lines` lists them) |
+| POST | `/api/test/{part}` | fire `speaker`, `chime`, `blue_light`, `mist` or `alarm` once |
+| GET | `/api/trips` · `/api/trips/{id}` · `/api/trips/current` | trip history, one trip with its events, the trip in progress |
+| POST | `/api/trips/start` · `/api/trips/end` | start or end a trip by hand (they also start and end by themselves) |
+| PUT | `/api/trips/current/route` | the route picked on the phone, saved with the trip |
+| GET | `/api/insights?range=week\|month\|all` | alert-free share, alerts per day, tired hours, what woke the driver |
+| POST | `/api/emergency/{id}` | `{"outcome": "ok"\|"contacted"\|"called"\|"dismissed"}` |
+
+Commands answer `202` at once; the result arrives on `/ws`.
 
 Try it without the app: `curl http://localhost:8000/api/health`, and in any
 browser's developer console,
@@ -540,13 +578,17 @@ bamnun/
 │   ├── alerts.py           actuators and the wake-up ladder
 │   ├── air.py              CO₂ sensor
 │   ├── telemetry.py        the snapshot and the hub between the loop and the server
-│   ├── server.py           FastAPI: the app, /api/health, /ws, /video
+│   ├── server.py           FastAPI: the app, the REST API, /ws, /video
+│   ├── control.py          phone commands, guided calibration, break reminder, emergency
+│   ├── store.py            profile, settings and trips in SQLite
+│   ├── trips.py            trip tracking and the Insights numbers
+│   ├── voice.py            Ollie's lines in English and Korean
 │   ├── session.py          config loading and session logs
 │   ├── demo.py             showcase mode
 │   └── viz.py              the preview overlay
-├── tests/                  226 tests
+├── tests/                  255 tests
 ├── tools/                  see section 8
-├── assets/                 alert tones, icon; voice prompts go in assets/voice/
+├── assets/                 alert tones, icon; voice clips go in assets/voice/en/ and ko/
 ├── frontend/               the phone app: see frontend/README.md
 │   ├── Bamnun_app.html     the whole app in one file: double-click to try it
 │   ├── screens/            one file per screen

@@ -37,7 +37,8 @@
       retry = 0; conn = "open";
       // The Pi has no reliable clock, so the phone tells it the time.
       ws.send(JSON.stringify({ type: "hello", time: Date.now(), lang: window.BN_LANG(),
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone }));
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        tz_min: -new Date().getTimezoneOffset() }));
       paint();
     };
     ws.onmessage = (e) => {

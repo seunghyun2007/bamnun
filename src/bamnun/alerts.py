@@ -206,9 +206,23 @@ class AudioActuator(Actuator):
     def path(self) -> Path:
         return self.paths[0] if self.paths else Path("")
 
+    # Ollie's voice language (SPEC.md, section 2). A path may contain
+    # ``{lang}``, e.g. assets/voice/{lang}/stage3.wav; it falls back to the
+    # same file without the language folder, where older recordings live.
+    lang = "en"
+
+    def _resolve(self, p: Path) -> Path:
+        s = str(p)
+        if "{lang}" not in s:
+            return p
+        chosen = Path(s.replace("{lang}", self.lang))
+        if chosen.exists():
+            return chosen
+        return Path(s.replace("{lang}/", "").replace("{lang}\\", ""))
+
     @property
     def present(self) -> list[Path]:
-        return [p for p in self.paths if p.exists()]
+        return [r for r in (self._resolve(p) for p in self.paths) if r.exists()]
 
     def _cmd(self, path: Path) -> list[str]:
         cmd = [self._player]
@@ -515,6 +529,10 @@ class EscalationPolicy:
         # slumped driver, and chiming every 10 s at an empty seat is noise.
         self.face_lost_cooldown_s = float(dcfg.get("face_lost_cooldown_s", 45.0))
         self._distraction_ready_at = 0.0
+        # Actuators the driver switched off in the app (SPEC.md, sections 1
+        # and 4). Skipped, and reported as suppressed, but the stage itself
+        # still climbs, so the next step fires on time.
+        self.muted: set[str] = set()
 
     @property
     def stage(self) -> int:
@@ -544,7 +562,7 @@ class EscalationPolicy:
         actuation whatever caused it.
         """
         act = self.actuators.get(name)
-        if act is None or not self.enabled:
+        if act is None or not self.enabled or name in self.muted:
             return None
         a = act.fire(t, reason or name)
         if a is not None:
@@ -667,6 +685,9 @@ class EscalationPolicy:
             act = self.actuators.get(act_name)
             if act is None:
                 suppressed.append(f"{act_name}: not configured")
+                continue
+            if act_name in self.muted:
+                suppressed.append(f"{act_name}: off in settings")
                 continue
             ok, why = act.can_fire(t)
             if not ok:

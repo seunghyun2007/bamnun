@@ -87,6 +87,8 @@ class StateEstimator:
 
         self.levels = list(cfg.get("levels", [{"name": "alert", "min_score": 0.0, "dwell_s": 0.0}]))
         self.levels.sort(key=lambda d: float(d.get("min_score", 0.0)))
+        self._base_levels = [dict(lv) for lv in self.levels]
+        self.sensitivity = "normal"
         self.hysteresis = float(cfg.get("recovery_hysteresis", 0.08))
         self.perclos_hysteresis = float(cfg.get("perclos_hysteresis", 0.02))
         self.no_face_grace_s = float(cfg.get("no_face_grace_s", 1.5))
@@ -112,6 +114,22 @@ class StateEstimator:
         self._last_good: Optional[FeatureFrame] = None
         self._last_score = 0.0
         self._last_kss = 1.0
+
+    # Alert sensitivity from the app (Settings: Gentle / Normal / Strict).
+    # Scales the score and PERCLOS each level needs, not the microsleep
+    # override: a closure happening now is never made to wait.
+    SENSITIVITY = {"gentle": 1.12, "normal": 1.0, "strict": 0.88}
+
+    def set_sensitivity(self, name: str) -> None:
+        k = self.SENSITIVITY.get(name)
+        if k is None:
+            return
+        self.sensitivity = name
+        for lv, base in zip(self.levels, self._base_levels):
+            if float(base.get("min_score", 0.0)) > 0:
+                lv["min_score"] = min(0.98, float(base["min_score"]) * k)
+            if "min_perclos" in base:
+                lv["min_perclos"] = min(0.95, float(base["min_perclos"]) * k)
 
     # ----------------------------------------------------------------- #
 

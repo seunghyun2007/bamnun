@@ -26,11 +26,13 @@ from .air import CabinAir
 from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
+from .control import Controller, FeatureCalibration
 from .features import Calibration, FeatureExtractor, FeatureFrame
 from .landmarks import FaceLandmarker
 from .predictor import RestPlanner
 from .session import SessionLogger, load_config, repo_root
 from .state import DriverState, StateEstimator
+from .store import Store
 from .telemetry import Hub, alert_event, build_snapshot
 
 console = Console()
@@ -133,6 +135,20 @@ class Monitor:
         self._cal_path = self.root / str(cal_path)
         self._load_calibration()
 
+        # Profile, settings and trips (SPEC.md, sections 0 and 1). The store
+        # is optional in the same way the server is: without it the device
+        # still detects and alerts, it just keeps no trips.
+        self.store = None
+        db = (self.cfg.get("storage") or {}).get("db", "runs/bamnun.db")
+        try:
+            self.store = Store(self.root / str(db))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("no profile or trip storage (%s); detection unaffected", exc)
+        self.controller = Controller(
+            self.hub, self.store, self.policy, estimator=self.estimator,
+            calibration=FeatureCalibration(self.features, on_commit=self._save_calibration),
+            trip_cfg=self.cfg.get("trips"))
+
         self.logger.write_meta({
             "config": self.cfg,
             "argv": sys.argv,
@@ -219,7 +235,8 @@ class Monitor:
                           "pip install -r requirements.txt[/]")
             return
         try:
-            self.server = ServerThread(self.hub, self.args.host, self.args.port).start()
+            self.server = ServerThread(self.hub, self.args.host, self.args.port,
+                                       store=self.store).start()
         except Exception as exc:  # noqa: BLE001
             log.warning("could not start the server: %s", exc)
             return
@@ -257,8 +274,12 @@ class Monitor:
             return "ok" if getattr(a, "_dev", None) is not None else "simulated"
 
         ir = self.illuminator
+        guided = self.controller.guided
         return {
             "calibrated": bool(self.features.calibration.complete),
+            # The driver's Yes / No from the last device test (section 8).
+            "checks": {k: v for k, v in (guided.results if guided else {}).items()
+                       if k in ("speaker", "chime", "light", "mist")},
             "gpio": bool(_HAVE_GPIO),
             "parts": {
                 "camera": str(self.cfg["capture"].get("source", "")),
@@ -290,6 +311,15 @@ class Monitor:
         if now - self._last_health >= HEALTH_PERIOD_S:
             self._last_health = now
             self.hub.set_health(self._health())
+
+    def _control(self, t: float, ff: FeatureFrame) -> None:
+        """Phone commands, guided calibration, trips, reminders, emergency."""
+        face = bool(ff.face_found)
+        self.controller.tick(
+            t, face=face, calibrated=bool(self.features.calibration.complete),
+            eye_closed=bool(ff.eye_closed) if face and not self.features.calibrating else None,
+            microsleep=bool(ff.microsleep_now), ear_raw=ff.ear_raw if face else None,
+            co2_ppm=self.air.ppm)
 
     def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
         """Encode a Camera-screen frame, but only while someone is watching."""
@@ -388,7 +418,8 @@ class Monitor:
                         self._voice("rest_voice", frame.timestamp)
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
-                decision = self.policy.update(state) if alerts_on else None
+                hold = self.controller.holds_ladder(frame.timestamp)
+                decision = self.policy.update(state) if alerts_on and not hold else None
                 if decision is not None:
                     self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
@@ -407,6 +438,8 @@ class Monitor:
             if self.demo:
                 for action in self.tour.due(time.monotonic()):
                     self._demo_action(action, frame.timestamp)
+
+            self._guarded(self._control, frame.timestamp, ff)
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -469,8 +502,14 @@ class Monitor:
         if self._plan is not None:
             console.print(f"[bold]final rest plan:[/] {self._plan.summary()}")
         self.logger.log_event("shutdown", {"actuations": len(self.policy.history)})
+        try:
+            self.controller.close()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not close the trip: %s", exc)
         if self.server is not None:
             self.server.stop()
+        if self.store is not None:
+            self.store.close()
         self.logger.close()
         self.policy.close()
         self.air.close()

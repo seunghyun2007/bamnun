@@ -112,6 +112,15 @@ class Hub:
         self._jpeg: Optional[bytes] = None
         self._jpeg_seq = 0
         self._viewers = 0
+        # Commands from the phone, drained by the camera loop (control.py).
+        self._commands: deque[dict[str, Any]] = deque(maxlen=100)
+        # The phone's clock and time zone, from its ``hello``: the Pi has no
+        # reliable clock of its own (SPEC.md, section 1).
+        self.clock_offset_s = 0.0
+        self.tz_min = 0
+        # Written by the controller about once a second, read by the server.
+        self.trip_live: Optional[dict[str, Any]] = None
+        self.cal_state: Optional[dict[str, Any]] = None
 
     # -- camera loop side ------------------------------------------------ #
 
@@ -139,7 +148,33 @@ class Hub:
             self._jpeg = jpeg
             self._jpeg_seq += 1
 
+    def take_commands(self) -> list[dict[str, Any]]:
+        with self._lock:
+            out = list(self._commands)
+            self._commands.clear()
+        return out
+
     # -- server side ----------------------------------------------------- #
+
+    def command(self, cmd: dict[str, Any]) -> None:
+        with self._lock:
+            self._commands.append(dict(cmd))
+
+    def set_client_clock(self, phone_ms: Any, tz_min: Any = None) -> None:
+        """Trust the phone's clock over the Pi's (no RTC, often no NTP)."""
+        try:
+            self.clock_offset_s = float(phone_ms) / 1000.0 - time.time()
+        except (TypeError, ValueError):
+            return
+        # Within a few seconds is "the same"; don't jitter the trip times.
+        if abs(self.clock_offset_s) < 5.0:
+            self.clock_offset_s = 0.0
+        if tz_min is not None:
+            try:
+                self.tz_min = int(tz_min)
+            except (TypeError, ValueError):
+                pass
+
 
     @property
     def seq(self) -> int:

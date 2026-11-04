@@ -65,7 +65,8 @@ what the detector measures. To see real detection, run the device (section 4).
 | **Live data server** (`--serve`): app, `/api/health`, `/ws` | **Done.** Tested |
 | **Device API for the phone**: profile and settings saved on the Pi, guided calibration and device test, Ollie's lines in English and Korean, trips, insights, break reminder, emergency trigger | **Done, new.** Tested |
 | **App screens connected to the device**: onboarding, voice language, guided calibration, Trips, Insights, Settings, emergency countdown (never dials a real emergency number) | **Done, new.** Tested in a browser, English and Korean |
-| **Gradual drowsiness score (0–100)** from squint, PERCLOS, blink length, slow blinks, lid speed, blink rate, microsleeps, yawns and nods, smoothed, with one shared state label; real camera on the Home tile and a 16:9 Camera screen with full screen | **Done, new.** Tested on a laptop webcam; tuning tools in section 8 |
+| Real camera on the Home tile and a 16:9 Camera screen with full screen; one shared state label | **Done.** Tested on a laptop webcam |
+| **Detection that learns the driver**: eye openness on the driver's own 0–100 % scale (calibrated closed and open levels, MediaPipe blendshapes as a second opinion), half-amplitude blinks, P80 PERCLOS, heavy lids, a head-nod and head-drop detector, smiles/talking/yawns/glances/glare/lighting left out, a guided calibration with quality checks and live hints, saved per driver | **Done, new.** Validated in a scenario simulator (17 cases, 4 eye types, 15 and 30 fps) and on a real webcam recording: `docs/detection-audit.md` |
 | **Live Home and Camera screens** in the app | **Done, new.** Tested in a browser |
 | Simulated driver, served (`tools/sim_server.py`) and in-app demo | **Done, new** |
 | Android and iOS app projects (Capacitor) | Created, not yet compiled (needs Android Studio, and a Mac for iOS) |
@@ -106,6 +107,12 @@ example the hand-weighted drowsiness score by a model trained on the logs,
 without touching the rest.
 
 ### Measuring drowsiness
+
+Everything is measured against the driver's own calibration: their open and
+closed eyes, normal blink and head position (`docs/SPEC.md`, section 15). The
+audit of the pipeline, the simulator results before and after, and every
+flaw fixed are in `docs/detection-audit.md`; every threshold's source is in
+`docs/thresholds.md`.
 
 - **Calibration first.** For 12 seconds the driver looks ahead and blinks
   normally. The device learns *this driver's* open-eye level and forward head
@@ -431,8 +438,9 @@ Where each threshold comes from (published, physical, or our choice):
 | `python tools/bench.py --seconds 30 --source picamera` | per-stage timing and frame rate |
 | `python tools/measure_glance_zones.py` | measure the mirror zones in the real cab |
 | `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic (`--list`, `--only NAME`) |
-| `python tools/record_session.py` | record a webcam session for tuning, with on-screen prompts (normal, squint, slow blinks, looking down) that mark each stretch |
-| `python tools/replay_session.py runs/recordings/<time>` | run the real pipeline over a recording: every signal and the score per frame to CSV, a summary per marked stretch, `--set state.weights.squint=0.35` to try a threshold in seconds, `--plot` for a chart |
+| `python tools/evaluate_detection.py` | every scenario through the real pipeline: detection rate, false alarms per hour, reaction time, resting score; `--recordings runs/recordings` adds labelled webcam sessions |
+| `python tools/record_session.py` | the 10-minute labelled test script on the webcam, one prompt at a time (calibration, normal, talking, smiling, glances, yawning, slow blinks, heavy lids, nodding off, microsleeps); `--free` labels by key press |
+| `python tools/replay_session.py runs/recordings/<time>` | run the real pipeline over a recording: every signal and the score per frame to CSV, a summary per marked stretch, `--set state.weights.perclos=0.25` to try a threshold in seconds, `--plot` for a chart |
 | `python tools/make_chime.py` | regenerate the alert tones in `assets/` |
 | `python tools/render_overlay_demo.py` | the overlay in every state, as one image |
 | `python tools/make_icon.py` | the desktop icon |

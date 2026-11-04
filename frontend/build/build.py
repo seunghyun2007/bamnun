@@ -72,6 +72,7 @@ shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="ut
 dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
 dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "route.js"), encoding="utf-8").read()
 dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "camera.js"), encoding="utf-8").read()
+dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "calibrate.js"), encoding="utf-8").read()
 live = open(os.path.join(os.path.dirname(__file__), "live.js"), encoding="utf-8").read()
 live += chr(10) + open(os.path.join(os.path.dirname(__file__), "api.js"), encoding="utf-8").read()
 live += chr(10) + open(os.path.join(os.path.dirname(__file__), "overlay.js"), encoding="utf-8").read()

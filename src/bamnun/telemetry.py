@@ -39,7 +39,9 @@ def build_snapshot(ff, state, *, stage: int, stage_name: str, calibrated: bool,
                    fps: float, last_blink_s: Optional[float] = None,
                    co2_ppm: Optional[float] = None,
                    co2_age_s: Optional[float] = None,
-                   face_box: Optional[list[float]] = None) -> dict[str, Any]:
+                   face_box: Optional[list[float]] = None,
+                   time_risk: Optional[dict] = None,
+                   fps_capacity: Optional[float] = None) -> dict[str, Any]:
     """One frame's state as plain JSON-ready values. Field list: SPEC.md, section 1.
 
     Ocular values are ``None`` unless they were actually measured on this
@@ -71,6 +73,11 @@ def build_snapshot(ff, state, *, stage: int, stage_name: str, calibrated: bool,
         "signals": ({k: [_r(v, 3), _r(state.contributions.get(k, 0.0) * 100, 1)]
                      for k, v in getattr(state, "signals", {}).items()} or None) if measured else None,
         "face_box": [_r(x, 3) for x in face_box] if face_box and face else None,
+        # Time-of-day risk is shown on its own; it never changes the camera
+        # score or the ladder (SPEC.md, 15).
+        "time_risk": time_risk,
+        "fps_capacity": _r(fps_capacity, 1),
+        "unreliable": getattr(ff, "unreliable", "") if measured else None,
         "distracted": bool(state.distracted),
         "distraction_reason": str(state.distraction_reason),
         "yaw": _r(ff.yaw, 1) if face and ff.pose_valid else None,

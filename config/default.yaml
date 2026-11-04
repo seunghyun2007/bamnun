@@ -46,6 +46,11 @@ landmarks:
   # eyeBlink, eyeSquint, jawOpen, mouthSmile, cheekSquint: a second opinion on
   # the eyes, and smiles/yawns/talking (docs/SPEC.md, 15). Costs ~2 ms a frame.
   output_blendshapes: true
+  # Give MediaPipe a picture this wide (0 = the full frame); landmarks still map
+  # onto the full frame. Measured on the laptop at 640: SLOWER (39.5 vs 17.2 ms
+  # a frame) and EAR shifted 2.7 %, so it stays off. Measure on the Pi before
+  # turning it on there.
+  input_width: 0
 
 features:
   # Eye measures are on the DRIVER'S OWN openness scale (docs/SPEC.md, 15):

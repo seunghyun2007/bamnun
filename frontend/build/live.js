@@ -12,20 +12,25 @@
   // its colour on the app's lavender -> pink scale.
   const LABEL = {
     alert: ["Alert", "#D9CEFF"], a_bit: ["A bit tired", "#C4B5FD"], drowsy: ["Drowsy", "#E2A8EC"],
-    very: ["Very drowsy", "#F9A8D4"], eyes_closed: ["Eyes closed", "#F48FB1"],
+    very: ["Very drowsy", "#F9A8D4"], eyes_closed: ["Eyes closed", "#F48FB1"], head_drop: ["Head dropping", "#F48FB1"],
     away: ["Looking away", "#FFB547"], no_face: ["No face", "#B3A6B4"],
   };
+  // The drowsiness signals (SPEC.md, 15), on the driver's own scale.
   const SIGNALS = {
-    squint: ["Squint", (v) => Math.round(v * 100) + "%"],
+    heavy_lids: ["Heavy eyelids", (v) => Math.round(v * 100) + "%"],
     perclos: ["Eyes shut, last min", (v) => (v * 100).toFixed(1) + "%"],
     blink_duration: ["Blink length", (v) => (v ? v.toFixed(2) + " s" : "–")],
-    slow_blinks: ["Slow blinks", (v) => Math.round(v * 100) + "%"],
-    lid_speed: ["Lid reopening", (v) => (v ? v.toFixed(2) + " s" : "–")],
-    blink_rate: ["Blinks / min", (v) => Math.round(v)],
+    long_blinks: ["Long blinks / min", (v) => v.toFixed(1)],
+    lid_speed: ["Lid reopening (x normal)", (v) => (v ? v.toFixed(1) + "×" : "–")],
+    nods: ["Head nods, last 2 min", (v) => Math.round(v)],
     microsleep: ["Microsleeps, last min", (v) => Math.round(v)],
-    yawn: ["Yawns / h", (v) => v.toFixed(1)],
-    head_nod: ["Head nodding", (v) => v.toFixed(1) + "°"],
+    yawn: ["Yawns / h", (v) => Math.round(v)],
+    blink_rate: ["Blink rate (x normal)", (v) => (v ? v.toFixed(1) + "×" : "–")],
   };
+  const UNRELIABLE = { smile: "smiling", talk: "talking", yawn: "yawning", expression: "expression",
+    lighting: "light changing", edge: "face at the edge", small_face: "face too far", looking_down: "looking down",
+    pose: "head turned", off_road: "looking away", disagree: "glare" };
+
   let ws = null, last = null, conn = "connecting", retry = 0;
   // Demo: a simulated driver inside the page, so the live screens can be seen
   // with nothing installed. Only ever on request (?demo, or opening the file
@@ -174,7 +179,8 @@
       return `<div style="display:grid;grid-template-columns:1fr auto 74px;gap:10px;align-items:center;font-size:13px">
         <span style="color:#B3A6B4">${T(name)}</span><b>${fmt(val || 0)}</b>
         <span style="position:relative;height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, (part || 0) / 30 * 100).toFixed(0)}%;background:#C4B5FD;border-radius:6px"></i></span></div>`;
-    }).join("") + `<p style="margin:4px 0 0;font-size:11.5px;color:#B3A6B4">${T("Bars: each signal's share of the score, in points.")}</p>`;
+    }).join("") + (s.unreliable ? `<p style="margin:4px 0 0;font-size:12.5px;color:#FFB547">${T("Eyes not scored right now: {why}", { why: T(UNRELIABLE[s.unreliable] || s.unreliable) })}</p>` : "")
+      + `<p style="margin:4px 0 0;font-size:11.5px;color:#B3A6B4">${T("Bars: each signal's share of the score, in points.")}</p>`;
   }
 
   function paint() {
@@ -206,7 +212,8 @@
     // The state chip, on both screens: the device's own label.
     const [label, bg, fg] = chip(s, v);
     text("state-chip", label); css("state-chip", "background", bg); css("state-chip", "color", fg);
-    text("cam-off-text", T(conn === "connecting" && !s ? "Connecting…" : v === "nocam" ? "No camera" : "Not connected"));
+    text("cam-off-text", T(conn === "connecting" && !s ? "Connecting…" : v === "nocam" ? "No camera"
+      : live && !s.video ? "No camera picture" : "Not connected"));
 
     // Drowsiness score and its breakdown (Camera screen).
     const score = live && s.drowsiness != null ? s.drowsiness : null;
@@ -215,6 +222,10 @@
     text("score-label", score == null ? dash : T((LABEL[s.label] || LABEL.alert)[0]));
     text("score-stage", !live ? dash : s.stage ? T("Wake-up step {n}: {name}", { n: s.stage, name: T(STAGES[s.stage]) }) : T("No wake-up step running"));
     for (const el of all("signals")) if (!el.hidden && live && s.signals) el.innerHTML = signalRows(s);
+    // Time-of-day risk: shown on its own, never part of the camera score.
+    const risk = live && s.time_risk ? s.time_risk.level : null;
+    text("time-risk", risk ? T({ low: "Low", medium: "Medium", high: "High" }[risk]) : dash);
+    css("time-risk", "color", risk === "high" ? "#F48FB1" : risk === "medium" ? "#FFB547" : "#B3A6B4");
 
     // Cab air.
     const ppm = live ? s.co2_ppm : null;

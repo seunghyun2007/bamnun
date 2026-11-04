@@ -49,41 +49,13 @@ PUBLISH_PERIOD_S = 0.1
 
 def feature_frame(extractor: FeatureExtractor, t: float, ear: float, mar: float,
                   yaw: float, pitch: float) -> FeatureFrame:
-    """Feed one synthetic sample through the real trackers.
+    """Feed one synthetic sample through the real extractor.
 
-    The same steps as the loop body in tools/simulate.py, which is left as it
-    is; this bypasses only the landmark geometry.
+    Only the landmark geometry is bypassed: openness, blinks, PERCLOS, nods
+    and everything after run exactly as on the device.
     """
-    ear_s = extractor.ear_ewma.update(ear)
-    cal = extractor.calibration
-    ear_norm = ear_s / cal.ear_open
-    ev = extractor.blink.update(t, ear_s, cal.ear_open)
-    extractor.perclos_window.push(t, ear_norm)
-    perclos = extractor.perclos_window.time_fraction_below(extractor.perclos_fraction)
-    extractor.yawn.update(t, mar)
-    off = extractor.head.update(t, yaw, pitch, True)
-
-    return FeatureFrame(
-        t=t, face_found=True, ear_raw=ear, ear=ear_s, ear_norm=ear_norm,
-        eye_closed=extractor.blink.is_closed,
-        ongoing_closure_s=extractor.blink.ongoing_closure_s,
-        microsleep_now=extractor.blink.microsleep_in_progress,
-        perclos=perclos,
-        blink_rate_per_min=extractor.blink.blink_rate_per_min(),
-        mean_blink_duration_s=extractor.blink.mean_blink_duration_s(),
-        microsleep_count=extractor.blink.microsleep_count(),
-        long_closure_count=extractor.blink.long_closure_count(),
-        mar=mar, yawn_count=extractor.yawn.count(),
-        yawn_rate_per_hour=extractor.yawn.rate_per_hour(),
-        yaw=yaw, pitch=pitch, pose_valid=True,
-        pitch_std=extractor.head.pitch_std(), nodding=extractor.head.nodding(),
-        gaze_h=0.0, gaze_v=0.0, gaze_valid=True,
-        off_road=off, off_road_alarm=extractor.head.off_road_alarm,
-        off_road_glance_s=extractor.head.current_glance_s,
-        long_glance_count=extractor.head.long_glance_count(),
-        interocular_px=120.0,
-        blink_event=ev.kind if ev else None,
-    )
+    from bamnun.features import HeadPose
+    return extractor.measure(t, ear, mar, HeadPose(yaw, pitch, 0.0, True), (0.0, 0.0, True), 120.0)
 
 
 class SimCalibration:
@@ -118,11 +90,21 @@ class SimCalibration:
     def failure(self) -> str:
         return ""
 
-    def open_level(self) -> float:
-        return 0.30
+    def failure_code(self) -> str:
+        return ""
 
-    def closed_fraction(self) -> float:
-        return 0.65
+    def start_closed(self, t: float) -> None:
+        pass
+
+    def finish_closed(self) -> tuple[bool, str, str]:
+        return True, "", ""          # the simulated driver always closes properly
+
+    def hint(self) -> str:
+        return ""
+
+    def summary(self) -> dict:
+        return Calibration(ear_open=0.30, ear_closed=0.10, blink_half_s=0.12, blink_rate=17.0,
+                           complete=True, closed_estimated=False).summary()
 
     def commit(self) -> None:
         self.t0 = None
@@ -133,8 +115,8 @@ def drive(hub: Hub, store: Store, minutes: float, calibrate_s: float, seed: int)
     for spec in cfg["alerts"]["actuators"].values():
         spec["type"] = "null"
     extractor = FeatureExtractor(cfg["features"], cfg["calibration"])
-    extractor.set_calibration(Calibration(ear_open=0.30, ear_std=0.01,
-                                          complete=True, n_samples=999))
+    extractor.set_calibration(Calibration(ear_open=0.30, ear_closed=0.10, ear_std=0.01,
+                                          complete=True, n_samples=999, closed_estimated=False))
     estimator = StateEstimator(cfg["state"])
     policy = EscalationPolicy(cfg["alerts"])
     sim_cal = SimCalibration()
@@ -188,7 +170,7 @@ def drive(hub: Hub, store: Store, minutes: float, calibrate_s: float, seed: int)
                 stage_name=str(policy.stages[policy.stage].get("name", "")),
                 calibrated=not calibrating, calibrating=calibrating,
                 cal_progress=t / calibrate_s if calibrating else 0.0,
-                trip_s=t, fps=FPS, last_blink_s=extractor.blink.last_blink_s,
+                trip_s=t, fps=FPS, last_blink_s=extractor.blinks.last_blink_s,
                 # A cabin slowly going stale, so the CO2 card moves too.
                 co2_ppm=co2, co2_age_s=2.0))
     control.close()

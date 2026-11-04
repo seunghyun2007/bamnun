@@ -38,7 +38,7 @@ Status: **fixed** on this branch unless marked otherwise.
 |---|---|---|---|
 | F1 | No check of the camera's real frame rate. A webcam in low light, or opened through DirectShow (YUY2 at 720p), silently delivers 10 fps. | Blinks are 1–2 frames; everything downstream degrades without a warning. | Fixed: the loop measures capture and processing rates separately and reports both; a warning is logged below 20 fps. |
 | F2 | The laptop preview window was drawn every frame. | Detection fell from ~34 to ~13 fps. | Fixed on `app-camera-page` (15 Hz). |
-| F3 | Every frame is converted to RGB at full resolution for MediaPipe. | A few ms per frame on the Pi. | Fixed: optional `landmarks.input_width` downscale (points are scaled back), see the Pi plan. |
+| F3 | Every frame goes to MediaPipe at full resolution. | Possibly slow on the Pi. | Option added (`landmarks.input_width`), **off**: on the laptop 640 px was slower (39.5 vs 17.2 ms a frame) and shifted EAR by 2.7 %. To be measured on the Pi. |
 
 ### Landmarks
 
@@ -108,4 +108,59 @@ Status: **fixed** on this branch unless marked otherwise.
 
 ## Before and after
 
-_Filled in below by `python tools/evaluate_detection.py` on the full set._
+`python tools/evaluate_detection.py` on the full set: 17 cases × 4 eye types
+(small, medium, large, glasses) × 2 frame rates (30 and 15 fps), 136 runs,
+7.6 simulated hours. "Before" is the original code from `App-Software`
+(`docs/eval/before-original-code.md`), "after" this branch
+(`docs/eval/after.md`), on the same scenarios.
+
+| Case | Kind | Before: detection | After: detection | Before: false alarms/h | After: false alarms/h | Before: reaction s | After: reaction s | Before: p90 score | After: p90 score |
+|---|---|---|---|---|---|---|---|---|---|
+| alert | not drowsy | – | – | 0.0 | 0.0 | – | – | 11.1 | 3.9 |
+| talking | not drowsy | – | – | 2.5 | 0.0 | – | – | 29.9 | 4.8 |
+| smiling_laughing | not drowsy | – | – | 4.9 | 0.0 | – | – | 32.5 | 4.1 |
+| mirror_glances | not drowsy | – | – | 0.0 | 0.0 | – | – | 15.3 | 5.5 |
+| dashboard_glances | not drowsy | – | – | 0.0 | 0.0 | – | – | 23.3 | 8.5 |
+| phone_glances | not drowsy | – | – | 7.2 | 0.0 | – | – | 42.0 | 10.1 |
+| head_turns | not drowsy | – | – | 0.0 | 0.0 | – | – | 18.7 | 9.7 |
+| yawning | not drowsy | – | – | 0.0 | 0.0 | – | – | 14.5 | 5.0 |
+| glasses_glare | not drowsy | – | – | 2.4 | 0.0 | – | – | 25.0 | 4.6 |
+| lighting_change | not drowsy | – | – | 0.0 | 0.0 | – | – | 18.3 | 7.2 |
+| face_partly_out | not drowsy | – | – | 2.4 | 0.0 | – | – | 26.5 | 5.3 |
+| one_eye_hidden | not drowsy | – | – | 2.4 | 0.0 | – | – | 26.1 | 7.7 |
+| slow_blinks | drowsy | 100 % | 100 % | – | – | 38.0 | 41.2 | 40.0 | 48.3 |
+| heavy_eyelids | drowsy | 88 % | 100 % | – | – | 46.8 | 42.3 | 48.9 | 59.0 |
+| head_nods | drowsy | 0 % | 100 % | – | – | – | 7.1 | 30.0 | 64.5 |
+| microsleep | drowsy | 41 % | 100 % | – | – | 0.8 | 0.7 | 81.7 | 82.3 |
+| progressive | drowsy | 100 % | 100 % | – | – | 159.7 | 184.9 | 39.1 | 44.8 |
+
+In short:
+
+- **Drowsy cases caught:** head nods 0 % → 100 %, microsleeps 41 % → 100 %
+  (reaching the top step in 0.7 s), heavy eyelids 88 % → 100 %, slow blinks
+  and progressive drowsiness 100 % → 100 %.
+- **False alarms:** 6 of 12 not-drowsy cases set the ladder off before (up to
+  7.2 / h, phone glances flagged 21 % of the time); after, none do (0.0 / h in
+  all 12).
+- **Resting score:** the 90th-percentile score in not-drowsy cases fell from
+  11–42 to 4–10; an alert driver's median is 0.9.
+
+**Real data.** The alert desk session that motivated this work scored a
+median of 34 / 100 (59 % of the time at "A bit tired") on the old pipeline.
+Its session log is sampled at 10 Hz, too coarse to replay blinks; the 40 s
+raw recording of the same setup replays on the new pipeline at **0 / 100,
+Alert 100 %** (`python tools/replay_session.py runs/recordings/tool-check`).
+Labelled real sessions can now be added with the 10-minute script
+(`tools/record_session.py`) and scored the same way
+(`tools/evaluate_detection.py --recordings runs/recordings`).
+
+**Frame rate (laptop webcam, 1280×720, blendshapes on).** Processing capacity
+58 fps (17 ms a frame); detection 24–30 fps, limited by the camera in low
+light. The phone video is encoded on its own thread and doesn't slow it.
+
+**Limits of this validation.** The simulator is a model, fitted to one real
+recording's noise and blink depth and to published timings; the thresholds
+were tuned on it (seed 7) and checked on an unseen seed (11) in the test
+suite. It is not a substitute for labelled sessions from several real
+drivers, which is what the 10-minute script is for. Nod kinematics in
+particular are our own model.

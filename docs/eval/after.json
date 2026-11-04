@@ -7,7 +7,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 0.9,
-    "p90_score": 3.8,
+    "p90_score": 3.9,
     "time_flagged": 0.0
   },
   {
@@ -18,7 +18,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 0.1,
-    "p90_score": 4.7,
+    "p90_score": 4.8,
     "time_flagged": 0.0
   },
   {
@@ -29,7 +29,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 0.2,
-    "p90_score": 3.9,
+    "p90_score": 4.1,
     "time_flagged": 0.0
   },
   {
@@ -39,8 +39,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 1.4,
-    "p90_score": 5.4,
+    "rest_score": 1.5,
+    "p90_score": 5.5,
     "time_flagged": 0.0
   },
   {
@@ -50,8 +50,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 3.0,
-    "p90_score": 8.4,
+    "rest_score": 3.1,
+    "p90_score": 8.5,
     "time_flagged": 0.0
   },
   {
@@ -61,8 +61,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 3.4,
-    "p90_score": 9.8,
+    "rest_score": 3.5,
+    "p90_score": 10.1,
     "time_flagged": 0.0
   },
   {
@@ -72,8 +72,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 1.6,
-    "p90_score": 9.6,
+    "rest_score": 1.7,
+    "p90_score": 9.7,
     "time_flagged": 0.0
   },
   {
@@ -84,7 +84,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 1.5,
-    "p90_score": 4.9,
+    "p90_score": 5.0,
     "time_flagged": 0.0
   },
   {
@@ -95,7 +95,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 0.2,
-    "p90_score": 4.4,
+    "p90_score": 4.6,
     "time_flagged": 0.0
   },
   {
@@ -105,8 +105,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 0.7,
-    "p90_score": 8.0,
+    "rest_score": 0.4,
+    "p90_score": 7.2,
     "time_flagged": 0.0
   },
   {
@@ -116,8 +116,8 @@
     "missed_eyes": [],
     "reaction_s": null,
     "false_alarms_h": 0.0,
-    "rest_score": 0.4,
-    "p90_score": 5.2,
+    "rest_score": 0.5,
+    "p90_score": 5.3,
     "time_flagged": 0.0
   },
   {
@@ -128,7 +128,7 @@
     "reaction_s": null,
     "false_alarms_h": 0.0,
     "rest_score": 0.6,
-    "p90_score": 7.4,
+    "p90_score": 7.7,
     "time_flagged": 0.0
   },
   {
@@ -139,7 +139,7 @@
     "reaction_s": 41.2,
     "false_alarms_h": null,
     "rest_score": 39.9,
-    "p90_score": 47.8,
+    "p90_score": 48.3,
     "time_flagged": 68.1
   },
   {
@@ -147,11 +147,11 @@
     "drowsy": true,
     "detection": 1.0,
     "missed_eyes": [],
-    "reaction_s": 40.5,
+    "reaction_s": 42.3,
     "false_alarms_h": null,
-    "rest_score": 48.5,
-    "p90_score": 59.2,
-    "time_flagged": 65.7
+    "rest_score": 48.7,
+    "p90_score": 59.0,
+    "time_flagged": 65.2
   },
   {
     "case": "head_nods",
@@ -161,7 +161,7 @@
     "reaction_s": 7.1,
     "false_alarms_h": null,
     "rest_score": 39.0,
-    "p90_score": 66.5,
+    "p90_score": 64.5,
     "time_flagged": 75.3
   },
   {
@@ -171,7 +171,7 @@
     "missed_eyes": [],
     "reaction_s": 0.7,
     "false_alarms_h": null,
-    "rest_score": 43.5,
+    "rest_score": 43.8,
     "p90_score": 82.3,
     "time_flagged": 71.1
   },
@@ -183,7 +183,7 @@
     "reaction_s": 184.9,
     "false_alarms_h": null,
     "rest_score": 8.0,
-    "p90_score": 44.5,
-    "time_flagged": 17.5
+    "p90_score": 44.8,
+    "time_flagged": 17.3
   }
 ]

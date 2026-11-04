@@ -6,48 +6,151 @@ a judge asks "why 0.15?" the answer is a sentence and not a shrug. Anything
 marked **ours** is a design choice we should be ready to defend as a choice,
 not to misrepresent as a finding.
 
-## Eye closure
+## Eye openness on the driver's own scale
+
+Every eye threshold below is on a personal 0–100 % scale: 100 % is this
+driver's normal open eyes, 0 % their closed eyes, both learned by the guided
+calibration (section *Calibration*). That is what makes small eyes, large eyes
+and glasses behave the same (audit F8, F24). The simulator checks it on four
+eye types (EAR open 0.20 / 0.26 / 0.28 / 0.36).
 
 | Parameter | Value | Basis |
 |---|---|---|
-| `ear_closed_fraction` | 0.65 of the driver's calibrated open EAR | **ours.** The widely cited absolute threshold is EAR < 0.21, from Soukupová & Čech's 2016 real-time blink detection work. Absolute thresholds do not transfer across eye shapes: a narrow aperture sits near 0.17 fully open and is classified as permanently closed. Expressing closure as a fraction of a per-driver baseline is the fix. 0.65 was chosen so that the equivalent absolute threshold for a typical 0.30 open EAR is 0.195, i.e. close to the published figure, while scaling correctly for everyone else. |
-| `ear_reopen_fraction` | 0.75 | **ours.** Hysteresis band of 0.10. Without it, EAR noise around a single threshold splits one blink into several and inflates the blink rate. |
-| `ear_smoothing_alpha` | 0.4 | **ours.** EWMA on raw EAR. At 25 fps this is roughly a 60 ms time constant, short relative to a 100–300 ms blink so genuine blinks survive, long enough to suppress single-frame landmark jitter. |
-| `ear_shut_fraction` | 0.40 | "Really shut", separate from the blink threshold. A closed eye's EAR is roughly a third of its open value (our bench sessions; see the PERCLOS note in the config), so below 40 % the lids are closed rather than narrowed. Microsleeps and PERCLOS use this line. **Why it exists:** with only the 0.65 blink line, a hard squint held for 0.5 s counted as a microsleep and sent the ladder straight to its top stage. Now a squint is scored gradually (below) and only shut eyes take the bypass. **ours**, tune per driver once the guided calibration stores a closed-eye EAR. |
+| Open level | median EAR of the look-ahead step, blinks excluded | **ours.** The old 75th percentile sat above the driver's typical eyes: a real 17-minute session read 84–89 % "open" while alert, a permanent squint. The median is the typical open eye. |
+| Closed level | median EAR of the eyes-closed step (darkest 60 % of its frames, after a 0.7 s lead) | **ours.** MediaPipe never reaches EAR 0 on a shut eye; measured shut EARs are 28–42 % of open, so fixed fractions of the open level (the old 0.65 / 0.40) can't work for everyone. |
+| `estimated_closed_ratio` | 0.33 | **ours**, from the bench sessions (closed EAR ≈ a third of open). Used only until the eyes-closed step has run. |
+| `blendshape_weight` | 0.5 | **ours.** MediaPipe's `eyeBlink` is a second, independent estimate of upper-lid closure, calibrated on the same scale (its own open and closed levels). Equal weight; either alone works. |
+| `eye_disagreement` | 0.45 | **ours.** When EAR and `eyeBlink` disagree by more than this, a reflection or landmark error is likely (glasses glare); the frame is unreliable and the more open estimate is used, so a reflection can't fake a closure. |
+| `eye_drop_width_ratio` | 0.60 | **ours.** An eye narrower than 60 % of the other is turned away, covered or cut by the frame edge; it is ignored and the other eye used (audit F6, F20). Replaces "max of both eyes", which picked the foreshortened far eye. |
+| `pose_compensation_max_deg` | 30° | Geometry: yaw narrows the eye's width by cos(yaw), raising EAR; pitch shortens its height by cos(pitch). EAR is corrected by the head angle relative to the calibrated neutral. Beyond ±30° the correction is unreliable and the frame is too (`reliable_yaw_deg`, `reliable_pitch_deg`). |
+
+## Frames that are not scored
+
+Eye signals skip frames that can't be trusted, and PERCLOS leaves their time
+out of both numerator and denominator.
+
+| Parameter | Value | Basis |
+|---|---|---|
+| `smile_threshold`, `cheek_threshold` | 0.35, 0.30 (MediaPipe `mouthSmile`, `cheekSquint`) | A genuine smile raises the cheeks and narrows the eyes from below (Duchenne smile; Ekman, Davidson & Friesen 1990). Thresholds **ours**. Without blendshapes: mouth 12 % wider than at rest (`smile_mouth_width_ratio`). |
+| `talk_jaw_std`, `talk_window_s` | 0.05 over 1 s | Speech moves the jaw at the syllable rate, 3–7 Hz (Chandrasekaran et al. 2009), which shows as variance of `jawOpen` within a second. Threshold **ours**. |
+| `yawn_jaw_open`, `yawn_min_s` | 0.50 held 1 s | Yawns last about 6 s with a ~2 s opening phase (Provine 1986); the eyes squeeze shut at the peak, so those frames are not eye evidence. A yawn is counted as its own signal. |
+| `expression_hold_s` | 0.7 s | **ours.** The face takes a moment to relax after a smile or yawn. |
+| `light_jump`, `light_hold_s` | 18 grey levels, 1 s | **ours.** A sudden brightness change (tunnel, streetlight) shifts landmarks for a moment; the next second is skipped and the new light becomes the new normal. |
+| `min_iod_frac` | 0.045 of frame width | **ours.** Below this the eye is a few pixels tall and its geometry is noise. |
+| `look_down_pitch_deg` | 10°, or 3× the calibrated pitch wobble | The upper lid follows vertical gaze, so looking down lowers it with no drowsiness at all (Becker & Fuchs 1988). Relative to the driver's own neutral pose and movement. |
 
 ## PERCLOS
 
 | Parameter | Value | Basis |
 |---|---|---|
-| `perclos_baseline_fraction` | 0.40 of open EAR | PERCLOS is conventionally P80, the share of time the eyes are more than 80 % closed (Wierwille et al. 1994 for the FHWA; Dinges & Grace 1998, who found it the best-correlated single ocular measure of lapses). EAR never reaches zero on a shut eye, so "80 % closed" is not "EAR below 20 %". The value was 0.80 originally (counted eyes only ~30 % closed), then 0.50 after the bench sessions (see the config comment), and is now 0.40, the same "really shut" line as `ear_shut_fraction`. At 0.50 a hard squint counted as closed on every frame and PERCLOS read 100 %. |
-| `perclos_window_s` | 60 | Standard. One minute is the usual PERCLOS integration window. |
-| `ranges.perclos` | 0.03 → 0 and 0.20 → 1 | Under the stricter "really shut" definition, alert drivers sit at 1–2 % (bench sessions). 0.15 is the usual drowsy criterion; 0.20 saturates. Anchors **ours**. |
-| PERCLOS gates on the levels (`min_perclos`) | 5 / 10 / 15 / 20 % | The four-stage stratification in the team research doc (KSS 6–9 at PERCLOS 5–20 %). Kept: with the stricter definition they only open for real closures, not squints. |
+| `perclos_closed_level` | openness ≤ 20 % | This is P80, the published definition: eyes more than 80 % closed (Wierwille et al. 1994; Dinges & Grace 1998). Only possible now that the closed level is measured; before it was approximated as 40–80 % of the open EAR. |
+| `perclos_window_s` | 60 s | Standard integration window. |
+| `ranges.perclos` | 3 % → 0, 15 % → 1 | On this scale ordinary blinking spends 3–5 % of the time below 20 % open; 15 % is the usual drowsy criterion (Dinges & Grace 1998). |
+| PERCLOS level gates | removed | They opened at 5 %, inside normal blinking on the true P80 scale, and made levels jump; PERCLOS is already in the score. |
 
-## Squint (eye openness)
+## Heavy eyelids
 
 | Parameter | Value | Basis |
 |---|---|---|
-| `openness_window_s` | 45 s | **ours.** Long enough that one narrowed glance doesn't count, short enough to follow a slide into drowsiness within a minute. |
-| `openness_percentile` | 60th | **ours.** Blinks take ~3 % of frames and pull a plain average down; a percentile above the median ignores them but follows a held squint. |
-| `ranges.squint` | 1 − openness: 0.10 → 0, 0.40 → 1 | Reduced lid opening between blinks is an early drowsiness sign (Caffier et al. 2003 report lower lid opening alongside longer blinks; Johns et al. 2007 use partial closures in the Johns Drowsiness Scale). The anchors are **ours**: 10 % is normal variation in EAR from posture and expression, 40 % narrower than the driver's own open level is a sustained heavy squint. Relative to the driver's calibrated level, so glasses and naturally narrow eyes are not mistaken for squinting. |
-| `look_down_pitch_deg` | 12° | The upper lid follows vertical gaze: looking down lowers it substantially with no drowsiness at all (Becker & Fuchs 1988, lid–eye coordination). Head pitch past 12° below the calibrated straight-ahead marks a look at the dashboard; those frames are left out of squint, PERCLOS and the blink averages. **ours** as a number; tune on the real mount. |
+| `openness_window_s` | 45 s | **ours.** Typical openness = median of reliable frames over the window; blinks are ~3 % of frames and don't move a median, a held droop does. |
+| `ranges.heavy_lids` | 1 − typical: 0.15 → 0, 0.45 → 1 | Lower lid opening between blinks is an early sign of drowsiness (Caffier et al. 2003; partial closures in the Johns Drowsiness Scale, Johns et al. 2007). Anchors **ours**: 15 % is normal variation in a real session, 45 % a heavy droop. |
 
 ## Blinks
 
 | Parameter | Value | Basis |
 |---|---|---|
-| `min_duration_s` | 0.05 | Physiological floor. Voluntary blinks do not complete in under ~50 ms, so anything shorter is landmark noise. |
-| `max_normal_duration_s` | 0.40 | Normal spontaneous blink duration is roughly 100–400 ms; longer closures are a distinct category. |
-| `microsleep_duration_s` | 0.50 | **ours, conservative.** Definitions of microsleep in the literature range from 0.5 s to 15 s of behavioural sleep. We take the low end deliberately: the cost of acting on a 0.5 s closure is one chime, the cost of missing a real one can be a lane departure. Worth stating in the report that our "microsleep" is the conservative end of the definition. |
-| `microsleep_looking_down_s` | 1.5 s | **ours.** With the head pitched down (phone, keyboard, low dashboard) the lids can close almost completely while awake, which our own webcam test showed: a glance at the keyboard read as a microsleep. Requiring 1.5 s shut while looking down removes that, and a head dropping forward with the eyes shut (nodding off) still passes it within two seconds. Covered by tests both ways. |
-| `ranges.blink_duration` | 0.15 → 0, 0.35 s → 1 | Normal spontaneous blinks last about 0.10–0.15 s at the closure threshold we measure them at; blink duration lengthens with sleepiness and correlates with KSS (Ingre et al. 2006; Schleicher et al. 2008; Caffier et al. 2003). Measured between our 0.65 / 0.75 thresholds, a 0.4 s blink reads about 0.33 s, hence the 0.35 s saturation. **ours** as anchors. |
-| `slow_blink_s` / `ranges.slow_blinks` | 0.30 s; share 0.10 → 0, 0.50 → 1 | Blinks of 0.3 s or more are a recognised early sign of sleepiness (Schleicher et al. 2008 describe the growth of these long blinks before lapses). The share, not the count, so a high or low blink rate doesn't distort it. Anchors **ours**. |
-| `ranges.lid_speed` | reopening 0.10 → 0, 0.30 s → 1 | Drowsy eyelids reopen slowly: Johns et al. 2007 base their drowsiness scale on the amplitude–velocity ratio of reopening, and Caffier et al. 2003 report prolonged reopening times. We measure from the deepest point back to open. Anchors **ours**. |
-| `ranges.blink_rate` | 24 → 0, 40 /min → 1 | Blink rate rises with fatigue (Stern et al. 1994) but varies widely between people, so it gets the smallest weight. **ours**. |
-| `min_blinks_for_stats` | 5 | **ours.** Fewer blinks than this in the last minute and the blink averages read "no evidence" (0), not "fast". 3 was too few: two odd blinks moved the score by 20 points in our webcam test. |
-| `max_blink_stat_s` | 1.0 s | **ours.** A "closure" longer than this is a held squint or a look down, not a blink, and is kept out of the blink averages. |
-| `eyes_closed_label_s` | 0.30 s | **ours.** The app shows "Eyes closed" only after this long shut, so a normal blink never flashes it. |
+| `blink_half_level` | 50 % | Blinks are timed at half amplitude, the convention in the blink-duration literature (Caffier et al. 2003; Schleicher et al. 2008), measured from where the lids currently rest, so heavy lids don't hide blinks. Crossing times are interpolated between frames: at 15 fps a frame is 67 ms, the size of the effect. |
+| Per-frame smoothing | removed | The old α = 0.4 smoothing erased 1–2-frame blinks at 15 fps: 3 blinks / min measured on a real session instead of 15–20 (audit F9). |
+| `long_blink_s` | 0.30 s | Blinks of 0.3 s or more are a recognised early sign (Schleicher et al. 2008). |
+| `ranges.long_blinks` | 1 → 0, 5 per minute → 1 | **ours.** One long blink a minute happens to anyone. |
+| `ranges.blink_duration` | +0.05 → 0, +0.18 s → 1 over the driver's normal blink | Alert half-amplitude blinks are ~100–150 ms and lengthen with sleepiness, correlating with KSS (Ingre et al. 2006). Scored as the change from this driver's calibrated blink. |
+| `ranges.lid_speed` | reopening AVR 1.3× → 0, 2.3× → 1 the driver's normal | Drowsy lids reopen slowly; the amplitude–velocity ratio is the basis of the Johns Drowsiness Scale (Johns et al. 2007). Relative to the driver's own blinks, so the camera's frame rate cancels out. |
+| `ranges.blink_rate` | 1.5× → 0, 2.5× → 1 the driver's normal | Blink rate changes with fatigue (Stern et al. 1994) but varies widely between people: smallest weight. |
+| `held_closure_s` | 1.0 s | **ours.** Longer "blinks" are held squints or looks down. |
+| `min_blinks_for_stats` | 5 | **ours.** Fewer judged blinks in the last minute = no evidence yet (0), not "fast". |
+
+## Shut eyes and the microsleep bypass
+
+| Parameter | Value | Basis |
+|---|---|---|
+| `shut_level` | openness ≤ 25 % (with blendshapes, EAR and `eyeBlink` each ≤ 40 %) | **ours.** Both estimates must agree, so glare can't trigger it. |
+| `microsleep_s` | 0.5 s | Microsleeps are eye closures from 0.5 s to several seconds (Boyle et al. 2008; Hertig-Godeschalk et al. 2020). Bypass: score ≥ 0.90 and the top ladder stage at once. |
+| `microsleep_looking_down_s` | 1.5 s | **ours.** With the head down the lids can close almost fully while awake; a head dropping with the eyes shut still passes 1.5 s. |
+| `microsleep_unreliable_s` | 1.0 s | **ours.** During a laugh, yawn or lighting change. |
+| `eyes_closed_label_s` | 0.3 s | **ours.** A normal blink never shows "Eyes closed". |
+
+## Head nods
+
+| Parameter | Value | Basis |
+|---|---|---|
+| Model | slow drift down, then a fast jerk back up | Head nodding / drooping is a late sign in observer rating schemes (Wierwille & Ellsworth 1994) and a classic fatigue cue in vision systems (Ji, Zhu & Lan 2004). The kinematic anchors below are **ours**, checked in the simulator against glances at the dashboard, phone and mirrors. |
+| `nod_start_deg` | 6° below neutral | A drop must start by crossing out of the neutral band, so its whole descent is seen. |
+| `nod_depth_deg`, `nod_wobble_multiple` | 12°, and 3× the calibrated pitch wobble | Deeper than the driver's normal head movement. |
+| `nod_max_drop_speed_deg_s` | 45°/s (fastest 0.15 s of the drop) | A deliberate look down is fast (≥ 100°/s in the simulator's glances); nodding off drifts. |
+| `nod_recovery_speed_deg_s` | 60°/s, and ≥ 2× the drop speed | The corrective jerk. A glance comes back as fast as it went down. |
+| `nod_recovery_window_s`, `nod_max_drop_s` | 2.5 s, 4 s | A head held down longer is a deliberate look, not a nod. |
+| `head_drop_lost_window_s`, `head_drop_min_speed_deg_s` | 0.6 s, 8°/s | A face lost within 0.6 s of a downward movement went down with the head: "Head dropping", never "No face" (audit F23). |
+| `head_drop_microsleep_s` | 0.5 s | A head drop with the face lost this long is treated as a microsleep. |
+| `ranges.nods` | 0 → 0, 2 nods in 2 min → 1 | **ours.** |
+| `state.nod_score` | 0.50 | A detected nod lifts the score to level 2 at once: rater schemes put nodding at "very drowsy". |
+
+## Calibration
+
+| Parameter | Value | Basis |
+|---|---|---|
+| `duration_s`, `max_duration_s`, `min_blinks` | 15 s, up to 25 s, 3 blinks | **ours.** At 15–20 blinks / min, 15 s usually holds 3–5 blinks; the step waits up to 25 s for them, so the driver's normal blink is measured, not assumed. |
+| `max_relative_pose_deg` | 12° | Frames this far from the session's own median pose are dropped. Relative, not absolute: the old ±20° absolute gate rejected dash cameras 15–25° off-axis (audit F25). |
+| `max_wobble_deg` | 4° robust std | **ours.** More head movement than this: "Hold still", redo. Also learned as the driver's normal wobble for the nod detector. |
+| `min_separation` | 30 % | (open − closed) / open EAR below this (or eyeBlink difference below 0.35): the eyes can't be told apart; redo. |
+| `min_brightness`, `max_brightness` | 45, 235 grey levels | **ours.** Live hints "Too dark" / "Too bright". |
+| `min_face_frac`, `max_face_frac`, `max_facing_deg` | 6 % and 32 % of the frame width, 28° | **ours.** Live hints "Move closer" / "Move back" / "Face the camera". |
+
+## Fusion and levels
+
+| Weight | Signal |
+|---|---|
+| 0.20 | heavy lids |
+| 0.20 | PERCLOS (P80) |
+| 0.15 | nods |
+| 0.14 | blink duration vs normal |
+| 0.14 | long blinks |
+| 0.07 | lid reopening speed vs normal |
+| 0.05 | microsleeps |
+| 0.03 | yawns |
+| 0.02 | blink rate vs normal |
+
+All **ours**, not fitted. Tuned so every drowsy scenario is caught and every
+not-drowsy one stays quiet in the simulator (`docs/detection-audit.md`), on
+four eye types at 15 and 30 fps. Every lower anchor sits beyond the driver's
+own normal variation, so an alert, calibrated driver scores ~0–5: the
+simulated alert driver's median is 0.9 / 100, and a real 40 s webcam
+recording replays at 0.
+
+Smoothing (`score_rise_tau_s` 6 s, `score_fall_tau_s` 20 s) and the levels
+(0.25 / 0.45 / 0.65 / 0.82 with dwell and 0.08 hysteresis) are unchanged from
+the previous branch. Time-of-day risk (the two-process model below) is **not**
+part of this score; it is shown separately.
+
+## Validation scenarios (simulator timings)
+
+`src/bamnun/scenarios.py`; every timing has a source or is marked ours.
+
+| Scenario | Timing | Source |
+|---|---|---|
+| Alert blinking | 17 / min, half-amplitude 100–150 ms | Stern et al. 1994; Caffier et al. 2003 |
+| Slow blinks | 14 / min, 300–450 ms, slow reopening | Schleicher et al. 2008; Johns et al. 2007 |
+| Heavy eyelids | openness ~60 %, blinks 180–320 ms | Caffier et al. 2003 |
+| Microsleep | eyes shut 0.6–2.0 s | Boyle et al. 2008; Hertig-Godeschalk et al. 2020 |
+| Head nods | drop 16–32° over 1–2.2 s, eyes heavy, jerk back in 0.12–0.25 s | Wierwille & Ellsworth 1994 (description); speeds ours |
+| Progressive | 10 min, blinks 0.10 → 0.43 s, lids → 65 %, nods at the end | composite of the above |
+| Yawning | ~6 s, eyes squeezed at the peak | Provine 1986 |
+| Talking | jaw at 4.5 Hz | Chandrasekaran et al. 2009 |
+| Mirror glances | 0.7–1.3 s, ±40° yaw | Rockwell 1988 |
+| Dashboard / phone | 0.6–1.5 s at 15–22° down / 1.8–3 s at 30–40° down | ours; lid lowering per Becker & Fuchs 1988 |
+| Real-camera effects | open EAR drift ±4.5 %, pitch wander ~2°, 0.45° jitter, exposure blur, 15 and 30 fps | measured on a real 30 fps webcam recording |
+
+`tests/test_detection_eval.py` runs every scenario once on every change.
+
 
 ## Head and gaze
 
@@ -55,46 +158,6 @@ not to misrepresent as a finding.
 |---|---|---|
 | `off_road_alert_s` | 2.0 | NHTSA's visual-manual driver distraction guidelines treat single off-road glances longer than 2 s as the risk criterion; this also matches the Klauer/Dingus 100-car naturalistic study finding that eyes-off-road beyond about 2 s sharply raises crash risk. Citable, not invented. |
 | `yaw_limit_deg` / `pitch_limit_deg` | 25 / 20 | **ours.** A rough forward gaze cone, measured relative to the calibration pose, not to the camera. Should be tuned once the camera is on its real mount, and the tuned value reported. |
-| `nod_pitch_std_deg` | 6.0 over 10 s | **ours.** Placeholder. This one needs real data before it goes in a report; it is currently the weakest threshold in the system. |
-
-## Fusion and levels
-
-The drowsiness score is a weighted sum of nine sub-scores, each a clamped
-linear ramp between the two anchors in `state.ranges`:
-
-| Weight | Signal | Why this much |
-|---|---|---|
-| 0.28 | squint | Eye-closure measures are the best single predictors; squint is the gradual one, so it carries the most. |
-| 0.20 | PERCLOS | The best-validated single indicator (Dinges & Grace 1998). |
-| 0.15 | blink duration | Rises early and correlates with KSS (Ingre et al. 2006). |
-| 0.12 | slow blinks | Early sign; complements the average. |
-| 0.09 | microsleeps in the last minute | Very specific, but also handled by the bypass, so not weighted heavily here. |
-| 0.06 | lid reopening time | Early sign (Johns et al. 2007), noisier on a webcam. |
-| 0.04 | yawns | Suggestive but noisy. |
-| 0.04 | head nodding | Our least trustworthy channel. |
-| 0.02 | blink rate | Varies most between people. |
-
-All weights and anchors are **ours**, not fitted, and the report should say
-so. `tools/record_session.py` and `tools/replay_session.py` exist to tune them
-against recorded sessions; learning them from labelled sessions is the next
-step.
-
-**Smoothing** (`score_rise_tau_s` 6 s, `score_fall_tau_s` 20 s, **ours**): the
-score moves towards the raw sum exponentially, faster up than down. Drowsiness
-builds over minutes and doesn't vanish when the driver opens their eyes wide
-for a second; the slow fall also stops the ladder flickering between stages.
-
-**Levels** (`min_score` 0.25 / 0.45 / 0.65 / 0.82, **ours**), each entered
-after a short dwell and left only below the threshold minus
-`recovery_hysteresis` (0.08). Level 1 fires stage 1 (blue light) and so on.
-Chosen so that a single mild sign (a held squint, a minute of slow blinks)
-reaches level 1 and no further, two or more together reach level 2, and the
-top levels need strong or sustained evidence. The tests in
-`tests/test_gradual.py` pin those cases.
-
-**Safety bypass:** eyes really shut (below `ear_shut_fraction`) for
-`microsleep_duration_s` sets the score to at least `microsleep_score` (0.90)
-and jumps the ladder to its top stage at once, as before.
 
 ## KSS
 
@@ -126,3 +189,11 @@ gives the ground truth the system currently lacks.
 - Schleicher, R., Galley, N., Briest, S. & Galley, L. (2008). Blinks and saccades as indicators of fatigue in sleepiness warnings: looking tired? *Ergonomics*, 51(7).
 - Stern, J. A., Boyer, D. & Schroeder, D. (1994). Blink rate: a possible measure of fatigue. *Human Factors*, 36(2).
 - Wierwille, W. W., Ellsworth, L. A., Wreggit, S. S., Fairbanks, R. J. & Kirn, C. L. (1994). *Research on vehicle-based driver status/performance monitoring.* NHTSA / Virginia Tech.
+- Boyle, L. N., Tippin, J., Paul, A. & Rizzo, M. (2008). Driver performance in the moments surrounding a microsleep. *Transportation Research Part F*, 11(2).
+- Chandrasekaran, C., Trubanova, A., Stillittano, S., Caplier, A. & Ghazanfar, A. A. (2009). The natural statistics of audiovisual speech. *PLoS Computational Biology*, 5(7).
+- Ekman, P., Davidson, R. J. & Friesen, W. V. (1990). The Duchenne smile: emotional expression and brain physiology II. *Journal of Personality and Social Psychology*, 58(2).
+- Hertig-Godeschalk, A., Skorucak, J., Malafeev, A., Achermann, P., Mathis, J. & Schreier, D. R. (2020). Microsleep episodes in the borderland between wakefulness and sleep. *Sleep*, 43(1).
+- Ji, Q., Zhu, Z. & Lan, P. (2004). Real-time nonintrusive monitoring and prediction of driver fatigue. *IEEE Transactions on Vehicular Technology*, 53(4).
+- Provine, R. R. (1986). Yawning as a stereotyped action pattern and releasing stimulus. *Ethology*, 72(2).
+- Rockwell, T. H. (1988). Spare visual capacity in driving — revisited. In *Vision in Vehicles II*, Elsevier.
+- Wierwille, W. W. & Ellsworth, L. A. (1994). Evaluation of driver drowsiness by trained raters. *Accident Analysis & Prevention*, 26(5).

@@ -116,7 +116,7 @@ def _bar(img, x: int, y: int, w: int, h: int, frac: float, colour,
 # The same words the app shows (SPEC.md, section 13), so the two can be
 # compared side by side while testing.
 LABEL_TEXT = {"alert": "ALERT", "a_bit": "A BIT TIRED", "drowsy": "DROWSY",
-              "very": "VERY DROWSY", "eyes_closed": "EYES CLOSED",
+              "very": "VERY DROWSY", "eyes_closed": "EYES CLOSED", "head_drop": "HEAD DROPPING",
               "away": "LOOKING AWAY", "no_face": "NO FACE"}
 
 
@@ -268,7 +268,7 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
             _bar(canvas, x0 + 12, y, panel_w - 24, 10,
                  feature_frame.ear_norm, _WHITE,
                  f"eye open {feature_frame.ear_norm*100:0.0f}%  (typical "
-                 f"{feature_frame.openness*100:0.0f}%)", threshold=0.65)
+                 f"{feature_frame.openness*100:0.0f}%)", threshold=0.5)
             y += 32
             cv2.putText(canvas,
                         f"blinks {feature_frame.blink_rate_per_min:0.0f}/min   "

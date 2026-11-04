@@ -28,6 +28,8 @@ from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
 from .control import Controller, FeatureCalibration
+from .eyes import face_brightness
+from .predictor import two_process_alertness
 from .features import Calibration, FeatureExtractor, FeatureFrame
 from .landmarks import FaceLandmarker
 from .predictor import RestPlanner
@@ -139,10 +141,6 @@ class Monitor:
         self._published_stage = 0
         self._publish_failed = False
 
-        cal_path = args.calibration or self.cfg["calibration"].get("save_path")
-        self._cal_path = self.root / str(cal_path)
-        self._load_calibration()
-
         # Profile, settings and trips (SPEC.md, sections 0 and 1). The store
         # is optional in the same way the server is: without it the device
         # still detects and alerts, it just keeps no trips.
@@ -157,6 +155,19 @@ class Monitor:
             calibration=FeatureCalibration(self.features, on_commit=self._save_calibration),
             trip_cfg=self.cfg.get("trips"))
 
+        # Calibration is per driver (SPEC.md, 15): runs/drivers/<name>/.
+        # --calibration names a file explicitly and pins it.
+        self._pinned_cal = args.calibration
+        self._driver = driver_id(self.controller.profile.get("name", ""))
+        self._cal_path = self._calibration_path()
+        self._load_calibration()
+        self._last_driver_check = -1e9
+        self._proc = deque(maxlen=60)
+        self._slow_since: Optional[float] = None
+        self._last_risk = -1e9
+        self._t_started = time.monotonic()
+        self._time_risk: Optional[dict] = None
+
         self.logger.write_meta({
             "config": self.cfg,
             "argv": sys.argv,
@@ -165,6 +176,30 @@ class Monitor:
         })
 
     # ----------------------------------------------------------------- #
+
+    def _calibration_path(self) -> Path:
+        if self._pinned_cal:
+            return self.root / str(self._pinned_cal)
+        per_driver = self.root / "runs" / "drivers" / self._driver / "calibration.json"
+        legacy = self.root / str(self.cfg["calibration"].get("save_path", "runs/calibration.json"))
+        # The first time, carry an older single calibration over to "default".
+        if not per_driver.exists() and self._driver == "default" and legacy.exists():
+            return legacy
+        return per_driver
+
+    def _check_driver(self, now: float) -> None:
+        """A new profile name means a new driver: use their calibration."""
+        if self._pinned_cal or now - self._last_driver_check < 2.0:
+            return
+        self._last_driver_check = now
+        d = driver_id(self.controller.profile.get("name", ""))
+        if d == self._driver:
+            return
+        self._driver = d
+        self._cal_path = self._calibration_path()
+        console.print(f"[cyan]driver changed[/] to {d!r}")
+        if self._cal_path.exists():
+            self._load_calibration()
 
     def _load_calibration(self) -> None:
         if self._cal_path.exists():
@@ -179,6 +214,8 @@ class Monitor:
         console.print("[yellow]no calibration on file; press 'c' or wait for auto-calibration[/]")
 
     def _save_calibration(self) -> None:
+        if not self._pinned_cal:
+            self._cal_path = self.root / "runs" / "drivers" / self._driver / "calibration.json"
         self._cal_path.parent.mkdir(parents=True, exist_ok=True)
         self._cal_path.write_text(
             json.dumps(self.features.calibration.to_dict(), indent=2), encoding="utf-8"
@@ -300,6 +337,33 @@ class Monitor:
             },
         }
 
+    def _watch_rate(self, now: float, fps: float) -> None:
+        """Warn once a minute if detection runs below 20 fps (audit F1)."""
+        if fps >= 20.0:
+            self._slow_since = None
+            return
+        if self._slow_since is None:
+            self._slow_since = now
+        elif now - self._slow_since > 10.0:
+            cap = len(self._proc) / max(sum(self._proc), 1e-6)
+            log.warning("detection at %.0f fps (processing could do %.0f): %s", fps, cap,
+                        "the camera is slow (low light?)" if cap > fps * 1.5
+                        else "processing is the limit: close the preview window")
+            self._slow_since = now + 50.0
+
+    def _risk(self, now: float) -> Optional[dict]:
+        """Time-of-day risk, separate from the camera score (SPEC.md, 15)."""
+        if now - self._last_risk < 30.0 and self._time_risk is not None:
+            return self._time_risk
+        self._last_risk = now
+        local = time.localtime(time.time() + self.hub.clock_offset_s)
+        hour = local.tm_hour + local.tm_min / 60.0
+        awake = float(self.args.hours_awake) + (now - self._t_started) / 3600.0
+        v = two_process_alertness(awake, hour)
+        self._time_risk = {"level": "high" if v >= 0.55 else "medium" if v >= 0.35 else "low",
+                           "value": round(v, 2), "hours_awake": round(awake, 1)}
+        return self._time_risk
+
     def _publish(self, now: float, ff: FeatureFrame, state: DriverState,
                  calibrating: bool, progress: float, fps: float,
                  trip_s: float, lms=None) -> None:
@@ -315,7 +379,9 @@ class Monitor:
             calibrated=self.features.calibration.complete,
             calibrating=calibrating, cal_progress=progress, trip_s=trip_s,
             fps=fps, last_blink_s=self.features.blinks.last_blink_s,
-            co2_ppm=air.ppm, co2_age_s=co2_age, face_box=face_box(lms)))
+            co2_ppm=air.ppm, co2_age_s=co2_age, face_box=face_box(lms),
+            time_risk=self._risk(now),
+            fps_capacity=(len(self._proc) / max(sum(self._proc), 1e-6)) if self._proc else None))
         if now - self._last_health >= HEALTH_PERIOD_S:
             self._last_health = now
             self.hub.set_health(self._health())
@@ -380,8 +446,10 @@ class Monitor:
             if self.args.duration and (frame.timestamp - t_start) > self.args.duration:
                 break
 
+            t_proc = time.perf_counter()     # processing capacity = face tracking + everything after
             lms = self.landmarker.process(frame)
-            ff: FeatureFrame = self.features.update(frame.timestamp, lms)
+            bright = face_brightness(frame.image, lms.points) if lms is not None and lms.ok else None
+            ff: FeatureFrame = self.features.update(frame.timestamp, lms, brightness=bright)
 
             calibrating = self.features.calibrating
             if calibrating:
@@ -449,6 +517,9 @@ class Monitor:
             self._fps.append(1.0 / max(now - last, 1e-6))
             last = now
             fps = sum(self._fps) / len(self._fps)
+            self._proc.append(time.perf_counter() - t_proc)
+            self._guarded(self._watch_rate, now, fps)
+            self._guarded(self._check_driver, now)
             self._guarded(self._publish, now, ff, state, calibrating, progress,
                           fps, frame.timestamp - t_start, lms)
             self._guarded(self._publish_video, now, frame.image, lms, ff)
@@ -534,6 +605,13 @@ class Monitor:
         except Exception:
             pass
         console.print("[bold]stopped[/]")
+
+
+def driver_id(name: str) -> str:
+    """A folder name for a driver: their profile name, or "default"."""
+    import re
+    s = re.sub(r"[^\w-]+", "_", (name or "").strip().lower()).strip("_")
+    return s[:40] or "default"
 
 
 def face_box(lms) -> Optional[list[float]]:

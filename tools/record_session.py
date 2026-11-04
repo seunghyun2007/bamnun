@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Record a webcam session for tuning the drowsiness thresholds.
+"""Record a labelled webcam session for evaluating and tuning detection.
 
-    python tools/record_session.py                 # guided: ~3 minutes of prompts
+    python tools/record_session.py                 # the 10-minute test script, with prompts
     python tools/record_session.py --free --seconds 300
 
 Writes a folder under runs/recordings/<date-time>/:
@@ -11,14 +11,21 @@ Writes a folder under runs/recordings/<date-time>/:
     markers.csv     what you were doing when (time, label)
     meta.json       resolution, frame rate, start time
 
-Guided mode shows a prompt on the preview ("Squint slightly", "Blink slowly",
-...) and marks each stretch for you. Free mode lets you mark by key:
+The test script (default) shows one instruction at a time on the preview and
+labels each stretch for you: calibration (look ahead, eyes closed), then
+every not-drowsy case (normal, talking, smiling, mirror/dashboard/phone
+glances, shoulder checks, yawning) and every drowsy one (slow blinks, heavy
+eyelids, nodding off, microsleeps). Free mode labels by key press:
 
-    1 normal   2 slight squint   3 hard squint   4 slow blinks
-    5 looking down   6 eyes closed   0 unmarked   q stop
+    1 normal  2 talking  3 smiling  4 mirror glances  5 dashboard glances
+    6 phone glances  7 head turns  8 yawning  9 slow blinks
+    h heavy eyelids  n head nods  m microsleep  0 unlabelled  q stop
 
-Then tune against it with tools/replay_session.py. Video stays on this
-machine; runs/ is not in git.
+Then:
+    python tools/replay_session.py runs/recordings/<time> --plot
+    python tools/evaluate_detection.py --recordings runs/recordings
+
+Video stays on this machine; runs/ is not in git.
 """
 
 from __future__ import annotations
@@ -37,20 +44,30 @@ sys.path.insert(0, str(ROOT / "src"))
 from bamnun.capture import open_source  # noqa: E402
 from bamnun.session import load_config  # noqa: E402
 
-KEYS = {"1": "normal", "2": "slight_squint", "3": "hard_squint", "4": "slow_blinks",
-        "5": "looking_down", "6": "eyes_closed", "0": ""}
+KEYS = {"1": "normal", "2": "talking", "3": "smiling", "4": "mirror_glances",
+        "5": "dashboard_glances", "6": "phone_glances", "7": "head_turns", "8": "yawning",
+        "9": "slow_blinks", "h": "heavy_eyelids", "n": "head_nods", "m": "microsleep", "0": ""}
 
-# (seconds, label, what to do). About three minutes in all.
+# The 10-minute test script: (seconds, label, what to do). The labels are the
+# ones tools/evaluate_detection.py --recordings understands.
 GUIDE = [
-    (25, "calibrate", "Look straight at the camera and blink normally (calibration)"),
-    (30, "normal", "Normal: look ahead, blink as usual"),
-    (30, "slight_squint", "Squint slightly, keep blinking"),
-    (20, "normal", "Normal again"),
-    (40, "slow_blinks", "Blink SLOWLY: close for about half a second, every 3 s"),
-    (20, "normal", "Normal again"),
-    (20, "looking_down", "Glance down at the dashboard for 2-3 s, then back, repeat"),
-    (20, "hard_squint", "Squint hard, keep it"),
-    (15, "normal", "Normal. Almost done"),
+    (20, "calibrate_look", "Look straight at the camera and blink normally"),
+    (5, "calibrate_closed", "Close your eyes and keep them closed"),
+    (5, "settle", "Open your eyes and look ahead"),
+    (60, "normal", "Drive normally: look ahead, blink as usual"),
+    (40, "talking", "Talk out loud: count, or describe the road"),
+    (30, "smiling", "Smile, and laugh at something"),
+    (40, "mirror_glances", "Check your mirrors every few seconds"),
+    (40, "dashboard_glances", "Glance down at the dashboard for 1-2 s now and then"),
+    (30, "phone_glances", "Look down at a phone in your lap for 2-3 s, then back"),
+    (30, "head_turns", "Shoulder checks: turn your head fully, then back"),
+    (40, "yawning", "Yawn two or three times"),
+    (30, "normal", "Back to normal driving"),
+    (60, "slow_blinks", "Blink SLOWLY: about half a second shut, every 3 s"),
+    (60, "heavy_eyelids", "Let your eyelids droop, as if very tired"),
+    (60, "head_nods", "Nod off: let your head sink slowly, then jerk it back up"),
+    (30, "microsleep", "Close your eyes for 1-2 s, a few times"),
+    (20, "normal", "Look ahead. Almost done"),
 ]
 
 
@@ -133,7 +150,8 @@ def main(argv=None) -> int:
                 k = cv2.waitKey(1) & 0xFF
                 if k == ord("q"):
                     break
-                if not guided and k != 0xFF and chr(k) in KEYS:
+                if not guided and k != 0xFF and chr(k).lower() in KEYS:
+                    k = ord(chr(k).lower())
                     current = KEYS[chr(k)]
                     mw.writerow([f"{t:.3f}", current])
                     markers.flush()

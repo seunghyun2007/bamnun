@@ -133,7 +133,12 @@
   function calEnter(i) {
     if (!cal) return;
     cal.idx = i;
-    if (i >= STEPS.length) { demoSay("cal_done"); emit(calState({ active: false, step: null, message: "done" })); cal = null; return; }
+    if (i >= STEPS.length) {
+      demoSay("cal_done");
+      emit(calState({ active: false, step: null, message: "done", summary: { eye_size: "medium", separation: 0.66, blink_ms: 120, blink_rate: 16,
+        wobble: { yaw: 1.5, pitch: 1.2 }, head: { yaw: -6, pitch: 4, roll: 0 }, closed_estimated: false, quality: {} } }));
+      cal = null; return;
+    }
     const step = STEPS[i], my = cal;
     demoSay(SAY[step]);
     emit(calState());

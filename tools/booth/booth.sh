@@ -44,6 +44,15 @@ on)
     sudo nmcli connection up "$CON"
     ;;
 off)
+    # Over SSH on the booth's Wi-Fi, taking the hotspot down cuts the
+    # session halfway through, so finish in the background.
+    if [ -n "${SSH_CONNECTION:-}" ] && [ -z "${BOOTH_DETACHED:-}" ]; then
+        systemctl --user reset-failed bamnun-booth-off.service >/dev/null 2>&1 || true
+        systemd-run --user --quiet --unit=bamnun-booth-off --setenv=BOOTH_DETACHED=1 "$ROOT/tools/booth/booth.sh" off
+        echo "Switching the booth off. This session will drop; the Pi goes back to normal Wi-Fi."
+        exit 0
+    fi
+    systemctl --user stop bamnun-booth-revert.timer >/dev/null 2>&1 || true
     rm -f "$AUTOSTART"
     systemctl --user stop bamnun-booth.service >/dev/null 2>&1 || true
     pkill -f "tools/booth/start.sh" || true

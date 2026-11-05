@@ -32,8 +32,8 @@ session over Wi-Fi drops. Ways to drive it without a keyboard and monitor:
 - `tools/booth/booth.sh try 10` from Pi Connect or SSH: the booth for 10
   minutes, then back on normal Wi-Fi by itself, and the session comes back.
   Nothing is set to start at boot, so unplugging the Pi also undoes it.
-- Join `Bamnun-Demo` from a laptop and `ssh <user>@10.42.0.1`, then
-  `tools/booth/booth.sh off` (works at the venue too).
+- Join `Bamnun-Demo` from a laptop and run
+  `ssh <user>@10.42.0.1 bamnun/tools/booth/booth.sh off` (works at the venue too).
 - An Ethernet cable to the router keeps the Pi online, so Pi Connect keeps
   working while the hotspot is on.
 

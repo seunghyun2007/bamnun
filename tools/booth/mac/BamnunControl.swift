@@ -130,10 +130,11 @@ struct ContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+            if pi.reachable == false { rescueBanner }
             boothBox
             deviceBox
             outputBox
-            Text("In booth mode the device fires nothing by itself: no light, mist or alarm unless a stage is played. Controlling the Pi over “Bamnun-Demo” needs this Mac’s key on it once: ssh-copy-id inpi.")
+            Text("In booth mode the device fires nothing by itself: no light, mist or alarm unless a stage is played. Controlling the Pi over “Bamnun-Demo” needs “Set up Mac access” once, while the Pi is online.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .padding(18)
@@ -174,6 +175,28 @@ struct ContentView: View {
                 Button { pi.refresh() } label: { Label("Refresh", systemImage: "arrow.clockwise") }
             }
         }
+    }
+
+    var rescueBanner: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "wifi.exclamationmark").font(.title2).foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("The Pi is out of reach").font(.headline)
+                Text("It's probably running the Bamnun-Demo hotspot, so it has no internet. This button switches this Mac to Bamnun-Demo for a moment, turns the booth off, and then your Mac goes back to your Wi-Fi by itself.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Bring the Pi back") {
+                        pi.run("Bring the Pi back", ["rescue"]) { _ in
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 25) { pi.refresh() }
+                        }
+                    }.buttonStyle(.borderedProminent).tint(.orange)
+                    Button("Check again") { pi.refresh() }
+                }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.12)))
     }
 
     var dotColor: Color {
@@ -233,6 +256,8 @@ struct ContentView: View {
                 Button("Update Pi") { pi.run("Update the Pi", ["update"]) }
                 Button("Show log") { pi.run("Booth log", ["log"]) }
                 Spacer()
+                Button("Set up Mac access (once)") { pi.run("Set up Mac access", ["setup"]) }
+                    .help("Lets this Mac control the Pi in booth mode without a password. Do it once while the Pi is online.")
             }
         }
     }

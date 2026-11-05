@@ -15,6 +15,10 @@
 #   tools/booth/pi.sh say greet ko    Ollie says a line on the device's speaker
 #   tools/booth/pi.sh volume [80]     show, or set, the speaker volume in %
 #   tools/booth/pi.sh ssh             a shell on the Pi
+#   tools/booth/pi.sh rescue          the Pi is a hotspot and out of reach: join
+#                                     "Bamnun-Demo" on this Mac and turn the booth off
+#   tools/booth/pi.sh setup           once, while the Pi is online: let this Mac in
+#                                     without a password (needed by rescue)
 #
 # It reaches the Pi over Tailscale when the Pi is online, and otherwise over
 # the booth's own Wi-Fi: join "Bamnun-Demo" on this laptop first, and the Pi
@@ -73,5 +77,27 @@ volume)  if [ -n "${2:-}" ]; then
              on_pi "amixer -c $SPEAKER sget PCM | grep -o '\\[[0-9]*%\\]' | head -1 | tr -d '[]' | sed 's/^/volume: /'"
          fi ;;
 ssh)     host="$(pick)"; exec ssh -t "$host" "cd $REPO; exec \$SHELL -l" ;;
-*) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+setup)   # Opens Terminal: the first connection may ask to approve or for a password.
+         osascript -e "tell application \"Terminal\" to do script \"ssh-copy-id $TS_HOST && echo && echo 'Done: this Mac can now control the Pi in booth mode. You can close this window.'\"" \
+             -e 'tell application "Terminal" to activate' >/dev/null
+         echo "Opened Terminal to add this Mac's key to the Pi (ssh-copy-id $TS_HOST)." ;;
+rescue)  # The Pi's Wi-Fi is the Bamnun-Demo hotspot, so it can only be reached from
+         # inside that network. Join it, turn the booth off; when the hotspot goes,
+         # this Mac rejoins its usual Wi-Fi by itself.
+         dev="$(networksetup -listallhardwareports | awk '/Wi-Fi/{getline; print $2; exit}')"
+         echo "Joining the Bamnun-Demo Wi-Fi on this Mac ($dev)..."
+         if ! networksetup -setairportnetwork "$dev" "Bamnun-Demo" >/dev/null 2>&1; then
+             echo "Couldn't join Bamnun-Demo. Is the booth hotspot on, and the Pi nearby?"; exit 1
+         fi
+         for _ in $(seq 1 25); do ping -c1 -t1 "$BOOTH_IP" >/dev/null 2>&1 && break; sleep 1; done
+         if ssh -o ConnectTimeout=6 -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+                "$USER_ON_PI@$BOOTH_IP" "cd $REPO && tools/booth/booth.sh off"; then
+             echo "The Pi is going back to its normal Wi-Fi; this Mac will rejoin yours in a moment."
+         else
+             echo "On Bamnun-Demo, but the Pi didn't accept this Mac's key (run setup once, later)."
+             echo "Opening Terminal: type the Pi's password there to turn the booth off."
+             osascript -e "tell application \"Terminal\" to do script \"ssh -o StrictHostKeyChecking=accept-new $USER_ON_PI@$BOOTH_IP '$REPO/tools/booth/booth.sh off'\"" \
+                 -e 'tell application "Terminal" to activate' >/dev/null
+         fi ;;
+*) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

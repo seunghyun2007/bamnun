@@ -124,6 +124,37 @@ function fit(){
   const w=innerWidth,h=innerHeight;
   if(w<=500){ const s=w/390; phone.classList.add("full"); phone.style.height=(h/s)+"px"; phone.style.transform=`scale(${s})`; }
   else { phone.classList.remove("full"); phone.style.height="844px"; const s=Math.min(1.15,(h-48)/844,(w-48)/390); phone.style.transform=`translate(-50%,-50%) scale(${s})`; }
+  fitScreen(phone.querySelector(".screen:not(.leave)"));
+}
+// The setup screens are drawn 844 tall, with their buttons pinned to the
+// bottom. A phone browser is shorter than that once its bars are showing, which
+// left those buttons below the edge. So on a shorter phone a screen takes the
+// real height when its content still clears the pinned buttons, and otherwise
+// shrinks whole to fit.
+function fitScreen(sc){
+  const root=sc&&sc.firstElementChild, box=root&&root.firstElementChild;
+  if(!box||!/(^|;)\s*height:\s*844px/.test(box.getAttribute("style")||"")) return;
+  box.style.height="844px"; box.style.transform=""; root.style.height=""; root.style.overflow="";
+  const H=sc.clientHeight;
+  if(!phone.classList.contains("full")||H>=844) return;
+  box.style.height=H+"px";
+  const top=box.getBoundingClientRect().top, s=box.getBoundingClientRect().height/H||1;
+  let flow=0,pinned=Infinity;
+  (function walk(el){
+    for(const c of el.children){
+      const cs=getComputedStyle(c), r=c.getBoundingClientRect();
+      if(cs.position==="absolute"||cs.position==="fixed"){
+        if((r.bottom-top)/s>H-4&&(r.top-top)/s>H/3)
+          for(const b of c.matches("a,button")?[c]:c.querySelectorAll("a,button")){ const t=(b.getBoundingClientRect().top-top)/s; if(t>H/3) pinned=Math.min(pinned,t); }
+        continue;
+      }
+      if(r.height) flow=Math.max(flow,(r.bottom-top)/s);
+      walk(c);
+    }
+  })(box);
+  if(flow<=Math.min(pinned-12,H)) return;
+  box.style.height="844px"; box.style.transform=`scale(${H/844})`; box.style.transformOrigin="top center";
+  root.style.height=H+"px"; root.style.overflow="hidden";
 }
 addEventListener("resize",fit); fit();
 function go(name,opts={}){
@@ -142,6 +173,7 @@ function go(name,opts={}){
   try{ history.replaceState(null,"","#"+name); }catch(e){}
   if(DYN[name]) try{ DYN[name](root,{go,forward,setLang,rerender:()=>go(name,{instant:true,keepScroll:true})}); }catch(err){ console.error(name,err); }
   if(window.BN_LIVE) BN_LIVE.paint();
+  fitScreen(sc);
   if(name==="Plan"){ setTimeout(()=>SFX.play("success"),350); if(window.BN_SYNC) BN_SYNC.markOnboarded(); }
 }
 window.BN_GO=go;

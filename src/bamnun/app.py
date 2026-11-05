@@ -39,6 +39,15 @@ from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
 
+# Console output must never stop detection. A Windows console in a legacy
+# code page can't print Korean (Ollie's lines, a driver's name), and an
+# encoding error raised inside a print in the camera loop used to end the
+# program. Write UTF-8 and replace anything the terminal still can't show.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 console = Console()
 
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.

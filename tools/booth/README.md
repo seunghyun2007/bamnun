@@ -48,6 +48,14 @@ online, and over the booth's Wi-Fi (join `Bamnun-Demo`, Pi at 10.42.0.1) while
 the booth is on. The second way needs the laptop's SSH key on the Pi once:
 `ssh-copy-id inpi`.
 
+### Bamnun Control (Mac app)
+
+The same, as buttons: `bash tools/booth/mac/build.sh` builds
+`~/Applications/Bamnun Control.app` (needs the Xcode command line tools). It
+shows whether the booth is on, starts a trial or turns the booth on and off,
+restarts or updates it, plays each wake-up stage, makes Ollie speak in either
+language, and sets the speaker volume.
+
 ## Poster
 
 On any computer: `pip install qrcode`, then

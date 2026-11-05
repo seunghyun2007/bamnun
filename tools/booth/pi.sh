@@ -7,7 +7,11 @@
 #   tools/booth/pi.sh try 10          booth for 10 minutes, then off by itself
 #   tools/booth/pi.sh restart         restart the booth program (after an update)
 #   tools/booth/pi.sh logs            follow the booth's log (Ctrl+C to stop)
+#   tools/booth/pi.sh log             the last 40 lines of it
 #   tools/booth/pi.sh update          pull this branch onto the Pi
+#   tools/booth/pi.sh stage 3         play wake-up stage 3 on the device (booth running)
+#   tools/booth/pi.sh say greet ko    Ollie says a line on the device's speaker
+#   tools/booth/pi.sh volume [80]     show, or set, the speaker volume in %
 #   tools/booth/pi.sh ssh             a shell on the Pi
 #
 # It reaches the Pi over Tailscale when the Pi is online, and otherwise over
@@ -39,20 +43,33 @@ pick() {
     fi
 }
 
-run() {   # run a booth.sh command on the Pi
+on_pi() {   # run a command on the Pi; BatchMode so nothing waits for typing
     local host; host="$(pick)"
     echo "(via $host)"
-    ssh -o StrictHostKeyChecking=accept-new "$host" "cd $REPO && tools/booth/booth.sh $*"
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$host" "cd $REPO && $*"
 }
+run() { on_pi "tools/booth/booth.sh $*"; }   # a booth.sh command
+
+SPEAKER=UACDemoV10   # the USB speaker the device plays through (~/.asoundrc)
 
 case "${1:-status}" in
 status|on|off) run "$1" ;;
 try)     run try "${2:-10}" ;;
-restart) host="$(pick)"; echo "(via $host)"
-         ssh "$host" 'systemctl --user restart bamnun-booth.service 2>/dev/null && echo "booth restarted" || echo "the booth isn'"'"'t running; start it with: on or try"' ;;
+restart) on_pi 'systemctl --user restart bamnun-booth.service 2>/dev/null && echo "booth restarted" || echo "the booth isn'"'"'t running; start it with: on or try"' ;;
 logs)    host="$(pick)"; echo "(via $host)"; ssh -t "$host" 'tail -n 40 -f ~/bamnun-booth.log' ;;
-update)  host="$(pick)"; echo "(via $host)"
-         ssh "$host" "cd $REPO && git pull --ff-only && git log --oneline -1" ;;
+log)     on_pi 'tail -n 40 ~/bamnun-booth.log 2>/dev/null || echo "no booth log yet"' ;;
+update)  on_pi "git pull --ff-only && git log --oneline -1" ;;
+stage)   n="${2:-1}"; [[ "$n" =~ ^[1-4]$ ]] || { echo "stage must be 1 to 4" >&2; exit 2; }
+         on_pi "curl -s -m 5 -X POST http://127.0.0.1/api/showcase/stage/$n || echo 'the booth isn'\''t running; start it with: on or try'"; echo ;;
+say)     line="${2:-greet}"; lang="${3:-en}"
+         [[ "$line" =~ ^[a-z_0-9]+$ && "$lang" =~ ^(en|ko)$ ]] || { echo "usage: say LINE [en|ko]" >&2; exit 2; }
+         on_pi "aplay -q assets/voice/$lang/$line.wav && echo 'Ollie said $lang/$line'" ;;
+volume)  if [ -n "${2:-}" ]; then
+             [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -le 100 ] || { echo "volume must be 0 to 100" >&2; exit 2; }
+             on_pi "amixer -q -c $SPEAKER sset PCM $2% && sudo alsactl store $SPEAKER && echo 'volume set to $2% (saved)'"
+         else
+             on_pi "amixer -c $SPEAKER sget PCM | grep -o '\\[[0-9]*%\\]' | head -1 | tr -d '[]' | sed 's/^/volume: /'"
+         fi ;;
 ssh)     host="$(pick)"; exec ssh -t "$host" "cd $REPO; exec \$SHELL -l" ;;
-*) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+*) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

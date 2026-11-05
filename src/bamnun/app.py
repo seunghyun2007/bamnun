@@ -165,7 +165,7 @@ class Monitor:
         self.controller = Controller(
             self.hub, self.store, self.policy, estimator=self.estimator,
             calibration=FeatureCalibration(self.features, on_commit=self._save_calibration),
-            trip_cfg=self.cfg.get("trips"))
+            trip_cfg=self.cfg.get("trips"), quiet=self.args.booth)
 
         # Calibration is per driver (SPEC.md, 15): runs/drivers/<name>/.
         # --calibration names a file explicitly and pins it.

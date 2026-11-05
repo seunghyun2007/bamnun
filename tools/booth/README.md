@@ -18,6 +18,15 @@ It prepares an open hotspot `Bamnun-Demo` at 10.42.0.1, DNS on it that sends
 every name to the Pi, port 80 for the app, and a `Bamnun booth` menu entry. It
 doesn't switch anything on.
 
+## Practising at home
+
+`tools/booth/booth.sh home` runs the booth program on the Pi's normal Wi-Fi:
+camera full screen on the monitor, the app for phones on the same Wi-Fi at
+the Pi's address, and the Pi stays reachable over Tailscale and Pi Connect.
+`booth.sh stop` stops it. In every booth mode the device fires nothing by
+itself (no light, mist, voice or alarm, no break reminder or emergency
+check); only Product control's stage buttons play the parts.
+
 ## At the venue
 
 ```

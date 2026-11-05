@@ -357,7 +357,12 @@ class GuidedCalibration:
 class Controller:
     def __init__(self, hub: Hub, store: Optional[Store], policy: EscalationPolicy,
                  estimator=None, calibration=None, speaker: Optional[Speaker] = None,
-                 trip_cfg: Optional[dict[str, Any]] = None) -> None:
+                 trip_cfg: Optional[dict[str, Any]] = None, quiet: bool = False) -> None:
+        # quiet: the demo booth. The ladder is still worked out and shown (on
+        # the big screen and the phones), but nothing fires by itself: no
+        # parts, no break reminder, no emergency check. Product control's
+        # stage buttons (fire_part, say) still play on demand.
+        self.quiet = quiet
         self.hub = hub
         self.store = store
         self.policy = policy
@@ -399,6 +404,8 @@ class Controller:
                 muted.update(acts)
         if not s.get("co2_alert", True):
             muted.add("open_window")
+        if self.quiet:
+            muted.update(self.policy.actuators)
         self.policy.muted = muted
         if self.estimator is not None and hasattr(self.estimator, "set_sensitivity"):
             self.estimator.set_sensitivity(s.get("sensitivity", "normal"))
@@ -514,6 +521,8 @@ class Controller:
                 self.hub.cal_state = self.guided.state(t)
 
     def _break_reminder(self, t: float) -> None:
+        if self.quiet:
+            return
         every = float(self.settings.get("break_every_min", 120) or 0) * 60.0
         if every <= 0 or self.trips.trip is None:
             self._next_break_at = None
@@ -532,7 +541,7 @@ class Controller:
     def _emergency(self, t: float, wall: float, face: bool, eye_closed: Optional[bool],
                    microsleep: bool) -> None:
         top = len(self.policy.stages) - 1
-        if self.policy.stage < top:
+        if self.quiet or self.policy.stage < top:
             self._stage4_since = None
             self._emergency_sent = False
             return

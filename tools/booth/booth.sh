@@ -5,6 +5,10 @@
 #   tools/booth/booth.sh try 10   the same for 10 minutes, then off by itself (for
 #                                 trying it over Pi Connect or SSH, which drop)
 #   tools/booth/booth.sh off      hotspot off, normal Wi-Fi back, booth stops starting
+#   tools/booth/booth.sh home     the booth on the normal Wi-Fi: camera on the monitor,
+#                                 the app for phones on the same Wi-Fi, and the Pi stays
+#                                 reachable (Tailscale, Pi Connect) for practising
+#   tools/booth/booth.sh stop     stop the booth program, leave the Wi-Fi alone
 #   tools/booth/booth.sh status
 
 set -euo pipefail
@@ -43,6 +47,17 @@ on)
     start_booth
     sudo nmcli connection up "$CON"
     ;;
+home)
+    start_booth
+    ip="$(hostname -I | awk '{print $1}')"
+    echo "Booth running on the normal Wi-Fi. Phones on the same Wi-Fi: http://$ip"
+    ;;
+stop)
+    systemctl --user stop bamnun-booth.service >/dev/null 2>&1 || true
+    pkill -f "tools/booth/start.sh" || true
+    pkill -f "bamnun.app.*--booth" || true
+    echo "Booth program stopped. Wi-Fi unchanged."
+    ;;
 off)
     # Over SSH on the booth's Wi-Fi, taking the hotspot down cuts the
     # session halfway through, so finish in the background.
@@ -67,7 +82,8 @@ status)
     echo "Wi-Fi:     $(nmcli -t -f GENERAL.CONNECTION device show wlan0 | cut -d: -f2)"
     echo "Autostart: $([ -f "$AUTOSTART" ] && echo on || echo off)"
     echo "Running:   $(pgrep -f "bamnun.app.*--booth" >/dev/null && echo yes || echo no)"
+    echo "Address:   http://$(hostname -I | awk '{print $1}')"
     ;;
 *)
-    echo "usage: $0 on|off|try [minutes]|status" >&2; exit 2 ;;
+    echo "usage: $0 on|off|try [minutes]|home|stop|status" >&2; exit 2 ;;
 esac

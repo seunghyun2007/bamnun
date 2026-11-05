@@ -5,6 +5,8 @@
 #   tools/booth/pi.sh off             booth off, Pi back on its normal Wi-Fi
 #   tools/booth/pi.sh on              booth on (and at every start-up)
 #   tools/booth/pi.sh try 10          booth for 10 minutes, then off by itself
+#   tools/booth/pi.sh home            booth on the normal Wi-Fi: stays reachable
+#   tools/booth/pi.sh stop            stop the booth program, Wi-Fi unchanged
 #   tools/booth/pi.sh restart         restart the booth program (after an update)
 #   tools/booth/pi.sh logs            follow the booth's log (Ctrl+C to stop)
 #   tools/booth/pi.sh log             the last 40 lines of it
@@ -53,7 +55,7 @@ run() { on_pi "tools/booth/booth.sh $*"; }   # a booth.sh command
 SPEAKER=UACDemoV10   # the USB speaker the device plays through (~/.asoundrc)
 
 case "${1:-status}" in
-status|on|off) run "$1" ;;
+status|on|off|home|stop) run "$1" ;;
 try)     run try "${2:-10}" ;;
 restart) on_pi 'systemctl --user restart bamnun-booth.service 2>/dev/null && echo "booth restarted" || echo "the booth isn'"'"'t running; start it with: on or try"' ;;
 logs)    host="$(pick)"; echo "(via $host)"; ssh -t "$host" 'tail -n 40 -f ~/bamnun-booth.log' ;;
@@ -71,5 +73,5 @@ volume)  if [ -n "${2:-}" ]; then
              on_pi "amixer -c $SPEAKER sget PCM | grep -o '\\[[0-9]*%\\]' | head -1 | tr -d '[]' | sed 's/^/volume: /'"
          fi ;;
 ssh)     host="$(pick)"; exec ssh -t "$host" "cd $REPO; exec \$SHELL -l" ;;
-*) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+*) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

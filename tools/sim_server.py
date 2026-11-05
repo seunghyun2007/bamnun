@@ -121,7 +121,7 @@ def drive(hub: Hub, store: Store, minutes: float, calibrate_s: float, seed: int)
     policy = EscalationPolicy(cfg["alerts"])
     sim_cal = SimCalibration()
     control = Controller(hub, store, policy, estimator=estimator, calibration=sim_cal,
-                         trip_cfg=cfg.get("trips"))
+                         trip_cfg=cfg.get("trips"), quiet=args.booth)
     total = minutes * 60.0
     away = (0.12 * total, 0.12 * total + 5.0)     # driver out of view for 5 s
     stage = 0

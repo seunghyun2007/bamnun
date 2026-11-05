@@ -30,6 +30,7 @@ final class Pi: ObservableObject {
     @Published var running = false
     @Published var autostart = false
     @Published var volume: Double = 80
+    @Published var address = ""
 
     let repo: URL
     var script: URL { repo.appendingPathComponent("tools/booth/pi.sh") }
@@ -42,6 +43,7 @@ final class Pi: ObservableObject {
     }
 
     var boothOn: Bool { wifi == "bamnun-booth" || running }
+    var hotspot: Bool { wifi == "bamnun-booth" }
 
     func run(_ title: String, _ args: [String], then: ((String) -> Void)? = nil) {
         guard busy == nil else { return }
@@ -96,6 +98,7 @@ final class Pi: ObservableObject {
                 if line.hasPrefix("Wi-Fi:") { self.wifi = value }
                 if line.hasPrefix("Autostart:") { self.autostart = value == "on" }
                 if line.hasPrefix("Running:") { self.running = value == "yes" }
+                if line.hasPrefix("Address:") { self.address = String(line.dropFirst("Address:".count)).trimmingCharacters(in: .whitespaces) }
             }
             self.readVolume()
         }
@@ -130,7 +133,7 @@ struct ContentView: View {
             boothBox
             deviceBox
             outputBox
-            Text("While the booth is on, the Pi has no internet. To keep controlling it, join the “Bamnun-Demo” Wi-Fi on this Mac (needs this Mac’s key on the Pi once: ssh-copy-id inpi).")
+            Text("In booth mode the device fires nothing by itself: no light, mist or alarm unless a stage is played. Controlling the Pi over “Bamnun-Demo” needs this Mac’s key on it once: ssh-copy-id inpi.")
                 .font(.footnote).foregroundStyle(.secondary)
         }
         .padding(18)
@@ -187,41 +190,58 @@ struct ContentView: View {
         case .some(false): return "Can't reach the Pi (booth on, or offline)"
         case .some(true):
             let how = pi.route.contains("10.42.0.1") ? "booth Wi-Fi" : "Tailscale"
-            return pi.boothOn
-                ? "Booth is ON · via \(how)"
-                : "Booth is off · Pi on “\(pi.wifi)” · via \(how)"
+            if pi.hotspot { return "Booth ON with hotspot · via \(how)" }
+            if pi.running { return "Booth ON at home · phones: \(pi.address)" }
+            return "Booth off · Pi on “\(pi.wifi)” · via \(how)"
         }
     }
 
     var boothBox: some View {
-        GroupBox("Booth") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Stepper("Try for \(minutes) min", value: $minutes, in: 5...60, step: 5).fixedSize()
-                    Button("Start trial") { confirm = .trial }.buttonStyle(.borderedProminent)
-                    Spacer()
-                }
-                HStack {
-                    Button("Booth on (stays on)") { confirm = .on }
-                    Button(role: .destructive) { pi.run("Booth off", ["off"]) { _ in pi.refresh() } } label: {
-                        Label("Booth off", systemImage: "power")
-                    }.tint(.red)
-                    Spacer()
-                }
-                HStack {
-                    Button("Restart booth") { pi.run("Restart the booth", ["restart"]) }
-                    Button("Update Pi") { pi.run("Update the Pi", ["update"]) }
-                    Button("Show log") { pi.run("Booth log", ["log"]) }
-                    Spacer()
-                }
-            }.padding(6)
+        VStack(spacing: 10) {
+            GroupBox("Practice at home: the Pi stays on your Wi-Fi") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Button("Start booth") { pi.run("Start booth at home", ["home"]) { _ in pi.refresh() } }
+                            .buttonStyle(.borderedProminent)
+                        Button("Stop booth") { pi.run("Stop booth", ["stop"]) { _ in pi.refresh() } }
+                        Spacer()
+                    }
+                    Text("Camera on the Pi’s monitor, stage buttons and voice all work, and you keep control. Phones on the same Wi-Fi open \(pi.address.isEmpty ? "the Pi’s address" : pi.address).")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(6)
+            }
+            GroupBox("At the venue: the Pi makes the “Bamnun-Demo” Wi-Fi") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Stepper("Try \(minutes) min", value: $minutes, in: 5...60, step: 5).fixedSize()
+                        Button("Start trial") { confirm = .trial }
+                        Button("Hotspot on (stays on)") { confirm = .on }
+                        Spacer()
+                    }
+                    HStack {
+                        Button(role: .destructive) { pi.run("Booth off", ["off"]) { _ in pi.refresh() } } label: {
+                            Label("Hotspot off, back to normal Wi-Fi", systemImage: "power")
+                        }.tint(.red)
+                        Spacer()
+                    }
+                    Text("The Pi leaves your Wi-Fi. To keep control, join “Bamnun-Demo” on this Mac too.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.padding(6)
+            }
+            HStack {
+                Button("Restart booth") { pi.run("Restart the booth", ["restart"]) }
+                Button("Update Pi") { pi.run("Update the Pi", ["update"]) }
+                Button("Show log") { pi.run("Booth log", ["log"]) }
+                Spacer()
+            }
         }
     }
 
     var deviceBox: some View {
         GroupBox("Device") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Wake-up stages (booth must be running)").font(.caption).foregroundStyle(.secondary)
+                Text(pi.running ? "Wake-up stages: play one on the device" : "Wake-up stages: start the booth first")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     stage(1, "Blue light", Color(red: 0.66, green: 0.61, blue: 0.94))
                     stage(2, "Mint mist", Color(red: 0.96, green: 0.71, blue: 0.78))

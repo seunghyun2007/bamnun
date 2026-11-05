@@ -309,6 +309,15 @@ const DYN = {
     const hello = h >= 5 && h < 12 ? 'Good morning,' : h >= 12 && h < 17 ? 'Good afternoon,' : h >= 17 && h < 22 ? 'Good evening,' : 'Good night,';
     root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
     root.querySelector('#hShift').textContent = T(SHIFT_NAMES[shiftOf(p.work)]);
+    // Came from Product demo on the Welcome screen: offer the way back.
+    let showcase = false; try { showcase = localStorage.getItem('bn-showcase') === '1'; } catch (e) {}
+    if (showcase) {
+      const pill = `display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;font-size:12.5px;font-weight:700;text-decoration:none;color:#F4EFE6;${GLASS}`;
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:absolute;top:12px;left:22px;right:22px;z-index:5;display:flex;justify-content:space-between';
+      bar.innerHTML = `<a href="#Welcome" data-go="Welcome" data-back style="${pill}">‹ ${esc(T('Start'))}</a><a href="#Stages" data-go="Stages" style="${pill}">${esc(T('Try the wake-up stages'))} ›</a>`;
+      root.querySelector('#hHello').closest('[style*="height:392px"]').appendChild(bar);
+    }
     const card = root.querySelector('#hTrip');
     async function load() {
       let trips = null;
@@ -522,6 +531,94 @@ const DYN = {
 
   Welcome(root) {
     root.querySelectorAll('[data-go="Account"]').forEach((a) => a.addEventListener('click', () => { try { localStorage.removeItem('bn-acct-from'); } catch (e) {} }));
+    // Product demo opens Home without setup; remember it so Home offers the
+    // way back here.
+    root.querySelectorAll('[data-go="Home"],[data-go="Stages"]').forEach((a) => a.addEventListener('click', () => { try { localStorage.setItem('bn-showcase', '1'); } catch (e) {} }));
+  },
+
+  // Product control (the booth demo): swipe through the four wake-up stages
+  // and play one. With a Bamnun connected it plays on the real device, one
+  // phone at a time (the device answers 409 while another stage is playing,
+  // and tells every phone what's playing). Otherwise it's a preview here.
+  Stages(root) {
+    const $ = (q) => root.querySelector(q);
+    const track = $('#stTrack'), cards = [...root.querySelectorAll('.st-card')], dots = [...root.querySelectorAll('.st-dot')];
+    const play = $('#stPlay'), label = $('#stPlayLabel'), msg = $('#stMsg'), dev = $('#stDev');
+    const SOUND = { 1: 'on', 2: 'on', 3: 'chime', 4: 'alarm' };
+    let cur = 1, busyUntil = 0, busyStage = 0, mine = false, timer = null;
+    const live = () => !API().demo && API().online();
+    dev.textContent = T(live() ? 'Bamnun connected' : 'Preview on your phone');
+    if (live()) { dev.style.color = '#7BD88F'; }
+
+    function select(n) {
+      if (n === cur && cards[n - 1].classList.contains('on')) return;
+      cur = n;
+      cards.forEach((c, i) => c.classList.toggle('on', i === n - 1));
+      dots.forEach((d, i) => d.classList.toggle('on', i === n - 1));
+      label.textContent = T('Play stage {n}', { n });
+      SFX.play('tick');
+    }
+    // A tap on a dot or card scrolls there; the cards passed on the way
+    // don't light up.
+    let steer = 0, steerUntil = 0;
+    const show = (n) => { const c = cards[n - 1]; steer = n; steerUntil = Date.now() + 900; track.scrollTo({ left: c.offsetLeft - (track.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); select(n); };
+    // The card that's mostly in view is the selected one.
+    const seen = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        const n = cards.indexOf(en.target) + 1;
+        if (steer && Date.now() < steerUntil) { if (n === steer) steer = 0; continue; }
+        steer = 0;
+        select(n);
+      }
+    }, { root: track, threshold: 0.6 });
+    cards.forEach((c) => seen.observe(c));
+    cards.forEach((c, i) => c.addEventListener('click', () => { if (i + 1 !== cur) show(i + 1); }));
+    dots.forEach((d, i) => d.addEventListener('click', () => show(i + 1)));
+
+    function glow(n, s) {
+      const c = cards[n - 1];
+      c.classList.add('playing');
+      setTimeout(() => c.classList.remove('playing'), s * 1000);
+    }
+    function tick() {
+      clearTimeout(timer);
+      const left = Math.ceil((busyUntil - Date.now()) / 1000);
+      if (left <= 0) { play.disabled = false; msg.textContent = ''; mine = false; return; }
+      play.disabled = true;
+      msg.textContent = mine ? T('Playing on Bamnun now…') : T('Someone is playing stage {n} on Bamnun. Your turn in {s} s.', { n: busyStage, s: left });
+      timer = setTimeout(tick, 250);
+    }
+    // Every phone hears what the device is playing, so the button waits.
+    API().on('showcase', (m) => {
+      if (!live()) return;
+      busyUntil = Date.now() + (m.hold_s || 4) * 1000; busyStage = m.stage;
+      if (!mine) glow(m.stage, m.hold_s || 4);
+      tick();
+    }, root);
+
+    play.addEventListener('click', async () => {
+      const n = cur;
+      if (!live()) {
+        SFX.play(SOUND[n]); glow(n, n >= 3 ? 3 : 2);
+        if (n >= 3) API().say('stage' + n);
+        msg.textContent = T('Preview on your phone. At the booth, this plays on the real Bamnun.');
+        return;
+      }
+      play.disabled = true; mine = true;
+      try {
+        const r = await API().post('/api/showcase/stage/' + n);
+        SFX.play(SOUND[n]); glow(n, r.hold_s || 4);
+        busyUntil = Math.max(busyUntil, Date.now() + (r.hold_s || 4) * 1000); busyStage = n;
+        tick();
+      } catch (e) {
+        mine = false;
+        if (/409/.test(e.message)) { if (busyUntil < Date.now()) busyUntil = Date.now() + 3000; tick(); }
+        else { play.disabled = false; msg.textContent = T("Couldn't reach Bamnun. Try again."); }
+      }
+    });
+    select(1);
+    requestAnimationFrame(() => show(1));
   },
 
   // Sign in with Google (account.js), then on through setup or straight home.

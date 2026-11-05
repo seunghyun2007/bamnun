@@ -139,3 +139,27 @@ def test_video_frame_is_a_small_jpeg():
 
     jpeg = video_frame(np.full((864, 1536), 90, np.uint8), None, eye_closed=False)
     assert jpeg[:2] == b"\xff\xd8" and len(jpeg) < 60_000
+
+
+def test_product_control_plays_one_stage_at_a_time_on_the_device(www, monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr("bamnun.server.time.monotonic", lambda: clock[0])
+    hub = Hub()
+    client = TestClient(create_app(hub, www))
+
+    r = client.post("/api/showcase/stage/3")
+    assert r.status_code == 202 and r.json() == {"playing": 3, "hold_s": 6.0}
+    assert hub.take_commands() == [{"cmd": "test", "part": "chime"},
+                                   {"cmd": "say", "line": "stage3"}]
+    assert [e["stage"] for e in hub.events_after(0) if e["type"] == "showcase"] == [3]
+
+    clock[0] += 2.0                                    # another phone, mid-stage
+    busy = client.post("/api/showcase/stage/1")
+    assert busy.status_code == 409
+    assert busy.json() == {"busy": True, "stage": 3, "retry_in": 4.0}
+    assert hub.take_commands() == []                   # nothing fired
+
+    clock[0] += 4.0                                    # stage 3 has finished
+    assert client.post("/api/showcase/stage/1").status_code == 202
+    assert hub.take_commands() == [{"cmd": "test", "part": "blue_light"}]
+    assert client.post("/api/showcase/stage/5").status_code == 404

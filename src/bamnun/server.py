@@ -13,6 +13,8 @@ Serves (docs/SPEC.md, sections 0 and 1):
                        SQLite on the Pi (store.py).
 * ``POST /api/calibration/start|cancel|answer``, ``GET /api/calibration``
 * ``POST /api/say/{line}``, ``POST /api/test/{part}``, ``GET /api/lines``
+* ``POST /api/showcase/stage/{1-4}``  the booth demo: play one wake-up stage
+                       on the device, one phone at a time (409 while busy).
 * ``GET /api/trips``, ``/api/trips/{id}``, ``/api/trips/current``,
   ``/api/insights``; ``POST /api/trips/start|end``,
   ``PUT /api/trips/current/route``
@@ -35,12 +37,13 @@ import asyncio
 import logging
 import socket
 import threading
+import time
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -87,6 +90,16 @@ async def mjpeg_stream(hub: Hub, poll_s: float = FRAME_POLL_S):
 CAL_STEPS_ASKED = ("speaker", "chime", "light", "mist")
 TEST_PARTS = ("speaker", "chime", "blue_light", "mist", "alarm")
 OUTCOMES = ("ok", "contacted", "called", "dismissed")
+
+# Product control (the booth demo): one wake-up stage played on the real
+# device, as (commands, seconds the device stays taken). One phone at a time:
+# while a stage plays, every other request gets 409 and how long to wait.
+SHOWCASE_STAGES: dict[int, tuple[tuple[dict[str, Any], ...], float]] = {
+    1: (({"cmd": "test", "part": "blue_light"},), 4.0),
+    2: (({"cmd": "test", "part": "mist"},), 4.0),
+    3: (({"cmd": "test", "part": "chime"}, {"cmd": "say", "line": "stage3"}), 6.0),
+    4: (({"cmd": "test", "part": "alarm"}, {"cmd": "say", "line": "stage4"}), 6.0),
+}
 
 
 def create_app(hub: Hub, www: Optional[Path] = None,
@@ -168,6 +181,26 @@ def create_app(hub: Hub, www: Optional[Path] = None,
             raise HTTPException(404, f"part must be one of {TEST_PARTS}")
         hub.command({"cmd": "test", "part": part})
         return {"queued": part}
+
+    showcase = {"until": 0.0, "stage": 0}
+    showcase_lock = threading.Lock()
+
+    @app.post("/api/showcase/stage/{stage}", status_code=202)
+    def showcase_stage(stage: int) -> Any:
+        if stage not in SHOWCASE_STAGES:
+            raise HTTPException(404, "stage must be 1 to 4")
+        cmds, hold_s = SHOWCASE_STAGES[stage]
+        with showcase_lock:
+            now = time.monotonic()
+            if now < showcase["until"]:
+                left = round(showcase["until"] - now, 1)
+                return JSONResponse({"busy": True, "stage": showcase["stage"], "retry_in": left},
+                                    status_code=409)
+            showcase.update(until=now + hold_s, stage=stage)
+        for cmd in cmds:
+            hub.command(cmd)
+        hub.emit({"type": "showcase", "stage": stage, "hold_s": hold_s})
+        return {"playing": stage, "hold_s": hold_s}
 
     @app.post("/api/calibration/start", status_code=202)
     def cal_start() -> dict[str, Any]:

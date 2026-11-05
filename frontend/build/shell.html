@@ -77,7 +77,11 @@ window.SFX=(function(){
     tick(){tone(1400,{d:.05,v:.03,type:"triangle"})},
     success(){[523,659,784,1047].forEach((f,i)=>{tone(f,{t:i*.09,d:.45,v:.06});tone(f*2,{t:i*.09,d:.2,v:.012})})},
     hoot(){tone(410,{d:.24,f2:370,v:.12,a:.05,vib:6});tone(460,{t:.32,d:.42,f2:390,v:.13,a:.06,vib:6})},
-    start(){tone(440,{d:.25,f2:880,v:.06,a:.02});[880,1109,1319].forEach((f,i)=>tone(f,{t:.2+i*.07,d:.35,v:.045}))}
+    start(){tone(440,{d:.25,f2:880,v:.06,a:.02});[880,1109,1319].forEach((f,i)=>tone(f,{t:.2+i*.07,d:.35,v:.045}))},
+    // Product control previews: stage 3's slow chime and stage 4's alarm,
+    // 3 beeps a second, getting louder rather than starting loud.
+    chime(){[0,1,2].forEach(i=>{tone(784,{t:i,d:.9,v:.07,a:.01});tone(1568,{t:i,d:.4,v:.015})})},
+    alarm(){for(let i=0;i<9;i++)tone(1046,{t:i/3,d:.16,v:.012+.011*i,type:"square"})}
   };
   S.play=n=>{if(S[n])S[n]()};
   S.enabled=()=>on;

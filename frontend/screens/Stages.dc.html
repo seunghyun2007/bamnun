@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bamnun product control</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;height:100%}a{color:#F4EFE6}
+.st-track{flex:1 1 0;min-height:0;display:flex;gap:14px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:4px 45px 6px;margin:0 -22px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.st-track::-webkit-scrollbar{display:none}
+.st-card{flex:0 0 300px;scroll-snap-align:center;display:flex;flex-direction:column;border-radius:26px;overflow:hidden;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:transform .3s,opacity .3s,box-shadow .3s;opacity:.55;transform:scale(.94)}
+.st-card.on{opacity:1;transform:none;box-shadow:0 0 0 1.5px var(--c),0 14px 40px rgba(0,0,0,.45)}
+.st-vis{position:relative;flex:0 0 118px;overflow:hidden;display:grid;place-items:center;background:radial-gradient(70% 90% at 50% 100%,color-mix(in srgb,var(--c) 45%,transparent),transparent 70%),#1F1724}
+.st-vis img{position:relative;width:96px;margin-top:22px;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4))}
+.st-vis i{position:absolute;pointer-events:none}
+.st-body{flex:1 1 0;min-height:0;overflow-y:auto;padding:14px 18px 16px;scrollbar-width:none}
+.st-body::-webkit-scrollbar{display:none}
+.st-ic{width:40px;height:40px;flex-shrink:0;border-radius:13px;display:grid;place-items:center;background:var(--c)}
+.st-num{font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--c)}
+.st-name{margin:1px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:80%;font-size:24px;line-height:1}
+.st-when{margin:10px 0 0;font-size:13.5px;font-weight:600;color:#F4EFE6;opacity:.85}
+.st-h{margin:12px 0 2px;font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#B3A6B4}
+.st-p{margin:0;font-size:14.5px;line-height:1.42;color:#E6DEE8}
+.st-dot{width:8px;height:8px;padding:0;border:0;border-radius:99px;background:rgba(255,255,255,.25);transition:width .25s,background .25s}
+.st-dot.on{width:22px;background:#F4EFE6}
+.st-play{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 24px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font:700 16px Figtree,Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.st-play:disabled{opacity:.55}
+/* stage 1: a slow blue glow */
+.st-fx1 i:first-child{inset:-30%;background:radial-gradient(closest-side,rgba(91,140,255,.75),rgba(91,140,255,0));animation:stGlow 3s ease-in-out infinite}
+/* stage 2: puffs of mint */
+.st-fx2 i{bottom:-20px;width:46px;height:46px;border-radius:50%;background:radial-gradient(closest-side,rgba(143,227,200,.8),rgba(143,227,200,0));animation:stPuff 2.6s ease-out infinite}
+.st-fx2 i:nth-child(1){left:22%}.st-fx2 i:nth-child(2){left:40%;animation-delay:.6s}.st-fx2 i:nth-child(3){left:58%;animation-delay:1.2s}.st-fx2 i:nth-child(4){left:72%;animation-delay:1.8s}
+/* stages 3 and 4: sound rings, slow then fast and red */
+.st-fx3 i,.st-fx4 i{left:50%;top:62%;width:60px;height:60px;margin:-30px;border-radius:50%;border:2px solid var(--c);opacity:0;animation:stRing 3s ease-out infinite}
+.st-fx3 i:nth-child(2),.st-fx4 i:nth-child(2){animation-delay:1s}.st-fx3 i:nth-child(3),.st-fx4 i:nth-child(3){animation-delay:2s}
+.st-fx3 i:nth-child(4),.st-fx4 i:nth-child(4){display:none}
+.st-fx4 i{border-color:#FF6B8B;animation-duration:1s}.st-fx4 i:nth-child(2){animation-delay:.33s}.st-fx4 i:nth-child(3){animation-delay:.66s}
+.st-fx4{animation:stAlarm 1s steps(2) infinite}
+.st-card:not(.on) .st-vis *,.st-card:not(.on) .st-vis{animation-play-state:paused}
+.st-card.playing .st-vis{filter:saturate(1.6) brightness(1.25)}
+.st-card.playing .st-vis i{animation-duration:.9s}
+@keyframes stGlow{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.05)}}
+@keyframes stPuff{0%{opacity:0;transform:translateY(0) scale(.6)}25%{opacity:.9}100%{opacity:0;transform:translateY(-120px) scale(1.8)}}
+@keyframes stRing{0%{opacity:.9;transform:scale(.6)}100%{opacity:0;transform:scale(3.2)}}
+@keyframes stAlarm{0%{background-color:#1F1724}50%{background-color:#3A1424}}
+</style>
+</helmet>
+<div style="width:390px;height:100%;min-height:600px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(110% 50% at 50% 0%,rgba(168,132,232,0.32) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 100%,rgba(236,140,172,0.22) 0%,rgba(236,140,172,0) 60%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:48px 22px 26px">
+  <div style="display:flex;align-items:center;gap:12px;height:44px">
+    <a href="Welcome.dc.html" aria-label="Back" style="width:40px;height:40px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span id="stDev" style="margin-left:auto;font-size:12px;font-weight:700;padding:6px 11px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:#B3A6B4">Preview on your phone</span>
+  </div>
+  <h1 style="margin:10px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:32px;line-height:1.02;text-align:center">The wake-up ladder</h1>
+  <p style="margin:6px auto 12px;max-width:32ch;text-align:center;color:#B3A6B4;font-size:14.5px;line-height:1.4">Swipe through the four stages. Each one only starts if the last wasn't enough.</p>
+  <div id="stTrack" class="st-track">
+      <article class="st-card" data-stage="1" style="--c:#A99BF0">
+        <div class="st-vis st-fx1" aria-hidden="true"><i></i><i></i><i></i><i></i><img src="/_blob/fa546fa5fa5789063fdee0a2beebd5b2" alt=""></div>
+        <div class="st-body">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="st-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"></path></svg></span>
+            <div style="flex-grow:1"><span class="st-num">Stage 1</span><h2 class="st-name">Blue light</h2></div>
+          </div>
+          <p class="st-when">When you're a bit drowsy</p>
+          <h3 class="st-h">What it does</h3>
+          <p class="st-p">A dim blue glow at the edge of your view, held for 30 minutes.</p>
+          <h3 class="st-h">Why we chose it</h3>
+          <p class="st-p">Blue light suppresses melatonin, the sleep hormone. That takes tens of minutes, so it stays on quietly in the background instead of flashing.</p>
+        </div>
+      </article>
+      <article class="st-card" data-stage="2" style="--c:#F5B5C8">
+        <div class="st-vis st-fx2" aria-hidden="true"><i></i><i></i><i></i><i></i><img src="/_blob/fa546fa5fa5789063fdee0a2beebd5b2" alt=""></div>
+        <div class="st-body">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="st-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21c-5-3-7-7-5-12 4 0 8 3 8 8M12 21c4-2 6-6 5-10"></path></svg></span>
+            <div style="flex-grow:1"><span class="st-num">Stage 2</span><h2 class="st-name">Mint mist</h2></div>
+          </div>
+          <p class="st-when">When drowsiness keeps building</p>
+          <h3 class="st-h">What it does</h3>
+          <p class="st-p">A 10-second burst of peppermint mist.</p>
+          <h3 class="st-h">Why we chose it</h3>
+          <p class="st-p">Peppermint wakes you through a different sense, fast, and it doesn't fade the way a repeated sound does. It waits 2 minutes between bursts because the nose adapts quickly.</p>
+        </div>
+      </article>
+      <article class="st-card" data-stage="3" style="--c:#C4B5FD">
+        <div class="st-vis st-fx3" aria-hidden="true"><i></i><i></i><i></i><i></i><img src="/_blob/4af7029f76e815daac75989af4aba986" alt=""></div>
+        <div class="st-body">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="st-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15V10a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"></path></svg></span>
+            <div style="flex-grow:1"><span class="st-num">Stage 3</span><h2 class="st-name">Chime and voice</h2></div>
+          </div>
+          <p class="st-when">When you're very drowsy</p>
+          <h3 class="st-h">What it does</h3>
+          <p class="st-p">A slow chime, then Ollie says: “Your eyes are closing. Let’s find a place to rest.”</p>
+          <h3 class="st-h">Why we chose it</h3>
+          <p class="st-p">A calm spoken warning you hear and understand, with a clear next step: take a break.</p>
+        </div>
+      </article>
+      <article class="st-card" data-stage="4" style="--c:#F48FB1">
+        <div class="st-vis st-fx4" aria-hidden="true"><i></i><i></i><i></i><i></i><img src="/_blob/57efe0ac85b17a5178828ea07e413fad" alt=""></div>
+        <div class="st-body">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="st-ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#241A26" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 16H3zM12 10v4M12 17v.5"></path></svg></span>
+            <div style="flex-grow:1"><span class="st-num">Stage 4</span><h2 class="st-name">Rising alarm</h2></div>
+          </div>
+          <p class="st-when">Extreme drowsiness, or any microsleep</p>
+          <h3 class="st-h">What it does</h3>
+          <p class="st-p">Fast beeps, three a second, growing 30 dB louder, with Ollie’s voice and a long burst of mint.</p>
+          <h3 class="st-h">Why we chose it</h3>
+          <p class="st-p">It has to wake you, but a sudden blast can startle a driver into swerving. So it rises instead of starting at full volume.</p>
+        </div>
+      </article>
+  </div>
+  <div id="stDots" style="display:flex;justify-content:center;gap:7px;margin:12px 0 14px"><button type="button" class="st-dot" data-dot="1" aria-label="Stage 1"></button><button type="button" class="st-dot" data-dot="2" aria-label="Stage 2"></button><button type="button" class="st-dot" data-dot="3" aria-label="Stage 3"></button><button type="button" class="st-dot" data-dot="4" aria-label="Stage 4"></button></div>
+  <button type="button" id="stPlay" class="st-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg><span id="stPlayLabel">Play stage 1</span></button>
+  <p id="stMsg" aria-live="polite" style="margin:10px 0 0;min-height:19px;text-align:center;font-size:13px;color:#B3A6B4"></p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

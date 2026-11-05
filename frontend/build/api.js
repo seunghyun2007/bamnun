@@ -111,6 +111,8 @@
   const LINES = {
     greet: ["Hi! I'm Ollie. Which language should I speak?", "안녕하세요! 저는 올리예요. 어떤 언어로 말할까요?"],
     sample: ["I'll keep watch while you drive.", "운전하는 동안 제가 지켜볼게요."],
+    stage3: ["Your eyes are closing. Let's find a place to rest.", "눈이 감기고 있어요. 쉴 곳을 찾아봐요."],
+    stage4: ["Wake up! Pull over now.", "일어나세요! 지금 차를 세우세요."],
     cal_position: ["Sit like you're driving and look at me.", "운전할 때처럼 앉아서 저를 봐주세요."],
     cal_look: ["Look straight ahead and blink normally.", "정면을 보며 평소처럼 눈을 깜빡이세요."],
     cal_close: ["Now close your eyes… and open.", "이제 눈을 감았다가… 떠주세요."],
@@ -198,6 +200,12 @@
     let m;
     if ((m = path.match(/^\/api\/say\/(\w+)(?:\?lang=(\w+))?/))) { demoSay(m[1], m[2]); return { queued: m[1] }; }
     if ((m = path.match(/^\/api\/test\/(\w+)/))) { later(() => emit({ type: "test_result", part: m[1], result: "simulated" }), 300); return { queued: m[1] }; }
+    if ((m = path.match(/^\/api\/showcase\/stage\/([1-4])$/))) {
+      const stage = +m[1], hold_s = stage >= 3 ? 6 : 4;
+      if (stage >= 3) later(() => demoSay("stage" + stage), 900);
+      later(() => emit({ type: "showcase", stage, hold_s }), 0);
+      return { playing: stage, hold_s };
+    }
     if (path === "/api/calibration/start") { cal = { idx: 0, results: {} }; calEnter(0); return { queued: "start" }; }
     if (path === "/api/calibration/cancel") { cal = null; emit(calState({ active: false, step: null, message: "cancelled" })); return {}; }
     if (path === "/api/calibration/answer") { if (cal && STEPS[cal.idx] === body.step) { cal.results[body.step] = body.ok ? "ok" : "fail"; const i = cal.idx + 1; later(() => calEnter(i), 200); } return {}; }

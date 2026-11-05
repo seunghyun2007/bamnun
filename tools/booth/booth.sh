@@ -82,8 +82,16 @@ off)
     pkill -f "bamnun.app.*--booth" || true
     sudo nmcli connection modify "$CON" connection.autoconnect no
     sudo nmcli connection down "$CON" || true
-    # Hand the radio back to whatever normal Wi-Fi it knows.
-    sudo nmcli device connect wlan0 >/dev/null 2>&1 || true
+    # Back onto a normal Wi-Fi. Not "nmcli device connect": that brings back
+    # the last connection used, which is the hotspot itself. Instead try the
+    # saved client networks (not hotspots) in their priority order.
+    nmcli -t -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show |
+        awk -F: '$2=="802-11-wireless"{print $3":"$1}' | sort -t: -k1,1nr | cut -d: -f2- |
+        while IFS= read -r name; do
+            [ "$name" = "$CON" ] && continue
+            [ "$(nmcli -g 802-11-wireless.mode connection show "$name")" = "ap" ] && continue
+            sudo nmcli connection up "$name" >/dev/null 2>&1 && break
+        done
     echo "Booth off. Normal Wi-Fi: $(nmcli -t -f GENERAL.CONNECTION device show wlan0 | cut -d: -f2)"
     ;;
 status)

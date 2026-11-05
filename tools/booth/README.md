@@ -1,7 +1,7 @@
 # Demo booth
 
-Visitors scan one QR code, join the Pi's Wi-Fi, and the Bamnun app pops up on
-their phone. The Pi's monitor shows the camera full screen with what Bamnun
+Visitors scan two QR codes with their phone's camera: the first joins the
+Pi's Wi-Fi, the second opens the Bamnun app in Safari or Chrome. The Pi's monitor shows the camera full screen with what Bamnun
 sees. The Welcome screen offers **Product demo** (the app on a demo drive) and
 **Product control** (the four wake-up stages, played on the real device, one
 phone at a time).
@@ -61,17 +61,17 @@ the booth is on. The second way needs the laptop's SSH key on the Pi once:
 
 On any computer: `pip install qrcode`, then
 `python tools/booth/make_poster.py`, open `tools/booth/poster.html` and print it
-on A4. The QR code only joins the Wi-Fi; joining is what opens the app.
+on A4. Code 1 joins `Bamnun-Demo`; code 2 opens `http://10.42.0.1`.
 
-## How the pop-up works
+## Why two codes
 
-Every phone checks for internet right after joining Wi-Fi by fetching a known
-page (`captive.apple.com/hotspot-detect.html`, `/generate_204`, ...). The DNS
-sends that to the Pi, and the app's server, started with `--booth`, answers
-with a redirect to its welcome page, so the phone shows it as a Wi-Fi sign-in
-sheet. After the visitor taps **Open the Bamnun app**, that phone gets the
-normal answer and stays on the network. Phones that don't pop it up can open
-`http://bamnun.demo`.
+A phone that joins Wi-Fi checks for internet by fetching a known page. A
+wrong answer would pop up a sign-in sheet, but on an iPhone that sheet only
+appears after leaving the Camera app, and it's a cut-down browser. So the
+booth (`--booth`) gives every phone the expected answer and it stays on the
+Wi-Fi quietly; the second code opens the app in the real browser. The link
+is the Pi's address rather than a name, because iCloud Private Relay sends
+names out to the internet, which the booth doesn't have.
 
 There's no internet on this Wi-Fi, so Google sign-in and the Kakao map don't
 work at the booth. Video stays on the booth's Wi-Fi.

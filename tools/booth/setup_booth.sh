@@ -6,8 +6,8 @@
 # It prepares, but doesn't switch on:
 #   * an open Wi-Fi hotspot, "Bamnun-Demo", at 10.42.0.1 (NetworkManager);
 #   * DNS on that hotspot that answers every name with the Pi, so a phone's
-#     "am I online?" check reaches Bamnun and pops the app up (server.py,
-#     booth mode), and http://bamnun.demo opens the app;
+#     "am I online?" check reaches Bamnun, which answers it so the phone
+#     stays on the Wi-Fi (server.py, booth mode);
 #   * permission for the app to listen on port 80, where phones look;
 #   * a launcher that starts the booth when the desktop logs in.
 #

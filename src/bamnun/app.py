@@ -77,8 +77,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--host", default="0.0.0.0", help="--serve: address to listen on")
     p.add_argument("--port", type=int, default=8000, help="--serve: port")
     p.add_argument("--booth", action="store_true",
-                   help="demo booth: --serve, plus the Wi-Fi sign-in pop-up that opens the "
-                        "app (tools/booth/setup_booth.sh)")
+                   help="demo booth: --serve, quiet ladder, and phones kept on the booth "
+                        "Wi-Fi (tools/booth/setup_booth.sh)")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 

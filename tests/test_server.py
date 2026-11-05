@@ -165,21 +165,14 @@ def test_product_control_plays_one_stage_at_a_time_on_the_device(www, monkeypatc
     assert client.post("/api/showcase/stage/5").status_code == 404
 
 
-def test_booth_wifi_check_pops_up_the_app_then_lets_the_phone_stay(www):
+def test_booth_answers_phones_internet_checks_so_they_stay_without_a_pop_up(www):
     client = TestClient(create_app(Hub(), www, booth=True))
-    for path in ("/hotspot-detect.html", "/generate_204", "/connecttest.txt"):
-        r = client.get(path, follow_redirects=False)
-        assert r.status_code == 302 and r.headers["location"] == "/booth"
-    assert "Open the Bamnun app" in client.get("/booth").text
-
-    r = client.get("/booth/go", follow_redirects=False)  # the visitor taps through
-    assert r.status_code == 302 and r.headers["location"] == "/"
     assert "Success" in client.get("/hotspot-detect.html").text
     assert client.get("/generate_204").status_code == 204
     assert client.get("/connecttest.txt").text == "Microsoft Connect Test"
+    assert "Bamnun App" in client.get("/").text          # the second QR code
 
 
-def test_without_booth_mode_there_is_no_wifi_pop_up(www):
+def test_without_booth_mode_the_internet_checks_are_not_answered(www):
     client = TestClient(create_app(Hub(), www))
-    assert client.get("/booth").status_code == 404
     assert client.get("/generate_204").status_code == 404

@@ -40,6 +40,14 @@ session over Wi-Fi drops. Ways to drive it without a keyboard and monitor:
 The Pi needs desktop auto-login (Raspberry Pi OS's default) for the booth to
 start by itself after a power cut. Log: `~/bamnun-booth.log`.
 
+## From your laptop
+
+`tools/booth/pi.sh status|on|off|try 10|restart|logs|update|ssh` runs the
+same commands on the Pi from a laptop. It goes over Tailscale while the Pi is
+online, and over the booth's Wi-Fi (join `Bamnun-Demo`, Pi at 10.42.0.1) while
+the booth is on. The second way needs the laptop's SSH key on the Pi once:
+`ssh-copy-id inpi`.
+
 ## Poster
 
 On any computer: `pip install qrcode`, then

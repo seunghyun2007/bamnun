@@ -41,9 +41,10 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse,
+                               Response, StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -102,8 +103,77 @@ SHOWCASE_STAGES: dict[int, tuple[tuple[dict[str, Any], ...], float]] = {
 }
 
 
+# -- booth mode: one QR code joins the Wi-Fi and opens the app ------------- #
+#
+# At a demo booth the Pi runs an open hotspot whose DNS answers every name
+# with the Pi (tools/booth/setup_booth.sh), and port 80 is sent here. Every
+# phone checks for internet the moment it joins, by fetching a known page.
+# Answering that check with a redirect makes the phone pop up its sign-in
+# sheet, showing /booth. Once the visitor taps through, the same check gets
+# the expected answer, so the phone treats the network as online and stays
+# on it. Only with --booth: a driver's device never does any of this.
+
+CAPTIVE_SUCCESS: dict[str, tuple[int, str]] = {
+    # Apple
+    "/hotspot-detect.html": (200, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"),
+    "/library/test/success.html": (200, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"),
+    # Android and ChromeOS
+    "/generate_204": (204, ""),
+    "/gen_204": (204, ""),
+    # Windows
+    "/connecttest.txt": (200, "Microsoft Connect Test"),
+    "/ncsi.txt": (200, "Microsoft NCSI"),
+    # Firefox
+    "/success.txt": (200, "success\n"),
+    "/canonical.html": (200, '<meta http-equiv="refresh" content="0;url=https://support.mozilla.org/kb/captive-portal"/>'),
+}
+
+BOOTH_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bamnun demo</title>
+<style>
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 24px;box-sizing:border-box;text-align:center;background:radial-gradient(110% 60% at 50% 0%,rgba(168,132,232,.4),rgba(168,132,232,0) 62%),#17111A;color:#F4EFE6;font-family:-apple-system,system-ui,sans-serif}
+h1{margin:0;font-size:34px;letter-spacing:-.01em}
+p{margin:0;max-width:30ch;color:#B3A6B4;font-size:16px;line-height:1.45}
+a.go{margin-top:10px;display:block;width:100%;max-width:340px;padding:18px;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:18px;text-decoration:none}
+small{margin-top:8px;color:#8E8191;font-size:13px;line-height:1.5}
+</style></head><body>
+<p style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">밤눈 · Bamnun</p>
+<h1>Your night co-pilot</h1>
+<p>You're on the Bamnun demo Wi-Fi. Try the app, and the device on the table.</p>
+<a class="go" href="/booth/go">Open the Bamnun app · 앱 열기</a>
+<small>No internet on this Wi-Fi. To use Safari or Chrome instead,<br>open <b>http://bamnun.demo</b></small>
+</body></html>"""
+
+
+def add_captive_portal(app: FastAPI) -> None:
+    welcomed: set[str] = set()
+
+    def who(request: Request) -> str:
+        return request.client.host if request.client else ""
+
+    for path, (code, body) in CAPTIVE_SUCCESS.items():
+        def probe(request: Request, code: int = code, body: str = body) -> Any:
+            if who(request) not in welcomed:
+                return RedirectResponse("/booth", status_code=302)
+            if code == 204:
+                return Response(status_code=204)
+            return HTMLResponse(body)
+        app.add_api_route(path, probe, methods=["GET"], include_in_schema=False)
+
+    @app.get("/booth", include_in_schema=False)
+    def booth_page() -> HTMLResponse:
+        return HTMLResponse(BOOTH_PAGE, headers={"Cache-Control": "no-store"})
+
+    @app.get("/booth/go", include_in_schema=False)
+    def booth_go(request: Request) -> RedirectResponse:
+        welcomed.add(who(request))
+        return RedirectResponse("/", status_code=302)
+
+
 def create_app(hub: Hub, www: Optional[Path] = None,
-               store: Optional[Store] = None) -> FastAPI:
+               store: Optional[Store] = None, booth: bool = False) -> FastAPI:
     app = FastAPI(title="Bamnun", version=__version__)
     # The Capacitor app runs at http://localhost or capacitor://localhost,
     # which are different origins from the Pi. Nothing here is secret, and
@@ -359,6 +429,9 @@ def create_app(hub: Hub, www: Optional[Path] = None,
         finally:
             reading.cancel()
 
+    if booth:
+        add_captive_portal(app)
+
     www = Path(www) if www is not None else default_www()
     if (www / "index.html").exists():
         app.mount("/", StaticFiles(directory=www, html=True), name="app")
@@ -380,10 +453,11 @@ class ServerThread:
     """
 
     def __init__(self, hub: Hub, host: str = "0.0.0.0", port: int = 8000,
-                 www: Optional[Path] = None, store: Optional[Store] = None) -> None:
+                 www: Optional[Path] = None, store: Optional[Store] = None,
+                 booth: bool = False) -> None:
         import uvicorn
 
-        config = uvicorn.Config(create_app(hub, www, store), host=host, port=port,
+        config = uvicorn.Config(create_app(hub, www, store, booth), host=host, port=port,
                                 log_level="warning", access_log=False)
         self._server = uvicorn.Server(config)
         self.host, self.port = host, port

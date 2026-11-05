@@ -184,6 +184,7 @@ def main() -> int:
     ap.add_argument("--calibrate-s", type=float, default=6.0)
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--booth", action="store_true", help="with the booth's Wi-Fi sign-in pop-up")
     ap.add_argument("--once", action="store_true", help="stop after one drive")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--db", default=str(Path(__file__).resolve().parents[1] / "runs" / "sim.db"),
@@ -192,7 +193,7 @@ def main() -> int:
 
     hub = Hub()
     store = Store(args.db)
-    server = ServerThread(hub, args.host, args.port, store=store).start()
+    server = ServerThread(hub, args.host, args.port, store=store, booth=args.booth).start()
     print(f"open http://localhost:{args.port}  (Ctrl+C to stop)", flush=True)
     seed = args.seed
     try:

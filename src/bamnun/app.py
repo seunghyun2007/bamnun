@@ -76,6 +76,9 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="serve the phone app and live data (needs fastapi, uvicorn)")
     p.add_argument("--host", default="0.0.0.0", help="--serve: address to listen on")
     p.add_argument("--port", type=int, default=8000, help="--serve: port")
+    p.add_argument("--booth", action="store_true",
+                   help="demo booth: --serve, plus the Wi-Fi sign-in pop-up that opens the "
+                        "app (tools/booth/setup_booth.sh)")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -290,7 +293,7 @@ class Monitor:
             return
         try:
             self.server = ServerThread(self.hub, self.args.host, self.args.port,
-                                       store=self.store).start()
+                                       store=self.store, booth=self.args.booth).start()
         except Exception as exc:  # noqa: BLE001
             log.warning("could not start the server: %s", exc)
             return
@@ -420,6 +423,9 @@ class Monitor:
                 import cv2 as _cv2
                 cv2 = _cv2
                 cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL)
+                if self.args.booth:   # the booth's big screen shows only this
+                    cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
+                                          cv2.WINDOW_FULLSCREEN)
             except Exception as exc:  # noqa: BLE001
                 log.warning("no GUI available (%s); running headless", exc)
                 self.show_window = False
@@ -437,7 +443,7 @@ class Monitor:
         last = time.monotonic()
         alerts_on = True
         self.illuminator.on()
-        if self.args.serve:
+        if self.args.serve or self.args.booth:
             self.start_server()
 
         console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")

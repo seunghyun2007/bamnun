@@ -113,6 +113,13 @@ def _bar(img, x: int, y: int, w: int, h: int, frac: float, colour,
                     cv2.LINE_AA)
 
 
+# The same words the app shows (SPEC.md, section 13), so the two can be
+# compared side by side while testing.
+LABEL_TEXT = {"alert": "ALERT", "a_bit": "A BIT TIRED", "drowsy": "DROWSY",
+              "very": "VERY DROWSY", "eyes_closed": "EYES CLOSED", "head_drop": "HEAD DROPPING",
+              "away": "LOOKING AWAY", "no_face": "NO FACE"}
+
+
 def video_frame(image: np.ndarray, landmarks, eye_closed: bool,
                 width: int = 480, quality: int = 70) -> bytes:
     """One JPEG for the app's Camera screen: the frame plus the eye outlines.
@@ -232,11 +239,12 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
         colour = _colour_for_level(state.level)
         label_colour = _GREY if stale else _WHITE
 
-        cv2.putText(canvas, state.level_name.upper(), (x0 + 12, y0 + 32),
+        title = LABEL_TEXT.get(getattr(state, "label", ""), state.level_name.upper())
+        cv2.putText(canvas, title, (x0 + 12, y0 + 32),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                     tuple(int(c * 0.45) for c in colour) if stale else colour,
                     2, cv2.LINE_AA)
-        _draw_right(canvas, f"KSS ~{state.kss:0.1f}", panel_right - 12, y0 + 30,
+        _draw_right(canvas, f"{100 * state.score:0.0f}/100", panel_right - 12, y0 + 30,
                     0.5, label_colour, min_x=x0 + 140)
 
         y = y0 + 56
@@ -250,7 +258,8 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
             y += 66
         else:
             _bar(canvas, x0 + 12, y, panel_w - 24, 12, state.score, colour,
-                 f"drowsiness {state.score:0.2f}", threshold=0.55)
+                 f"drowsiness {100 * state.score:0.0f}  (level {state.level_name})",
+                 threshold=0.45)
             y += 34
             _bar(canvas, x0 + 12, y, panel_w - 24, 10,
                  feature_frame.perclos / 0.30, _WHITE,
@@ -258,8 +267,8 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
             y += 30
             _bar(canvas, x0 + 12, y, panel_w - 24, 10,
                  feature_frame.ear_norm, _WHITE,
-                 f"eye open {feature_frame.ear_norm*100:0.0f}% of baseline",
-                 threshold=0.65)
+                 f"eye open {feature_frame.ear_norm*100:0.0f}%  (typical "
+                 f"{feature_frame.openness*100:0.0f}%)", threshold=0.5)
             y += 32
             cv2.putText(canvas,
                         f"blinks {feature_frame.blink_rate_per_min:0.0f}/min   "

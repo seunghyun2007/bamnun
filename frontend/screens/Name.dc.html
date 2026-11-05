@@ -31,7 +31,7 @@ body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d
 <div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
     <a href="Meet.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:18%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:17%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
   </div>
   <div style="display:flex;justify-content:center;margin-top:8px">
     <div class="olw" style="width:140px;font-size:14px">
@@ -47,14 +47,10 @@ body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}input::placeholder{color:#7d
   <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center;text-wrap:balance">What should Ollie call you?</h1>
   <div style="margin-top:22px;display:flex;flex-direction:column;gap:8px">
     <label for="inName" style="font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4;padding-left:4px">Your name</label>
-    <input id="inName" autocomplete="given-name" placeholder="e.g. Minsu" value="Siroj" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid #C4B5FD;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
-  </div>
-  <div style="margin-top:22px;display:flex;flex-direction:column;gap:8px">
-    <label for="inOwl" style="font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4;padding-left:4px">Your owl's name</label>
-    <input id="inOwl" value="Ollie" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid transparent;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
+    <input id="inName" autocomplete="given-name" placeholder="e.g. Minsu" value="" maxlength="20" style="width:100%;box-sizing:border-box;padding:17px 18px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:2px solid #C4B5FD;color:#F4EFE6;font:600 18px Figtree,Arial,sans-serif;outline:none">
   </div>
   <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
-    <a href="Vehicle.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    <a id="nameNext" href="Vehicle.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
   </div>
 </div>
 </x-dc>

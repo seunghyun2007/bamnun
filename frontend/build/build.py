@@ -1,6 +1,6 @@
 import re, json, base64, sys, os
 D = sys.argv[1]; OUT = sys.argv[2]; OL = sys.argv[3]
-ORDER = ["Main","Welcome","Meet","Name","Vehicle","Night","Voice","Ladder","Privacy","Permissions","Pair","Calibrate","Plan","Route","Home","Camera","Trips","Insights","Settings"]
+ORDER = ["Main","Welcome","Account","Meet","Name","Vehicle","Night","Ladder","Privacy","Permissions","Contact","Pair","Voice","Calibrate","Plan","Route","Drive","Home","Camera","Trips","Insights","Settings"]
 BLOB = {
  "bb73e1b39dabf3b35d036c39c5cdd1c1":"idle","be4e6418a0a3f416c7aca695e46d9667":"hello","4af7029f76e815daac75989af4aba986":"thinking",
  "fa546fa5fa5789063fdee0a2beebd5b2":"sleepy","57efe0ac85b17a5178828ea07e413fad":"wake","f6f6ffbf7935cbf40e40727534b41f50":"celebrate",
@@ -58,8 +58,10 @@ for name in ORDER:
         body = body.replace('<p class="vc-say"', '<p id="vSay" class="vc-say"').replace('>{{cur.line}}</p>', '></p>')
         body = re.sub(r'(<div style="display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:12px;margin-top:18px">)\s*<sc-for list="\{\{cards\}\}".*?</button>\s*</sc-for>', r'<div id="vCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px">', body, flags=re.S)
     if name in ("Home", "Trips", "Insights"):
-        body = re.sub(r'height:(1520|1240)px;box-sizing:border-box;position:relative;overflow:hidden;', 'min-height:844px;box-sizing:border-box;position:relative;overflow:clip;', body, count=1)
-        body = body.replace('<nav style="position:absolute;left:16px;right:16px;bottom:26px;', '<nav style="position:sticky;z-index:20;margin:24px ' + ('16px' if name == "Home" else '0') + ' 0;bottom:26px;')
+        body = re.sub(r'height:(1520|1240)px;box-sizing:border-box;position:relative;overflow:hidden;', 'min-height:844px;flex:1 0 auto;display:flex;flex-direction:column;box-sizing:border-box;position:relative;overflow:clip;', body, count=1)
+        # The bar sits at the bottom of the screen even when the content is
+        # short (or still loading), and stays sticky when it's long.
+        body = body.replace('<nav style="position:absolute;left:16px;right:16px;bottom:26px;', '<div aria-hidden="true" style="flex:1 0 24px"></div><nav style="position:sticky;z-index:20;margin:0 ' + ('16px' if name == "Home" else '0') + ';bottom:26px;')
         body = re.sub(r'(</nav>)', r'\1<div style="height:26px"></div>', body, count=1)
     assert "{{" not in body and "<sc-" not in body, (name, re.findall(r".{40}\{\{.{30}", body)[:3])
     for bid, n in BLOB.items():
@@ -70,7 +72,14 @@ for name in ORDER:
 
 shell = open(os.path.join(os.path.dirname(__file__), "shell.html"), encoding="utf-8").read()
 dyn = open(os.path.join(os.path.dirname(__file__), "dyn.js"), encoding="utf-8").read()
+dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "route.js"), encoding="utf-8").read()
+dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "camera.js"), encoding="utf-8").read()
+dyn += chr(10) + open(os.path.join(os.path.dirname(__file__), "calibrate.js"), encoding="utf-8").read()
 live = open(os.path.join(os.path.dirname(__file__), "live.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "account.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "api.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "sync.js"), encoding="utf-8").read()
+live += chr(10) + open(os.path.join(os.path.dirname(__file__), "overlay.js"), encoding="utf-8").read()
 html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
              .replace("/*__LIVE__*/", live)
              .replace("<!--__TEMPLATES__-->", "\n".join(tpls))
@@ -81,8 +90,38 @@ html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
 # it opens from disk, from the Pi or in Capacitor with nothing beside it.
 FONTS = os.path.join(os.path.dirname(__file__), "..", "fonts")
 html = re.sub(r"url\(fonts/([\w.-]+\.woff2)\)", lambda m: "url(data:font/woff2;base64," + base64.b64encode(open(os.path.join(FONTS, m.group(1)), "rb").read()).decode() + ")", html)
+# The Kakao map key (public, but locked to registered web addresses) goes only
+# into builds under www/, which are not in git. Bamnun_app.html stays key-free
+# and asks the device (/api/config). The secret REST key never goes in at all.
+ENV = {}
+try:
+    for line in open(os.path.join(os.path.dirname(__file__), "..", ".env"), encoding="utf-8"):
+        if "=" in line and not line.strip().startswith("#"):
+            k, v = line.split("=", 1)
+            ENV[k.strip()] = v.strip().strip("'\"")
+except OSError:
+    pass
+def _jwt_role(key):
+    """The payload of a legacy JWT key, as text ('' if it isn't one)."""
+    try:
+        part = key.split(".")[1]
+        return base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)).decode("utf-8", "replace")
+    except (IndexError, ValueError):
+        return ""
 # OUT may list several paths separated by commas; all get the same build.
 for out in OUT.split(","):
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    open(out, "w", encoding="utf-8", newline="\n").write(html)
+    page = html
+    if ENV.get("KAKAO_JS_KEY") and "www" in os.path.normpath(out).split(os.sep):
+        page = page.replace("<script>", "<script>window.BN_KAKAO_JS=" + json.dumps(ENV["KAKAO_JS_KEY"]) + ";", 1)
+    # Supabase: the project URL and the public anon (publishable) key, which
+    # are safe in an app because Row Level Security guards every row. Like
+    # the Kakao key, only builds under www/ get them. The service role key
+    # must never be in .env for the app, and is refused here.
+    sb_url, sb_key = ENV.get("SUPABASE_URL", "").rstrip("/"), ENV.get("SUPABASE_ANON_KEY", "")
+    if sb_key.startswith("sb_secret_") or '"service_role"' in _jwt_role(sb_key):
+        sys.exit("SUPABASE_ANON_KEY in frontend/.env is a secret/service role key. Use the anon or publishable key.")
+    if sb_url and sb_key and "www" in os.path.normpath(out).split(os.sep):
+        page = page.replace("<script>", "<script>window.BN_SUPABASE=" + json.dumps({"url": sb_url, "key": sb_key}) + ";", 1)
+    open(out, "w", encoding="utf-8", newline="\n").write(page)
 print("ok", len(html))

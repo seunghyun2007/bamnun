@@ -34,6 +34,12 @@ def ff(t=0.0, **kw) -> FeatureFrame:
     return FeatureFrame(**base)
 
 
+# Level mechanics on an instantaneous score; smoothing is tested on its own.
+NO_SMOOTH = {"score_rise_tau_s": 0.0, "score_fall_tau_s": 0.0,
+             # The PERCLOS-gate mechanics, with the range they were written for.
+             # The shipped config no longer uses gates (docs/detection-audit.md).
+             "ranges": {"perclos": [0.05, 0.30]}}
+
 LEVELS = [
     {"name": "alert", "min_score": 0.00, "dwell_s": 0.0},
     {"name": "a_bit", "min_score": 0.30, "min_perclos": 0.05, "dwell_s": 2.0},
@@ -56,7 +62,7 @@ def _quiet_policy_cfg():
 
 
 def test_perclos_alone_enters_a_level_after_its_dwell():
-    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS})
+    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS, **NO_SMOOTH, **NO_SMOOTH})
     # PERCLOS 7 % ramps to a tiny score, far below min_score 0.30.
     s = est.update(ff(t=0.0, perclos=0.07), calibrated=True)
     assert s.score < 0.30 and s.level == 0
@@ -65,7 +71,7 @@ def test_perclos_alone_enters_a_level_after_its_dwell():
 
 
 def test_perclos_route_has_its_own_hysteresis():
-    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS,
+    est = StateEstimator({"weights": {"perclos": 1.0}, "levels": LEVELS, **NO_SMOOTH,
                           "perclos_hysteresis": 0.02})
     for t in (0.0, 2.5):
         s = est.update(ff(t=t, perclos=0.07), calibrated=True)
@@ -77,7 +83,7 @@ def test_perclos_route_has_its_own_hysteresis():
 
 
 def test_levels_without_a_perclos_gate_behave_as_before():
-    est = StateEstimator({"weights": {"perclos": 1.0},
+    est = StateEstimator({"weights": {"perclos": 1.0}, **NO_SMOOTH,
                           "levels": [{"name": "alert", "min_score": 0.0},
                                      {"name": "mild", "min_score": 0.5}]})
     s = est.update(ff(t=0.0, perclos=0.10), calibrated=True)
@@ -128,10 +134,10 @@ def test_policy_ticks_the_light_off_while_the_driver_is_alert():
     pol = EscalationPolicy(_quiet_policy_cfg())
     est = StateEstimator(load_config()["state"])
     light = pol.actuators["blue_light"]
-    # PERCLOS 7 % for 12 s clears the 10 s dwell into "a bit drowsy".
+    # Heavy lids and some shut-eye time for 15 s: into "a bit tired".
     t = 0.0
-    while t < 12.0:
-        pol.update(est.update(ff(t=t, perclos=0.07), calibrated=True))
+    while t < 15.0:
+        pol.update(est.update(ff(t=t, openness=0.55, perclos=0.15), calibrated=True))
         t += 0.5
     assert pol.stage == 1 and light.is_on
     # Then alert for longer than the hold.
@@ -148,8 +154,11 @@ def test_policy_ticks_the_light_off_while_the_driver_is_alert():
 def test_shipped_ladder_has_one_stage_per_level():
     cfg = load_config()
     assert len(cfg["state"]["levels"]) == len(cfg["alerts"]["stages"]) == 5
-    gates = [lv["min_perclos"] for lv in cfg["state"]["levels"][1:]]
-    assert gates == sorted(gates) == [0.05, 0.10, 0.15, 0.20]
+    scores = [lv["min_score"] for lv in cfg["state"]["levels"]]
+    assert scores == sorted(scores) and scores[0] == 0.0
+    # No PERCLOS shortcut: on the true P80 scale ordinary blinking already
+    # sits at 3-5 %, so a 5 % gate flagged alert drivers.
+    assert not any("min_perclos" in lv for lv in cfg["state"]["levels"])
 
 
 def test_shipped_ladder_escalates_light_scent_sound():

@@ -14,7 +14,7 @@
 <div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(80% 45% at 0% 70%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 60%),radial-gradient(80% 45% at 100% 80%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
     <a href="Vehicle.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:36%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:33%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
   </div>
   <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center">When do you work?</h1>
   <p style="margin:10px auto 0;max-width:31ch;text-align:center;color:#B3A6B4;font-size:15px;line-height:1.4">Ollie learns when your hardest hours are, before you even start.</p>
@@ -33,24 +33,13 @@
     </sc-for>
   </div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Starts</span><b style="font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{start}}</b></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Ends</span><b style="font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{end}}</b></div>
-  </div>
-
-  <div style="margin-top:14px;padding:14px;border-radius:18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)">
-    <div role="img" aria-label="Your shift on a 24-hour day, with tired windows shaded" style="position:relative;height:26px;border-radius:8px;background:rgba(255,255,255,.11);overflow:hidden">
-      <div style="position:absolute;top:0;bottom:0;left:8.33%;width:16.67%;background:repeating-linear-gradient(135deg,rgba(244,143,177,.35) 0 4px,transparent 4px 8px)"></div>
-      <div style="position:absolute;top:0;bottom:0;left:54.17%;width:8.33%;background:repeating-linear-gradient(135deg,rgba(244,143,177,.35) 0 4px,transparent 4px 8px)"></div>
-      <sc-for list="{{segs}}" as="s" hint-placeholder-count="2"><div style="{{s.style}}"></div></sc-for>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#B3A6B4"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>12 AM</span></div>
-    <div style="display:flex;gap:14px;margin-top:8px;font-size:12px;color:#B3A6B4"><span style="display:flex;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:#C4B5FD"></i>Your shift</span><span style="display:flex;align-items:center;gap:6px"><i style="width:10px;height:10px;border-radius:3px;background:repeating-linear-gradient(135deg,rgba(244,143,177,.7) 0 2px,transparent 2px 4px)"></i>Tired window</span></div>
-    <p style="margin:10px 0 0;font-size:14.5px;font-weight:600;line-height:1.35">{{hardest}}</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Starts</span><b data-time="start" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{start}}</b></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Ends</span><b data-time="end" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{end}}</b></div>
   </div>
 
   <div style="position:absolute;left:0;right:0;bottom:0;padding:16px 22px 34px;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(to top,rgba(23,17,26,.9) 35%,rgba(23,17,26,0))">
-    <a href="Voice.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
-    <div style="display:flex;gap:4px"><a href="Voice.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">My hours change every week</a><a href="Voice.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">Skip</a></div>
+    <a id="nNext" href="Ladder.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    <div style="display:flex;gap:4px"><a id="nVar" href="Ladder.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">My hours change every week</a><a id="nSkip" href="Ladder.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">Skip</a></div>
   </div>
 </div>
 </x-dc>

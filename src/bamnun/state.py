@@ -23,24 +23,42 @@ it should be trained on the session logs this module writes, not invented.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from .features import FeatureFrame
 
-# Sub-score saturation points. Each pair is (value at score 0, value at score 1).
-# Sources for the anchor values are given in docs/thresholds.md.
-PERCLOS_RANGE = (0.05, 0.30)          # P80 over 60 s; >0.15 is the usual drowsy mark
-BLINK_DURATION_RANGE = (0.15, 0.45)   # seconds, mean normal-blink duration
-MICROSLEEP_RANGE = (0.0, 2.0)         # events per 60 s
-YAWN_RATE_RANGE = (0.0, 12.0)         # per hour
-PITCH_STD_RANGE = (2.0, 10.0)         # degrees over 10 s
-
+# Sub-score saturation points: (value at sub-score 0, value at sub-score 1).
+# Defaults only; config state.ranges overrides each one. Sources and reasoning
+# are in docs/thresholds.md.
+RANGES: dict[str, tuple[float, float]] = {
+    # All on the driver's personal scale (SPEC.md, 15); see docs/thresholds.md.
+    "heavy_lids": (0.15, 0.45),       # 1 - typical openness over 45 s
+    "perclos": (0.03, 0.15),          # P80: share of reliable time with openness <= 20 %
+    "blink_duration": (0.17, 0.30),   # s: recent median minus the driver's normal, + 0.12
+    "long_blinks": (1.0, 5.0),        # 0.3-0.5 s blinks per minute
+    "lid_speed": (1.3, 2.3),          # reopening AVR / the driver's normal
+    "nods": (0.0, 2.0),               # head nods in the last 2 minutes
+    "microsleep": (0.0, 2.0),         # per minute
+    "yawn": (0.0, 18.0),              # per hour (3 in 10 min saturates)
+    "blink_rate": (1.5, 2.5),         # rate / the driver's normal rate
+}
+# Kept as names for anything that imported them.
+PERCLOS_RANGE = RANGES["perclos"]
+BLINK_DURATION_RANGE = RANGES["blink_duration"]
+MICROSLEEP_RANGE = RANGES["microsleep"]
+YAWN_RATE_RANGE = RANGES["yawn"]
 
 # The fused sub-scores, in a fixed order. The session CSV takes its columns
 # from this, so a frame with no face (and so no components) cannot leave them
 # out of the header.
-COMPONENTS = ("perclos", "blink_duration", "microsleep", "yawn", "head_nod")
+COMPONENTS = tuple(RANGES)
+
+# The driver's state in one word, decided here so the app and the laptop
+# overlay can't disagree (docs/SPEC.md, section 13).
+LABELS = ("alert", "a_bit", "drowsy", "very", "eyes_closed", "head_drop", "away", "no_face")
+LEVEL_LABELS = ("alert", "a_bit", "drowsy", "very", "very")
 
 
 def _ramp(x: float, lo: float, hi: float) -> float:
@@ -53,7 +71,8 @@ def _ramp(x: float, lo: float, hi: float) -> float:
 @dataclass
 class DriverState:
     t: float = 0.0
-    score: float = 0.0                  # fused drowsiness, 0..1
+    score: float = 0.0                  # fused drowsiness, 0..1, smoothed
+    raw_score: float = 0.0              # the same before smoothing
     level: int = 0                      # index into the configured level list
     level_name: str = "alert"
     kss: float = 1.0                    # heuristic Karolinska Sleepiness Scale estimate
@@ -65,6 +84,11 @@ class DriverState:
     face_lost_s: float = 0.0
     confidence: float = 1.0
     calibrated: bool = False
+    label: str = "alert"                # one of LABELS
+    # Raw signal values behind each component, for the debug panel, and each
+    # component's share of the raw score (weight x sub-score).
+    signals: dict[str, float] = field(default_factory=dict)
+    contributions: dict[str, float] = field(default_factory=dict)
 
     @property
     def emergency(self) -> bool:
@@ -87,7 +111,26 @@ class StateEstimator:
 
         self.levels = list(cfg.get("levels", [{"name": "alert", "min_score": 0.0, "dwell_s": 0.0}]))
         self.levels.sort(key=lambda d: float(d.get("min_score", 0.0)))
+        self._base_levels = [dict(lv) for lv in self.levels]
+        self.sensitivity = "normal"
         self.hysteresis = float(cfg.get("recovery_hysteresis", 0.08))
+        self.ranges = dict(RANGES)
+        for k, v in (cfg.get("ranges") or {}).items():
+            if k in self.ranges:
+                self.ranges[k] = (float(v[0]), float(v[1]))
+        # The score moves towards the raw value with these time constants:
+        # quickly enough to follow a real slide, slowly enough not to flicker,
+        # and slower on the way down, because drowsiness doesn't vanish in a
+        # second when the eyes open wide.
+        self.rise_tau = float(cfg.get("score_rise_tau_s", 6.0))
+        self.fall_tau = float(cfg.get("score_fall_tau_s", 20.0))
+        self.microsleep_floor = float(cfg.get("microsleep_score", 0.90))
+        # A detected nod is a late sign of drowsiness (rater schemes put
+        # head nodding at "very drowsy"), so it lifts the score at once.
+        self.nod_floor = float(cfg.get("nod_score", 0.50))
+        self._smooth: Optional[float] = None
+        self._smooth_t: Optional[float] = None
+        self._label = "alert"
         self.perclos_hysteresis = float(cfg.get("perclos_hysteresis", 0.02))
         self.no_face_grace_s = float(cfg.get("no_face_grace_s", 1.5))
         # MediaPipe stops finding a face somewhere past 45-50 deg of yaw, so a
@@ -113,16 +156,68 @@ class StateEstimator:
         self._last_score = 0.0
         self._last_kss = 1.0
 
+    # Alert sensitivity from the app (Settings: Gentle / Normal / Strict).
+    # Scales the score and PERCLOS each level needs, not the microsleep
+    # override: a closure happening now is never made to wait.
+    SENSITIVITY = {"gentle": 1.12, "normal": 1.0, "strict": 0.88}
+
+    def set_sensitivity(self, name: str) -> None:
+        k = self.SENSITIVITY.get(name)
+        if k is None:
+            return
+        self.sensitivity = name
+        for lv, base in zip(self.levels, self._base_levels):
+            if float(base.get("min_score", 0.0)) > 0:
+                lv["min_score"] = min(0.98, float(base["min_score"]) * k)
+            if "min_perclos" in base:
+                lv["min_perclos"] = min(0.95, float(base["min_perclos"]) * k)
+
     # ----------------------------------------------------------------- #
 
-    def _components(self, f: FeatureFrame) -> dict[str, float]:
+    @staticmethod
+    def _signals(f: FeatureFrame) -> dict[str, float]:
+        """The raw value behind each component, in its own units."""
+        base = getattr(f, "blink_baseline_s", 0.12) or 0.12
+        rate0 = getattr(f, "blink_rate_baseline", 17.0) or 17.0
         return {
-            "perclos": _ramp(f.perclos, *PERCLOS_RANGE),
-            "blink_duration": _ramp(f.mean_blink_duration_s, *BLINK_DURATION_RANGE),
-            "microsleep": _ramp(float(f.microsleep_count), *MICROSLEEP_RANGE),
-            "yawn": _ramp(f.yawn_rate_per_hour, *YAWN_RATE_RANGE),
-            "head_nod": _ramp(f.pitch_std, *PITCH_STD_RANGE),
+            "heavy_lids": max(0.0, 1.0 - f.openness),
+            "perclos": f.perclos,
+            # Re-anchored on a typical 0.12 s blink, so the range reads in
+            # ordinary seconds whatever this driver's own normal is.
+            "blink_duration": (f.mean_blink_duration_s - base + 0.12) if f.mean_blink_duration_s > 0 else 0.0,
+            "long_blinks": getattr(f, "long_blinks_per_min", 0.0),
+            "lid_speed": getattr(f, "reopen_ratio", 1.0),
+            "nods": float(getattr(f, "nod_count", 0)),
+            "microsleep": float(f.microsleep_count),
+            "yawn": f.yawn_rate_per_hour,
+            "blink_rate": (f.blink_rate_per_min / rate0) if f.blink_rate_per_min > 0 else 0.0,
         }
+
+    def _components(self, f: FeatureFrame) -> dict[str, float]:
+        sig = self._signals(f)
+        return {k: _ramp(sig[k], *self.ranges[k]) for k in COMPONENTS}
+
+    def _smoothed(self, t: float, raw: float) -> float:
+        if self._smooth is None or self._smooth_t is None:
+            self._smooth, self._smooth_t = raw, t
+            return raw
+        dt = max(0.0, t - self._smooth_t)
+        self._smooth_t = t
+        tau = self.rise_tau if raw > self._smooth else self.fall_tau
+        if tau > 0:
+            self._smooth += (raw - self._smooth) * (1.0 - math.exp(-dt / tau))
+        else:
+            self._smooth = raw
+        return self._smooth
+
+    def _label_for(self, f: FeatureFrame, level: int, distracted: bool) -> str:
+        if getattr(f, "head_drop", False):
+            return "head_drop"
+        if f.microsleep_now or f.shut_now:
+            return "eyes_closed"
+        if distracted or f.off_road:
+            return "away"
+        return LEVEL_LABELS[min(level, len(LEVEL_LABELS) - 1)]
 
     def _meets(self, lv: dict, score: float, perclos: float, slack: float = 0.0,
                perclos_slack: float = 0.0) -> bool:
@@ -187,6 +282,25 @@ class StateEstimator:
     def update(self, f: FeatureFrame, calibrated: bool = True) -> DriverState:
         t = f.t
 
+        if not f.face_found and getattr(f, "head_drop", False):
+            # The face went down with the head (SPEC.md, 15): a nod, and after
+            # head_drop_microsleep_s a microsleep. Never "no face".
+            self._face_lost_since = None
+            score = self._last_score
+            if f.microsleep_now:
+                score = max(score, self.microsleep_floor)
+            score = max(score, self.nod_floor)
+            self._smooth = score
+            self._smooth_t = t
+            level, level_name = self._resolve_level(t, score, force_top=f.microsleep_now,
+                                                    perclos=0.0)
+            self._last_score = score
+            self._label = "head_drop"
+            return DriverState(t=t, score=score, raw_score=score, label="head_drop",
+                               level=level, level_name=level_name, kss=1.0 + 8.0 * score,
+                               microsleep_now=f.microsleep_now, face_lost=True, face_lost_s=0.0,
+                               confidence=0.5, calibrated=calibrated)
+
         if not f.face_found:
             if self._face_lost_since is None:
                 self._face_lost_since = t
@@ -214,9 +328,13 @@ class StateEstimator:
                 reason = f"head turned away {self._last_pose_yaw:+.0f} deg"
             else:
                 reason = "driver not visible"
+            if lost_s > grace:
+                self._label = "away" if turned_away else "no_face"
             return DriverState(
                 t=t,
                 score=self._last_score,
+                raw_score=self._last_score,
+                label=self._label,
                 level=self._level,
                 level_name=str(self.levels[self._level].get("name", "")),
                 kss=self._last_kss,
@@ -238,7 +356,9 @@ class StateEstimator:
         self._last_good = f
 
         comps = self._components(f)
-        score = sum(self.weights.get(k, 0.0) * v for k, v in comps.items())
+        raw = sum(self.weights.get(k, 0.0) * v for k, v in comps.items())
+        raw = max(0.0, min(1.0, raw))
+        score = self._smoothed(t, raw)
 
         # A closure in progress that has already passed the microsleep
         # threshold is not something to average into a 60 s window. Override.
@@ -249,8 +369,12 @@ class StateEstimator:
         # features.blink.microsleep_duration_s, so editing the config moved
         # the event classification but not the alert trigger.
         microsleep_now = f.microsleep_now
+        if getattr(f, "nodding", False):
+            score = max(score, self.nod_floor)
+            self._smooth = score
         if microsleep_now:
-            score = max(score, 0.90)
+            score = max(score, self.microsleep_floor)
+            self._smooth = score
 
         score = max(0.0, min(1.0, score))
         level, level_name = self._resolve_level(t, score, force_top=microsleep_now,
@@ -281,10 +405,15 @@ class StateEstimator:
         kss = 1.0 + 8.0 * score      # heuristic mapping; see docs/thresholds.md
         self._last_score = score
         self._last_kss = kss
+        self._label = self._label_for(f, level, distracted)
 
         return DriverState(
             t=t,
             score=score,
+            raw_score=raw,
+            label=self._label,
+            signals=self._signals(f),
+            contributions={k: self.weights.get(k, 0.0) * v for k, v in comps.items()},
             level=level,
             level_name=level_name,
             kss=kss,

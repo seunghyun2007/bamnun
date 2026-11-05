@@ -43,42 +43,75 @@ landmarks:
   min_face_detection_confidence: 0.4   # lowered: IR faces score lower than RGB
   min_face_presence_confidence: 0.4
   min_tracking_confidence: 0.4
-  output_blendshapes: false            # costs ~2 ms; eyeBlink_* is a useful backup
+  # eyeBlink, eyeSquint, jawOpen, mouthSmile, cheekSquint: a second opinion on
+  # the eyes, and smiles/yawns/talking (docs/SPEC.md, 15). Costs ~2 ms a frame.
+  output_blendshapes: true
+  # Give MediaPipe a picture this wide (0 = the full frame); landmarks still map
+  # onto the full frame. Measured on the laptop at 640: SLOWER (39.5 vs 17.2 ms
+  # a frame) and EAR shifted 2.7 %, so it stays off. Measure on the Pi before
+  # turning it on there.
+  input_width: 0
 
 features:
-  # Eye Aspect Ratio closure threshold is expressed as a FRACTION of the
-  # driver's own calibrated open-eye EAR, not an absolute number. Absolute
-  # thresholds (the usual 0.21) fail on narrow eye shapes and on anyone
-  # wearing glasses.
-  ear_closed_fraction: 0.65
-  ear_reopen_fraction: 0.75        # hysteresis: must exceed this to count as open
-  ear_smoothing_alpha: 0.4         # EWMA on raw EAR, 1.0 = no smoothing
+  # Eye measures are on the DRIVER'S OWN openness scale (docs/SPEC.md, 15):
+  # 100 % = their normal open eyes (the median of the calibration look-ahead),
+  # 0 % = their closed eyes (the eyes-closed step). Small eyes, big eyes and
+  # glasses then behave the same. Sources and reasoning: docs/thresholds.md.
+  eyes:
+    # -- openness from the camera ------------------------------------------- #
+    eye_drop_width_ratio: 0.60     # an eye narrower than this x the other (turned away, covered) is ignored
+    pose_compensation_max_deg: 30  # EAR is corrected for yaw/pitch foreshortening up to this
+    blendshape_weight: 0.5         # share of MediaPipe eyeBlink in the fused openness (0 = EAR only)
+    eye_disagreement: 0.45         # EAR and eyeBlink openness further apart = glare/landmark error: frame unreliable
+    # -- frames that can't be trusted for eye measures ----------------------- #
+    smile_threshold: 0.35          # mouthSmile above this = smiling (cheeks narrow the eyes)
+    cheek_threshold: 0.30          # cheekSquint above this = smiling or laughing
+    smile_mouth_width_ratio: 1.12  # no blendshapes: mouth this much wider than at rest = smiling
+    talk_jaw_std: 0.05             # jawOpen moving this much within talk_window_s = talking
+    talk_window_s: 1.0
+    yawn_jaw_open: 0.50            # jawOpen held above this ...
+    yawn_mar: 0.55                 # ... (or mouth aspect ratio this far above rest, without blendshapes)
+    yawn_min_s: 1.0                # ... for this long = a yawn (yawns last ~6 s, Provine 1986)
+    expression_hold_s: 0.7         # frames stay unreliable this long after an expression ends
+    light_jump: 18.0               # face brightness jumping this far (0-255) from its 2 s average = lighting change
+    light_hold_s: 1.0              # ... frames unreliable for this long after
+    min_iod_frac: 0.045            # face smaller than this (eye distance / frame width): too far for eyelids
+    reliable_yaw_deg: 30.0         # head turned further than this from neutral: eye shape unreliable
+    reliable_pitch_deg: 30.0
+    # -- blinks ---------------------------------------------------------------- #
+    blink_half_level: 0.50         # blinks are timed where openness crosses 50 % (half amplitude)
+    blink_open_level: 0.70         # a new blink needs the eyes back above this first
+    long_blink_s: 0.30             # half-amplitude duration from which a blink is "long" (drowsy sign)
+    held_closure_s: 1.0            # longer "blinks" are held closures/squints: not in blink stats
+    blink_window_s: 60.0
+    min_blinks_for_stats: 5        # fewer judged blinks in the window = no blink averages yet
+    # -- shut eyes and the microsleep bypass ----------------------------------- #
+    perclos_closed_level: 0.20     # P80: openness <= 20 % counts as closed for PERCLOS
+    shut_level: 0.25               # fused openness at or below this = shut
+    shut_each_level: 0.40          # ... and, with blendshapes, EAR and eyeBlink each at or below this
+    eyes_closed_label_s: 0.30      # shut this long shows "Eyes closed"; a normal blink never does
+    microsleep_s: 0.50             # shut this long = microsleep: straight to the top stage
+    microsleep_looking_down_s: 1.5 # head down (dashboard, phone): lids close without sleep, so wait longer
+    microsleep_unreliable_s: 1.0   # during a smile, laugh, yawn, lighting change or at the frame edge
 
-  # PERCLOS: proportion of time the eye opening is below this fraction of the
-  # driver's calibrated open-eye EAR.
-  #
-  # 0.50, not 0.80. P80 means "eyelids MORE than 80% closed", but EAR never
-  # reaches zero on a shut eye (closed EAR is roughly a third of open), so
-  # ear_norm < 0.80 counted an eye only ~30% closed. On the two 40-minute
-  # bench sessions in runs/ that put the median rolling-60 s PERCLOS at 9-10%,
-  # i.e. the literature's "drowsy" band during ordinary sitting, and would
-  # have held the 5% stage-1 gate open ~85% of the time. At 0.50 (about 70%
-  # closed) the same sessions sit at a 1-2% median, inside the 0-5% alert
-  # baseline the four-stage scheme assumes. Measure closed EAR per driver
-  # before quoting this as true P80.
-  perclos_baseline_fraction: 0.50
+  # Head nods (nodding off): a slow drift down, often with the eyes closing,
+  # then a fast jerk back up. Pitch is relative to the calibrated neutral.
+  nod:
+    nod_start_deg: 6.0             # a drop starts this far below neutral
+    nod_depth_deg: 12.0            # a nod goes at least this deep ...
+    nod_wobble_multiple: 3.0       # ... and at least this x the driver's own calibrated pitch wobble
+    nod_max_drop_speed_deg_s: 45.0 # drops slower than this are nod-like (a deliberate look down is faster) ...
+    nod_recovery_speed_deg_s: 60.0 # ... and the head must come back up at least this fast (the jerk)
+    nod_recovery_window_s: 2.5     # the jerk must come within this of the lowest point
+    nod_max_drop_s: 4.0            # a drop still going after this long is a deliberate look down, not a nod
+    nod_window_s: 120.0            # nods counted over this window for the score
+    head_drop_lost_window_s: 0.6   # face lost within this of a downward movement = the head dropped
+    head_drop_min_speed_deg_s: 8.0 # ... if it was going down at least this fast
+    head_drop_microsleep_s: 0.5    # a head drop with the face lost this long counts as a microsleep
+
   perclos_window_s: 60.0
-
-  blink:
-    min_duration_s: 0.05           # below this is landmark noise, not a blink
-    max_normal_duration_s: 0.40    # above this the closure is a "long closure"
-    microsleep_duration_s: 0.50    # >= this is scored as a microsleep event
-    rate_window_s: 60.0
-
-  yawn:
-    mar_threshold: 0.60            # mouth aspect ratio
-    min_duration_s: 1.0
-    window_s: 300.0
+  openness_window_s: 45.0          # heavy lids: median openness of reliable, non-blink frames over this
+  look_down_pitch_deg: 10.0        # head down past this (or 3x the calibrated pitch wobble) = looking down
 
   head:
     # Approximate on-road gaze cone. Outside it for longer than
@@ -114,54 +147,76 @@ features:
       # - {name: cluster,    yaw: [-15.0, 10.0], pitch: [8.0, 26.0], dwell_s: 2.5}
 
 calibration:
-  # Driver looks straight ahead and blinks normally. 12 s at 25 fps is ~300
-  # frames containing 3-4 natural blinks, so the 75th-percentile open-eye EAR
-  # sits comfortably above the closed frames (a blink is ~0.2 s, so blinks are
-  # under 10% of the window).
-  #
-  # This runs ONCE per driver. The result is written to save_path and loaded
-  # automatically on later runs, so a repeat demo does not re-calibrate.
-  duration_s: 12.0
-  # Quality requirement, expressed as a FRACTION of the frames actually seen
-  # so it does not depend on frame rate. An absolute count here (it was 120)
-  # implicitly demands 10 usable frames per second over a 12 s window, and
-  # below that frame rate calibration can never finish at all.
-  min_tracking_fraction: 0.40
+  # The guided calibration (docs/SPEC.md, 15). Look ahead, then close the eyes.
+  duration_s: 15.0                 # look-ahead step ...
+  max_duration_s: 25.0             # ... extended up to this until min_blinks are seen
+  min_blinks: 3                    # blinks needed to learn this driver's normal blink
+  min_tracking_fraction: 0.60      # the face must be tracked in at least this share of frames
   min_open_samples: 30             # absolute floor, for very slow streams
-  # Reject frames where the head is badly off-axis, so the pose zero means
-  # something. 20 rather than 12 degrees because solvePnP against a generic
-  # head model carries a per-person bias of roughly this size; too tight a
-  # gate rejects every frame and calibration never completes.
-  # 30 rather than 20. The gate exists only to be sure the driver is roughly
-  # forward while the zero is measured; the zero itself then absorbs whatever
-  # constant offset the mount imposes, so the gate does NOT need to be tight.
-  # At 20 a camera off eye level rejected a natural seated pose outright: the
-  # first run on the Pi reported median yaw -24, pitch -22 and never
-  # calibrated. A dash or mirror mount looks down at the driver by 15-25 deg
-  # before they have done anything wrong, and that is the intended geometry.
-  max_yaw_deg: 30.0
-  max_pitch_deg: 30.0
+  max_relative_pose_deg: 12.0      # frames this far from the session's own median pose are dropped
+  max_wobble_deg: 4.0              # head movement (robust std) above this: "Hold still", redo
+  min_separation: 0.30             # (open - closed) / open EAR below this: eyes not separable, redo
+  estimated_closed_ratio: 0.33     # no eyes-closed step: closed EAR estimated as this x open
+  closed_lead_s: 0.7               # eyes-closed step: frames before this are the eyes still closing
+  min_brightness: 45.0             # face darker than this (0-255): "Too dark"
+  max_brightness: 235.0            # brighter: "Too bright"
+  min_face_frac: 0.06              # eye distance / frame width below this: "Move closer"
+  max_face_frac: 0.32              # above: "Move back"
+  max_facing_deg: 28.0             # head turned further from the camera than this: "Face the camera"
+  # Saved per driver: runs/drivers/<profile name>/calibration.json. This is
+  # the fallback when there is no profile name.
   save_path: runs/calibration.json
 
 state:
   # Weights for the fused drowsiness score (sum need not be 1; it is normalised).
+  # Squint and PERCLOS carry most of it: both are eye-closure measures, the
+  # best single predictors in the literature. The blink-shape signals catch
+  # the early, gradual signs. See docs/thresholds.md.
   weights:
-    perclos: 0.35
-    blink_duration: 0.20
-    microsleep: 0.25
-    yawn: 0.10
-    head_nod: 0.10
+    heavy_lids: 0.20
+    perclos: 0.20
+    blink_duration: 0.14
+    long_blinks: 0.14
+    nods: 0.15
+    lid_speed: 0.07
+    microsleep: 0.05
+    yawn: 0.03
+    blink_rate: 0.02
+  # Each signal maps linearly onto 0-1 between these two values (in its own
+  # units), and is clamped outside them. Every lower anchor sits beyond the
+  # driver's own normal variation, so an alert, calibrated driver scores ~0.
+  ranges:
+    heavy_lids: [0.15, 0.45]       # 1 - typical openness (personal scale); 15 % = normal variation
+    perclos: [0.03, 0.15]          # P80 share of 60 s; alert < 5 %, drowsy > 15 % (Dinges & Grace 1998)
+    blink_duration: [0.17, 0.30]   # s, recent median - the driver's normal + 0.12 (i.e. +0.05..+0.18 s)
+    long_blinks: [1.0, 5.0]        # 0.3-0.5 s blinks per minute
+    lid_speed: [1.3, 2.3]          # reopening amplitude-velocity ratio / the driver's normal
+    nods: [0.0, 2.0]               # nods in the last 2 minutes
+    microsleep: [0.0, 2.0]         # per minute
+    yawn: [0.0, 18.0]              # per hour (3 in 10 minutes saturates)
+    blink_rate: [1.5, 2.5]         # rate / the driver's normal
+  # A detected nod lifts the score to at least this at once (level 2): rater
+  # schemes put head nodding at "very drowsy" (Wierwille & Ellsworth 1994).
+  nod_score: 0.50
+  score_rise_tau_s: 6.0
+  score_fall_tau_s: 20.0
+  microsleep_score: 0.90
   # Four drowsiness stages after the KSS/PERCLOS stratification in the team
   # research doc: KSS 6 / 7 / 8 / 9 at PERCLOS 5 / 10 / 15 / 20 %. A level is
   # entered on EITHER the fused score or PERCLOS alone (min_perclos), with a
   # dwell to avoid flapping. Microsleeps (>= 0.5 s closure) jump straight to
   # the top level regardless.
+  # Score thresholds on the smoothed 0-1 score (the app shows it x100).
+  # Level 1 fires ladder stage 1 (blue light), and so on up. There is no
+  # separate PERCLOS shortcut any more: on the true P80 scale ordinary
+  # blinking already spends 3-5 % of the time below 20 % open, so a 5 % gate
+  # flagged alert drivers, and PERCLOS is already in the score.
   levels:
     - {name: alert,     min_score: 0.00, dwell_s: 0.0}
-    - {name: a_bit,     min_score: 0.30, min_perclos: 0.05, dwell_s: 10.0}
-    - {name: drowsy,    min_score: 0.45, min_perclos: 0.10, dwell_s: 3.0}
-    - {name: very,      min_score: 0.60, min_perclos: 0.15, dwell_s: 2.0}
-    - {name: extreme,   min_score: 0.75, min_perclos: 0.20, dwell_s: 1.0}
+    - {name: a_bit,     min_score: 0.25, dwell_s: 5.0}
+    - {name: drowsy,    min_score: 0.45, dwell_s: 3.0}
+    - {name: very,      min_score: 0.65, dwell_s: 2.0}
+    - {name: extreme,   min_score: 0.82, dwell_s: 1.0}
   recovery_hysteresis: 0.08        # must drop this far below to de-escalate
   perclos_hysteresis: 0.02         # same, for the PERCLOS route
   no_face_grace_s: 1.5             # eyes-not-visible tolerated this long
@@ -244,11 +299,11 @@ alerts:
       refractory_s: 8.0
     warn:
       type: audio
-      files: [assets/chime_slow.wav, assets/voice/stage3.wav]
+      files: [assets/chime_slow.wav, "assets/voice/{lang}/stage3.wav"]
       refractory_s: 12.0
     alarm:
       type: audio
-      files: [assets/looming.wav, assets/voice/stage4.wav]
+      files: [assets/looming.wav, "assets/voice/{lang}/stage4.wav"]
       refractory_s: 8.0
     scent:
       type: atomizer
@@ -262,18 +317,18 @@ alerts:
     # Spoken cues outside the ladder. Missing recordings are skipped.
     open_window:
       type: audio
-      file: assets/voice/open_window.wav
+      file: "assets/voice/{lang}/open_window.wav"
       refractory_s: 300.0
     rest_voice:
       type: audio
-      file: assets/voice/rest_soon.wav
+      file: "assets/voice/{lang}/rest_soon.wav"
       refractory_s: 900.0
     calibrate_voice:
       type: audio
-      file: assets/voice/calibrate.wav
+      file: "assets/voice/{lang}/cal_look.wav"
     calibrated_voice:
       type: audio
-      file: assets/voice/calibrated.wav
+      file: "assets/voice/{lang}/cal_done.wav"
 
 # Cabin CO2 (SCD41 on I2C). Fires the open_window prompt once per excursion.
 air:
@@ -284,6 +339,13 @@ air:
   drowsy_level: 2
   rearm_drop_ppm: 200
   actuator: open_window
+
+# The Camera screen's video (only encoded while someone watches, on its own
+# thread). 640 px is sharp on a phone held upright and light on Wi-Fi.
+video:
+  width: 640
+  quality: 80                  # JPEG quality, 0-100
+  max_fps: 30                  # at most this; the camera's own rate is the real limit
 
 logging:
   dir: runs
@@ -297,3 +359,19 @@ ui:
   draw_eyes: true
   draw_gauges: true
   window_scale: 0.75
+  # The preview window is redrawn at most this often. Drawing it every frame
+  # slowed detection from ~34 to ~13 fps on a laptop; 15 still looks smooth.
+  window_max_fps: 15
+
+# Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
+# section 0). The phone caches a copy and pushes changes over the API.
+storage:
+  db: runs/bamnun.db
+
+# A trip starts when a calibrated driver is first seen, or when the phone
+# says so. An empty seat for break_min_s is a break (and resets the break
+# reminder); for end_after_s it ends the trip.
+trips:
+  auto_start: true
+  break_min_s: 180
+  end_after_s: 900

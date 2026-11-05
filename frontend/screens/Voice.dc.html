@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Ollie's style</title>
+<title>Ollie's voice</title>
 <script src="./support.js"></script>
 </head>
 <body>
@@ -30,59 +30,47 @@ body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:in
 @keyframes olShadow{0%,72%,100%{transform:scale(1);opacity:1}42%{transform:scale(.55);opacity:.45}}
 @keyframes olDrive{0%,100%{transform:translateY(0) rotate(0)}10%{transform:translateY(-.8%)}20%{transform:translateY(0)}30%{transform:translateY(-.6%)}40%{transform:translateY(0) rotate(0)}55%{transform:rotate(-2deg)}70%{transform:rotate(1.5deg)}85%{transform:rotate(0)}}
 @keyframes vcSay{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+
+.vc-card{position:relative;border-radius:22px;padding:16px 12px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;border:2px solid transparent;transition:all .25s}
+.vc-glow{box-shadow:0 0 0 4px rgba(196,181,253,.35),0 0 34px rgba(196,181,253,.55)}
+.cal-ring{transition:stroke-dasharray .4s linear}
+.cal-row{display:flex;align-items:center;gap:12px;padding:10px 14px;font-size:15px;font-weight:600;color:#B3A6B4;transition:color .2s}
+.cal-row+.cal-row{border-top:1px solid rgba(255,255,255,.07)}
+.cal-dot{width:24px;height:24px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.11);font-size:13px;font-weight:800;color:#241A26}
+@keyframes calPulse{0%,100%{box-shadow:0 0 0 0 rgba(196,181,253,.5)}50%{box-shadow:0 0 0 6px rgba(196,181,253,0)}}
+.cal-now .cal-dot{background:#C4B5FD;animation:calPulse 1.4s ease-in-out infinite}
+.ol-clip{position:absolute;inset:0}
+.ol-enter{position:absolute;inset:0;transform-origin:50% 96%;animation:olIn .8s cubic-bezier(.22,1,.36,1) both}
+@keyframes olIn{0%{opacity:0;transform:translateY(14%) scale(.5,.42)}38%{opacity:1;transform:translateY(-5%) scale(1.07,.95)}58%{transform:translateY(0) scale(.95,1.05)}78%{transform:scale(1.02,.98)}100%{opacity:1;transform:none}}
 </style>
 </helmet>
-<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
-    <a href="Night.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:45%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+    <a href="Pair.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:83%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
   </div>
-  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center">How should Ollie talk to you?</h1>
-  <div style="display:flex;gap:10px;align-items:flex-start;margin-top:16px">
-    <div style="position:relative;width:52px;height:52px;flex-shrink:0;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><img src="{{cur.src}}" alt="" style="position:absolute;width:80px;left:-14px;top:-4px"></div>
-    <p class="vc-say" style="margin:0;background:#F4EFE6;color:#241A26;border-radius:20px 20px 20px 6px;padding:14px 16px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:700;font-stretch:85%;font-size:20px;line-height:1.15">{{cur.line}}</p>
+  <div style="display:flex;justify-content:center;margin-top:4px;position:relative">
+    <div class="olw" style="width:128px;font-size:12.8px">
+      <div class="ol-shadow"></div>
+      <div class="ol-clip"><div class="ol-enter"><div class="ol-loop a-wave">
+        <img src="/_blob/be4e6418a0a3f416c7aca695e46d9667" alt="Ollie the owl waving hello">
+      </div></div></div>
+    </div>
+    <p id="vSay" style="position:absolute;left:auto;right:-4px;top:-8px;transform:none;width:max-content;max-width:150px;margin:0;background:#F4EFE6;color:#241A26;border-radius:16px 16px 16px 4px;padding:8px 12px;font-weight:700;font-size:13px;line-height:1.25;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;transition:opacity .25s"></p>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px">
-    <sc-for list="{{cards}}" as="c" hint-placeholder-count="4">
-      <button aria-pressed="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}">
-        <sc-if value="{{c.selected}}" hint-placeholder-val="{{false}}"><span style="position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#C4B5FD;display:grid;place-items:center"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#241A26" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"></path></svg></span></sc-if>
-        <div class="olw" style="width:96px;font-size:9.6px">
-          <div class="{{c.shadowCls}}"></div>
-          <div class="ol-loop {{c.anim}}">
-            <img src="{{c.src}}" alt="">
-            <sc-for list="{{c.eyes}}" as="e" hint-placeholder-count="2"><div class="ol-eye" style="{{e.style}}"><div class="ol-lid"></div></div></sc-for>
-          </div>
-        </div>
-        <b style="font-size:15px">{{c.name}}</b><small style="color:#B3A6B4;font-size:12.5px;text-align:center">{{c.desc}}</small>
-      </button>
-    </sc-for>
-  </div>
+  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:34px;line-height:1.02;text-align:center;text-wrap:balance">How should Ollie talk to you?</h1>
+  <p style="margin:10px auto 0;max-width:32ch;text-align:center;color:#B3A6B4;font-size:15px;line-height:1.4">Ollie speaks from your Bamnun, in the language you pick. It can differ from the app.</p>
+  <div id="vCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px"></div>
+  <button type="button" id="vBoth" style="align-self:center;margin-top:16px;display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-weight:700;font-size:14.5px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"></path></svg>Hear both</button>
+  <p id="vNote" style="margin:12px auto 0;text-align:center;color:#B3A6B4;font-size:13.5px;min-height:20px"></p>
   <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
-    <a href="Ladder.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    <a id="vNext" href="Calibrate.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5);border:0">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
   </div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
 class Component extends DCLogic {
-  constructor(props) { super(props); this.state = { pick: 2 }; }
-  renderVals() {
-    const eye = (l, t) => ({ style: 'left:' + l + '%;top:' + t + '%' });
-    const C = [
-      { name: 'Calm guide', desc: 'Soft voice, gentle nudges', line: 'Easy now. There’s a rest stop in 12 km.', src: '/_blob/bb73e1b39dabf3b35d036c39c5cdd1c1', anim: 'a-breathe', eyes: [eye(27.08, 32.58), eye(54.2, 32.6)] },
-      { name: 'Straight talker', desc: 'Short and direct', line: 'Your eyes are closing. Pull over.', src: '/_blob/e5ad4d3fd744c75caea7c6c78782a441', anim: 'a-drive', eyes: [eye(27.65, 38.91), eye(53.35, 38.71)] },
-      { name: 'Cheerleader', desc: 'Upbeat, keeps you going', line: 'You’ve got this! Coffee break in 10?', src: '/_blob/f6f6ffbf7935cbf40e40727534b41f50', anim: 'a-jump', eyes: [], jump: true },
-      { name: 'Road buddy', desc: 'Chatty, like a co-driver', line: 'Long night, huh? Let’s stretch at the next stop.', src: '/_blob/be4e6418a0a3f416c7aca695e46d9667', anim: 'a-wave', eyes: [] }
-    ];
-    const p = this.state.pick;
-    const cards = C.map((c, i) => ({
-      name: c.name, desc: c.desc, src: c.src, anim: c.anim, eyes: c.eyes,
-      shadowCls: c.jump ? 'ol-shadow s-jump' : 'ol-shadow',
-      selected: i === p, on: String(i === p),
-      style: 'position:relative;border-radius:22px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border:2px solid ' + (i === p ? '#C4B5FD' : 'transparent') + ';background:' + (i === p ? 'rgba(196,181,253,.16)' : 'rgba(255,255,255,.07)'),
-      pick: () => this.setState({ pick: i })
-    }));
-    return { cards, cur: C[p] };
-  }
+  renderVals() { return {}; }
 }
 </script>
 </body>

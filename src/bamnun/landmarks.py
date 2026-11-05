@@ -164,6 +164,11 @@ class FaceLandmarker:
         )
         self._landmarker = mp_vision.FaceLandmarker.create_from_options(options)
         self._want_blendshapes = bool(cfg.get("output_blendshapes", False))
+        # Optional: give MediaPipe a smaller picture (it works on a 256 px face
+        # crop anyway). Landmarks come back normalised, so they still map onto
+        # the full-size frame exactly. 0 = full size. See the Pi plan in
+        # docs/SPEC.md, section 15.
+        self._input_width = int(cfg.get("input_width", 0) or 0)
         self._last_ms = -1
 
     def process(self, frame) -> Optional[LandmarkResult]:
@@ -172,7 +177,13 @@ class FaceLandmarker:
 
         rgb = frame.as_rgb()
         h, w = rgb.shape[:2]
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+        if self._input_width and w > self._input_width:
+            import cv2
+            small = cv2.resize(rgb, (self._input_width, int(round(h * self._input_width / w))),
+                               interpolation=cv2.INTER_AREA)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=small)
+        else:
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
 
         # VIDEO mode demands strictly increasing integer milliseconds.
         ts_ms = int(frame.timestamp * 1000.0)

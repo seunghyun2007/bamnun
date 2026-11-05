@@ -30,6 +30,9 @@ from collections import deque
 from dataclasses import dataclass, field, asdict
 from typing import Any, Deque, Optional, Sequence
 
+from .eyes import (BlinkDetector, Calibration, Calibrator, Conditions, EyeInputs,  # noqa: F401
+                   NodDetector, Personal, RollingPerclos)
+
 import numpy as np
 
 from .landmarks import (
@@ -324,423 +327,8 @@ class TimeWindow:
 
 
 # --------------------------------------------------------------------------- #
-# Calibration
+# Head tracker (looking away)
 # --------------------------------------------------------------------------- #
-
-
-@dataclass
-class Calibration:
-    """Per-driver baseline. Persisted so a repeat demo does not re-calibrate."""
-
-    ear_open: float = 0.30
-    ear_std: float = 0.02
-    mar_rest: float = 0.05
-    yaw_zero: float = 0.0
-    pitch_zero: float = 0.0
-    roll_zero: float = 0.0
-    gaze_h_zero: float = 0.0
-    gaze_v_zero: float = 0.0
-    interocular_px: float = 100.0
-    n_samples: int = 0
-    complete: bool = False
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Calibration":
-        known = {k: d[k] for k in d if k in cls.__dataclass_fields__}
-        return cls(**known)
-
-
-class Calibrator:
-    """Collects an open-eye baseline while the driver looks ahead.
-
-    Robustness details that matter in practice: samples taken while the head
-    is off-axis are rejected, and the open-eye EAR is taken as a high
-    percentile rather than a mean, because the driver will blink during
-    calibration and those frames must not drag the baseline down.
-    """
-
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        self.duration_s = float(cfg.get("duration_s", 12.0))
-        # Two separate requirements, because one absolute frame count cannot
-        # express both.
-        #
-        # min_open_samples used to be 120 over a 12 s window, which silently
-        # assumed at least 10 usable frames per second. Below that frame rate
-        # calibration could NEVER complete however good the tracking was: the
-        # window would expire short of the count, restart, and loop forever
-        # with no symptom except a progress bar that kept returning to zero.
-        # MediaPipe on a laptop CPU with a preview window can sit under 10 fps,
-        # so this was reachable on ordinary hardware.
-        #
-        # The quality requirement is now a FRACTION of the frames actually
-        # seen, which is frame-rate independent and is what "is tracking good
-        # enough" actually means. The absolute floor is only there to stop a
-        # 2 fps stream from passing on three lucky frames.
-        self.min_fraction = float(cfg.get("min_tracking_fraction", 0.40))
-        self.min_samples = int(cfg.get("min_open_samples", 30))
-        self.max_yaw = float(cfg.get("max_yaw_deg", 20.0))
-        self.max_pitch = float(cfg.get("max_pitch_deg", 20.0))
-        self.attempts = 0
-        self.last_failure: Optional[str] = None
-        self._seen = 0
-        self._rejected_pose = 0
-        self._raw_yaw: list[float] = []
-        self._raw_pitch: list[float] = []
-        self._t0: Optional[float] = None
-        self._ear: list[float] = []
-        self._mar: list[float] = []
-        self._yaw: list[float] = []
-        self._pitch: list[float] = []
-        self._roll: list[float] = []
-        self._gh: list[float] = []
-        self._gv: list[float] = []
-        self._iod: list[float] = []
-
-    @property
-    def active(self) -> bool:
-        return self._t0 is not None
-
-    def start(self, t: float) -> None:
-        self._t0 = t
-        self._seen = 0
-        self._rejected_pose = 0
-        for lst in (self._ear, self._mar, self._yaw, self._pitch, self._roll,
-                    self._gh, self._gv, self._iod, self._raw_yaw,
-                    self._raw_pitch):
-            lst.clear()
-
-    def progress(self, t: float) -> float:
-        if self._t0 is None:
-            return 0.0
-        return min(1.0, (t - self._t0) / self.duration_s)
-
-    @property
-    def median_raw_yaw(self) -> float:
-        return float(np.median(self._raw_yaw)) if self._raw_yaw else 0.0
-
-    @property
-    def median_raw_pitch(self) -> float:
-        return float(np.median(self._raw_pitch)) if self._raw_pitch else 0.0
-
-    def stats(self, t: Optional[float] = None) -> dict[str, Any]:
-        """Live diagnostics, shown on the calibration banner.
-
-        Calibration is the one phase where the driver is looking at the screen
-        and waiting, so it is the one phase that must explain itself while it
-        is happening rather than after it fails.
-        """
-        usable = len(self._ear)
-        elapsed = 0.0
-        if self._t0 is not None and t is not None:
-            elapsed = max(t - self._t0, 0.0)
-        return {
-            "seen": self._seen,
-            "usable": usable,
-            "rejected_pose": self._rejected_pose,
-            "fraction": (usable / self._seen) if self._seen else 0.0,
-            "fps": (self._seen / elapsed) if elapsed > 0.3 else 0.0,
-            "need_fraction": self.min_fraction,
-            "need_samples": self.min_samples,
-            "attempts": self.attempts,
-            "raw_yaw": self.median_raw_yaw,
-            "raw_pitch": self.median_raw_pitch,
-        }
-
-    def feed(self, t: float, ear: float, mar: float, pose: HeadPose,
-             gaze: tuple[float, float, bool], iod: float) -> None:
-        if self._t0 is None:
-            return
-        self._seen += 1
-        if pose.valid:
-            # Kept regardless of acceptance, so a pose-gate rejection can
-            # report what the angles actually were.
-            self._raw_yaw.append(pose.yaw)
-            self._raw_pitch.append(pose.pitch)
-        # Head must be roughly forward for the pose zero to mean anything. The
-        # raw PnP angles are used here because there is no zero yet.
-        #
-        # These limits come from the config. They used to be read into
-        # self.max_yaw/max_pitch and then ignored in favour of a hardcoded 45
-        # degrees, so the documented 12-degree gate did nothing.
-        if pose.valid and (abs(pose.yaw) > self.max_yaw
-                           or abs(pose.pitch) > self.max_pitch):
-            self._rejected_pose += 1
-            return
-        self._ear.append(ear)
-        self._mar.append(mar)
-        if pose.valid:
-            self._yaw.append(pose.yaw)
-            self._pitch.append(pose.pitch)
-            self._roll.append(pose.roll)
-        if gaze[2]:
-            self._gh.append(gaze[0])
-            self._gv.append(gaze[1])
-        if iod > 0:
-            self._iod.append(iod)
-
-    def finish(self, t: float) -> Optional[Calibration]:
-        if self._t0 is None:
-            return None
-        # Tolerance, not a bare `< 1.0`. A caller that accumulates dt rather
-        # than reading a clock lands on 11.999999999999863 for a nominal 12 s,
-        # which silently skipped the evaluation for one more frame.
-        if (t - self._t0) < self.duration_s - 1e-6:
-            return None
-        usable = len(self._ear)
-        fraction = (usable / self._seen) if self._seen else 0.0
-        elapsed = max(t - (self._t0 or t), 1e-6)
-        fps = self._seen / elapsed
-
-        if usable < self.min_samples or fraction < self.min_fraction:
-            # Not enough usable data. Restart rather than commit a bad
-            # baseline, but say WHY. A silent restart looks identical to a
-            # hung progress bar, and the causes have completely different
-            # fixes: no face at all means lighting, focus or framing; frames
-            # rejected for pose means the driver is not facing the camera or
-            # the generic-head bias in solvePnP exceeds the gate; a low frame
-            # rate means the machine cannot keep up.
-            self.attempts += 1
-            if self._seen == 0:
-                self.last_failure = ("no face detected at all; check lighting, "
-                                     "focus and framing")
-            elif self._rejected_pose > self._seen * 0.5:
-                self.last_failure = (
-                    f"{self._rejected_pose}/{self._seen} frames rejected for head "
-                    f"pose outside +-{self.max_yaw:.0f} deg yaw / "
-                    f"{self.max_pitch:.0f} deg pitch "
-                    f"(median yaw {self.median_raw_yaw:+.0f}, "
-                    f"pitch {self.median_raw_pitch:+.0f}); face the camera "
-                    "squarely, or widen calibration.max_yaw_deg / max_pitch_deg"
-                )
-            elif usable < self.min_samples:
-                self.last_failure = (
-                    f"only {usable} usable frames in {elapsed:.0f}s "
-                    f"({fps:.1f} fps), absolute minimum is {self.min_samples}; "
-                    "the machine is too slow or tracking keeps dropping")
-            else:
-                self.last_failure = (
-                    f"tracking {fraction*100:.0f}% of frames "
-                    f"({usable}/{self._seen} at {fps:.1f} fps), need "
-                    f"{self.min_fraction*100:.0f}%")
-            self.start(t)
-            return None
-
-        ear = np.asarray(self._ear, dtype=np.float64)
-        # 75th percentile: above the blinks, below any landmark outliers.
-        ear_open = float(np.percentile(ear, 75))
-        open_mask = ear >= ear_open * 0.9
-        ear_std = float(ear[open_mask].std()) if open_mask.sum() > 5 else float(ear.std())
-
-        cal = Calibration(
-            ear_open=ear_open,
-            ear_std=max(ear_std, 1e-3),
-            mar_rest=float(np.median(self._mar)) if self._mar else 0.05,
-            yaw_zero=float(np.median(self._yaw)) if self._yaw else 0.0,
-            pitch_zero=float(np.median(self._pitch)) if self._pitch else 0.0,
-            roll_zero=float(np.median(self._roll)) if self._roll else 0.0,
-            gaze_h_zero=float(np.median(self._gh)) if self._gh else 0.0,
-            gaze_v_zero=float(np.median(self._gv)) if self._gv else 0.0,
-            interocular_px=float(np.median(self._iod)) if self._iod else 100.0,
-            n_samples=len(self._ear),
-            complete=True,
-        )
-        self._t0 = None
-        return cal
-
-
-# --------------------------------------------------------------------------- #
-# Blink / closure tracking
-# --------------------------------------------------------------------------- #
-
-
-@dataclass(slots=True)
-class BlinkEvent:
-    start_t: float
-    end_t: float
-    duration_s: float
-    min_ear: float
-    kind: str  # "blink" | "long_closure" | "microsleep"
-
-
-class BlinkTracker:
-    """Hysteretic closure detector with live microsleep reporting."""
-
-    def __init__(self, features_cfg: dict[str, Any]) -> None:
-        bl = features_cfg.get("blink", {})
-        self.closed_fraction = float(features_cfg.get("ear_closed_fraction", 0.65))
-        self.reopen_fraction = float(features_cfg.get("ear_reopen_fraction", 0.75))
-        self.min_duration = float(bl.get("min_duration_s", 0.05))
-        self.max_normal = float(bl.get("max_normal_duration_s", 0.40))
-        self.microsleep = float(bl.get("microsleep_duration_s", 0.50))
-        self.rate_window = float(bl.get("rate_window_s", 60.0))
-
-        self._closed = False
-        self._closure_start: Optional[float] = None
-        self._closure_min_ear = 1.0
-        self._events: Deque[BlinkEvent] = deque()
-        self._microsleep_latched = False
-        # The event appended when a microsleep latched mid-closure, held so the
-        # reopen can finalise it rather than record the same closure twice.
-        self._latched_event: Optional[BlinkEvent] = None
-        self.ongoing_closure_s = 0.0
-        # Duration of the most recent ordinary blink, for the app's Camera
-        # screen. Long closures and microsleeps are reported elsewhere.
-        self.last_blink_s: Optional[float] = None
-
-    def reset(self) -> None:
-        self._closed = False
-        self._closure_start = None
-        self._microsleep_latched = False
-        self._latched_event = None
-        self.ongoing_closure_s = 0.0
-        self.last_blink_s = None
-        self._events.clear()
-
-    def update(self, t: float, ear: float, ear_open: float) -> Optional[BlinkEvent]:
-        """Feed one smoothed EAR sample. Returns a completed event, if any."""
-        close_th = ear_open * self.closed_fraction
-        open_th = ear_open * self.reopen_fraction
-        event: Optional[BlinkEvent] = None
-
-        if not self._closed:
-            if 0.0 < ear < close_th:
-                self._closed = True
-                self._closure_start = t
-                self._closure_min_ear = ear
-                self._microsleep_latched = False
-                self._latched_event = None
-        else:
-            self._closure_min_ear = min(self._closure_min_ear, ear)
-            self.ongoing_closure_s = t - (self._closure_start or t)
-            if ear > open_th:
-                start = self._closure_start if self._closure_start is not None else t
-                dur = t - start
-                self._closed = False
-                self._closure_start = None
-                self.ongoing_closure_s = 0.0
-                if self._latched_event is not None:
-                    # This closure is ALREADY in the window: it was recorded the
-                    # moment it latched, mid-shut, so the alert could fire during
-                    # the event. Finalise that record instead of appending a
-                    # second one. Appending counted every microsleep twice, and
-                    # because the score saturates at 2 events per 60 s, a single
-                    # real closure pinned the microsleep component at its maximum
-                    # for a full minute: the driver was told they were DROWSY
-                    # with their eyes measurably wider than their own baseline.
-                    ev = self._latched_event
-                    ev.end_t = t
-                    ev.duration_s = dur
-                    ev.min_ear = self._closure_min_ear
-                    ev.kind = self._classify(dur)
-                    event = ev
-                    self._latched_event = None
-                elif dur >= self.min_duration:
-                    event = BlinkEvent(
-                        start_t=start, end_t=t, duration_s=dur,
-                        min_ear=self._closure_min_ear,
-                        kind=self._classify(dur),
-                    )
-                    self._events.append(event)
-                    if event.kind == "blink":
-                        self.last_blink_s = dur
-
-        # Latch a microsleep DURING the closure so the alert can fire now.
-        if self._closed and not self._microsleep_latched and \
-                self.ongoing_closure_s >= self.microsleep:
-            self._microsleep_latched = True
-            start = self._closure_start if self._closure_start is not None else t
-            event = BlinkEvent(
-                start_t=start, end_t=t, duration_s=self.ongoing_closure_s,
-                min_ear=self._closure_min_ear, kind="microsleep",
-            )
-            self._events.append(event)
-            self._latched_event = event
-
-        cutoff = t - self.rate_window
-        while self._events and self._events[0].end_t < cutoff:
-            self._events.popleft()
-        return event
-
-    def _classify(self, dur: float) -> str:
-        if dur >= self.microsleep:
-            return "microsleep"
-        if dur > self.max_normal:
-            return "long_closure"
-        return "blink"
-
-    # -- window statistics -------------------------------------------------- #
-
-    @property
-    def is_closed(self) -> bool:
-        return self._closed
-
-    @property
-    def microsleep_in_progress(self) -> bool:
-        """Eye shut right now, past the configured microsleep threshold."""
-        return self._closed and self.ongoing_closure_s >= self.microsleep
-
-    def blink_rate_per_min(self) -> float:
-        n = sum(1 for e in self._events if e.kind == "blink")
-        return n * 60.0 / self.rate_window
-
-    def mean_blink_duration_s(self) -> float:
-        d = [e.duration_s for e in self._events if e.kind == "blink"]
-        return float(np.mean(d)) if d else 0.0
-
-    def microsleep_count(self) -> int:
-        return sum(1 for e in self._events if e.kind == "microsleep")
-
-    def long_closure_count(self) -> int:
-        return sum(1 for e in self._events if e.kind in ("long_closure", "microsleep"))
-
-
-# --------------------------------------------------------------------------- #
-# Yawn and head trackers
-# --------------------------------------------------------------------------- #
-
-
-class YawnTracker:
-    """A yawn is a sustained wide mouth, not a momentarily wide one.
-
-    Speech and laughter both cross any MAR threshold you pick; requiring the
-    threshold to hold for a full second removes almost all of it.
-    """
-
-    def __init__(self, cfg: dict[str, Any]) -> None:
-        y = cfg.get("yawn", {})
-        self.threshold = float(y.get("mar_threshold", 0.60))
-        self.min_duration = float(y.get("min_duration_s", 1.0))
-        self.window_s = float(y.get("window_s", 300.0))
-        self._open_since: Optional[float] = None
-        self._events: Deque[float] = deque()
-
-    def update(self, t: float, mar: float) -> bool:
-        """Returns True on the frame a yawn is confirmed."""
-        confirmed = False
-        if mar >= self.threshold:
-            if self._open_since is None:
-                self._open_since = t
-            elif (t - self._open_since) >= self.min_duration:
-                # Confirm once per continuous opening.
-                if not self._events or self._events[-1] < self._open_since:
-                    self._events.append(t)
-                    confirmed = True
-        else:
-            self._open_since = None
-
-        cutoff = t - self.window_s
-        while self._events and self._events[0] < cutoff:
-            self._events.popleft()
-        return confirmed
-
-    def count(self) -> int:
-        return len(self._events)
-
-    def rate_per_hour(self) -> float:
-        return len(self._events) * 3600.0 / self.window_s
 
 
 @dataclass(slots=True)
@@ -878,22 +466,38 @@ class HeadTracker:
 
 @dataclass
 class FeatureFrame:
-    """Everything the state estimator needs from one frame."""
+    """Everything the state estimator needs from one frame.
+
+    Eye measures are on the driver's personal openness scale (SPEC.md, 15):
+    1.0 = their normal open level, 0.0 = their closed level.
+    """
 
     t: float = 0.0
     face_found: bool = False
     ear_raw: float = 0.0
-    ear: float = 0.0                 # smoothed
-    ear_norm: float = 1.0            # ear / calibrated open EAR
-    eye_closed: bool = False
+    ear: float = 0.0                 # pose-corrected EAR used for openness
+    ear_norm: float = 1.0            # openness now (personal scale, fused)
+    eye_closed: bool = False         # inside a blink or closure right now
     ongoing_closure_s: float = 0.0
-    # Decided here, by the tracker that owns the configured threshold, rather
-    # than re-derived downstream from ongoing_closure_s against a second copy
-    # of the same number.
     microsleep_now: bool = False
-    perclos: float = 0.0
+    shut_now: bool = False           # shut longer than a normal blink ("Eyes closed")
+    openness: float = 1.0            # typical openness over the last 45 s (heavy lids)
+    slow_blink_fraction: float = 0.0 # share of recent blinks that were long (0.3-0.5 s)
+    long_blinks_per_min: float = 0.0
+    mean_reopen_s: float = 0.0       # mean reopening amplitude-velocity ratio
+    reopen_ratio: float = 1.0        # ... relative to the driver's normal
+    looking_down: bool = False
+    reliable: bool = True            # eye measures can be trusted in this frame
+    unreliable: str = ""             # why not: smile, talk, yawn, lighting, edge, ...
+    expression: str = ""
+    yawn_now: bool = False
+    o_ear: Optional[float] = None    # openness from EAR alone
+    o_bs: Optional[float] = None     # openness from the eyeBlink blendshape alone
+    perclos: float = 0.0             # P80 on the personal scale, reliable time only
     blink_rate_per_min: float = 0.0
-    mean_blink_duration_s: float = 0.0
+    blink_rate_baseline: float = 17.0
+    mean_blink_duration_s: float = 0.0   # median half-amplitude duration of recent blinks
+    blink_baseline_s: float = 0.12       # this driver's normal blink
     microsleep_count: int = 0
     long_closure_count: int = 0
     mar: float = 0.0
@@ -905,14 +509,14 @@ class FeatureFrame:
     pose_valid: bool = False
     pitch_std: float = 0.0
     nodding: bool = False
+    nod_count: int = 0               # nods in the last nod_window_s
+    head_drop: bool = False          # the face went down with the head and is lost
     gaze_h: float = 0.0
     gaze_v: float = 0.0
     gaze_valid: bool = False
     off_road: bool = False          # outside the forward cone right now
     off_road_alarm: bool = False    # ...and for longer than off_road_alert_s
     off_road_glance_s: float = 0.0
-    # Name of the permitted region this glance falls in ("" = none), and the
-    # dwell it must exceed. Logged so a suppressed alert can be explained.
     glance_region: str = ""
     glance_dwell_s: float = 0.0
     long_glance_count: int = 0
@@ -922,114 +526,314 @@ class FeatureFrame:
     def to_row(self) -> dict[str, Any]:
         d = asdict(self)
         d["blink_event"] = d["blink_event"] or ""
+        for k in ("o_ear", "o_bs"):
+            if d[k] is None:
+                d[k] = ""
         return d
 
 
 class FeatureExtractor:
     """Landmarks in, FeatureFrame out. Owns all the per-driver state."""
 
+    # The evaluation harness passes simulator frames as ``extra``.
+    accepts_extra = True
+
     def __init__(self, features_cfg: dict[str, Any], calib_cfg: dict[str, Any]) -> None:
         self.cfg = features_cfg
-        self.ear_ewma = Ewma(float(features_cfg.get("ear_smoothing_alpha", 0.4)))
-        self.blink = BlinkTracker(features_cfg)
-        self.yawn = YawnTracker(features_cfg)
+        eyes = dict(features_cfg.get("eyes") or {})
+        self.personal = Personal(eyes)
+        self.conditions = Conditions(eyes)
+        self.blinks = BlinkDetector(eyes)
+        self.nods = NodDetector(features_cfg.get("nod") or {})
         self.head = HeadTracker(features_cfg)
-        self.perclos_window = TimeWindow(float(features_cfg.get("perclos_window_s", 60.0)))
-        self.perclos_fraction = float(features_cfg.get("perclos_baseline_fraction", 0.80))
+        self.perclos_meter = RollingPerclos(float(features_cfg.get("perclos_window_s", 60.0)),
+                                            float(eyes.get("perclos_closed_level", 0.20)))
+        self.open_window_s = float(features_cfg.get("openness_window_s", 45.0))
+        self.look_down_pitch = float(features_cfg.get("look_down_pitch_deg", 10.0))
+        self.shut_level = float(eyes.get("shut_level", 0.25))
+        self.shut_each = float(eyes.get("shut_each_level", 0.40))
+        self.shut_label_s = float(eyes.get("eyes_closed_label_s", 0.30))
+        self.micro_s = float(eyes.get("microsleep_s", 0.50))
+        self.micro_down_s = float(eyes.get("microsleep_looking_down_s", 1.5))
+        self.micro_other_s = float(eyes.get("microsleep_unreliable_s", 1.0))
+        self.head_drop_micro_s = float((features_cfg.get("nod") or {}).get("head_drop_microsleep_s", 0.5))
+        self.min_blinks = int(eyes.get("min_blinks_for_stats", 5))
         self.calibrator = Calibrator(calib_cfg)
         self.calibration = Calibration()
+        self.candidate: Optional[Calibration] = None
+        self.hold = False
+        self._closing = False
+        self._reset_live()
 
-    # -- calibration passthrough ------------------------------------------- #
+    def _reset_live(self) -> None:
+        self._open: Deque[tuple[float, float]] = deque()
+        self._open_cache = (-1e9, 1.0)
+        self._shut_since: Optional[float] = None
+        self._micro_latched = False
+        self._micro: Deque[float] = deque()
+        self._reliable_s: Deque[tuple[float, float]] = deque()
+        self._last_t: Optional[float] = None
+        self.blinks.events.clear()
+        self.blinks.closed = False
 
-    def start_calibration(self, t: float) -> None:
+    # -- calibration ---------------------------------------------------------- #
+
+    def start_calibration(self, t: float, hold: bool = False) -> None:
+        """Start the look-ahead step.
+
+        ``hold`` is the guided recalibration from the phone: with a
+        calibration already in place, detection carries on with the old one
+        while the new one is measured, and the result waits in ``candidate``
+        until the eyes-closed step passes and the caller commits it.
+        """
+        self.hold = bool(hold and self.calibration.complete)
+        self.candidate = None
+        self._closing = False
+        self.calibrator.failure_code = None
+        self.calibrator.last_failure = None
         self.calibrator.start(t)
-        self.ear_ewma.reset()
-        self.blink.reset()
-        self.perclos_window.clear()
+        if not self.hold:
+            self._reset_live()
+
+    def start_closed(self, t: float) -> None:
+        """Start the eyes-closed step (after the look-ahead step finished)."""
+        self._closing = True
+        self.calibrator.start_closed(t)
+
+    def finish_closed(self) -> tuple[bool, str, str]:
+        """Learn the closed level from the eyes-closed step. (ok, code, reason)"""
+        self._closing = False
+        target = self.candidate if self.hold else self.calibration
+        if target is None or not target.complete:
+            return False, "no_calibration", "Run the look-ahead step first."
+        res = self.calibrator.finish_closed(target)
+        if not self.hold:
+            self._reset_live()
+        return res
+
+    def calibrate_closed(self, t: float, frame) -> None:
+        """Evaluation helper: one eyes-closed frame (starts the step if needed)."""
+        if not self._closing:
+            self.start_closed(t)
+        self.measure(t, 0.0, getattr(frame, "mar", 0.05),
+                     HeadPose(frame.yaw, frame.pitch, frame.roll, True), (0.0, 0.0, True),
+                     getattr(frame, "iod", 120.0), extra=frame)
+
+    def end_closed(self) -> tuple[bool, str, str]:
+        return self.finish_closed() if self._closing else (True, "", "")
+
+    def cancel_calibration(self) -> None:
+        """Stop measuring; whatever calibration was in place stays."""
+        self.calibrator._t0 = None
+        self.calibrator._closed = None
+        self._closing = False
+        self.candidate = None
+        self.hold = False
+
+    def commit_candidate(self) -> bool:
+        if self.candidate is None:
+            return False
+        self.calibration = self.candidate
+        self.candidate = None
+        self.hold = False
+        self._reset_live()
+        return True
 
     @property
     def calibrating(self) -> bool:
-        return self.calibrator.active
+        """Calibrating with no usable baseline: detection is paused."""
+        return self.calibrator.active and not self.hold
+
+    @property
+    def measuring(self) -> bool:
+        return self.calibrator.active or self._closing
 
     def set_calibration(self, cal: Calibration) -> None:
         self.calibration = cal
+        self._reset_live()
 
-    # -- main entry point --------------------------------------------------- #
+    # -- frames ----------------------------------------------------------------- #
 
-    def update(self, t: float, landmarks) -> FeatureFrame:
+    def update(self, t: float, landmarks, brightness: Optional[float] = None) -> FeatureFrame:
         if landmarks is None or not landmarks.ok:
-            return FeatureFrame(t=t, face_found=False)
-
+            return self.no_face(t)
         pts = landmarks.points
         ear_r, ear_l = both_eye_ear(pts)
-        # Use the more open eye. A single occluded or badly tracked eye is the
-        # most common landmark failure, and max() is far more robust than the
-        # usual mean. Genuine one-eyed closure is not a thing in drowsiness.
-        ear_raw = max(ear_r, ear_l)
         mar = mouth_aspect_ratio(pts)
         pose = solve_head_pose(pts, landmarks.image_size)
         gaze = gaze_offset(pts)
         iod = interocular_px(pts)
+        x = EyeInputs.from_landmarks(landmarks, ear_r=ear_r, ear_l=ear_l, iod=iod, brightness=brightness)
+        return self.measure(t, max(ear_r, ear_l), mar, pose, gaze, iod, extra=x)
 
+    def no_face(self, t: float) -> FeatureFrame:
+        """No face this frame. If it went down with the head, it's a head drop."""
         if self.calibrator.active:
-            self.calibrator.feed(t, ear_raw, mar, pose, gaze, iod)
+            self.calibrator.observe(t, None)
+        if not self.calibration.complete or self.calibrating:
+            return FeatureFrame(t=t, face_found=False)
+        dropped = self.nods.lost(t)
+        micro = False
+        if dropped and self.nods.head_drop_since is not None:
+            micro = t - self.nods.head_drop_since >= self.head_drop_micro_s
+            if micro and not self._micro_latched:
+                self._micro_latched = True
+                self._micro.append(t)
+        else:
+            self._micro_latched = False
+        return FeatureFrame(t=t, face_found=False, head_drop=dropped, microsleep_now=micro,
+                            shut_now=micro, nod_count=self.nods.count(),
+                            microsleep_count=len(self._micro))
+
+    @staticmethod
+    def _inputs(extra, ear_raw: float, iod: float) -> EyeInputs:
+        if isinstance(extra, EyeInputs):
+            return extra
+        if extra is None:
+            return EyeInputs(ear_l=ear_raw, ear_r=ear_raw)
+        f = extra          # a simulator frame
+        hide_l = f.width_l < 0.5 * f.width_r
+        hide_r = f.width_r < 0.5 * f.width_l
+        return EyeInputs(
+            ear_l=f.ear_l, ear_r=f.ear_r, width_l=f.width_l / max(f.width_l, f.width_r),
+            width_r=f.width_r / max(f.width_l, f.width_r), edge=bool(f.edge),
+            edge_l=bool(f.edge and hide_l), edge_r=bool(f.edge and hide_r),
+            blink_l=f.blink_l, blink_r=f.blink_r, squint_l=f.squint_l, squint_r=f.squint_r,
+            jaw=f.jaw, smile=f.smile, cheek=f.cheek, mouth_width=0.0,
+            brightness=f.brightness, iod_frac=f.iod / 1280.0,
+        )
+
+    def measure(self, t: float, ear_raw: float, mar: float, pose: HeadPose,
+                gaze: tuple[float, float, bool] = (0.0, 0.0, False),
+                iod: float = 120.0, extra=None) -> FeatureFrame:
+        """Everything after the landmark geometry, for one frame with a face."""
+        x = self._inputs(extra, ear_raw, iod)
+        if self._closing:
+            self.calibrator.observe(t, x, pose.yaw, pose.pitch)
+            self.calibrator.feed_closed(t, x, pose)
+        if self.calibrator.active:
+            self.calibrator.feed(t, ear_raw, mar, pose, gaze, iod, x)
             cal = self.calibrator.finish(t)
             if cal is not None:
-                self.calibration = cal
-            # During calibration report raw values and no alarms.
-            return FeatureFrame(
-                t=t, face_found=True, ear_raw=ear_raw, ear=ear_raw,
-                mar=mar, yaw=pose.yaw, pitch=pose.pitch, roll=pose.roll,
-                pose_valid=pose.valid, gaze_h=gaze[0], gaze_v=gaze[1],
-                gaze_valid=gaze[2], interocular_px=iod,
-            )
+                if self.hold:
+                    self.candidate = cal
+                else:
+                    self.calibration = cal
+                    self._reset_live()
+        # The eyes-closed step's frames are calibration, not driving: they
+        # must not reach PERCLOS, blinks or the microsleep counter.
+        if (self.calibrator.active and not self.hold) or not self.calibration.complete or self._closing:
+            return FeatureFrame(t=t, face_found=True, ear_raw=ear_raw, ear=ear_raw, mar=mar,
+                                yaw=pose.yaw, pitch=pose.pitch, roll=pose.roll,
+                                pose_valid=pose.valid, gaze_h=gaze[0], gaze_v=gaze[1],
+                                gaze_valid=gaze[2], interocular_px=iod)
+        return self._detect(t, ear_raw, mar, pose, gaze, iod, x)
 
+    def _detect(self, t, ear_raw, mar, pose, gaze, iod, x: EyeInputs) -> FeatureFrame:
         cal = self.calibration
-        ear = self.ear_ewma.update(ear_raw)
-        ear_norm = ear / cal.ear_open if cal.ear_open > 1e-6 else 1.0
-
-        event = self.blink.update(t, ear, cal.ear_open)
-        self.perclos_window.push(t, ear_norm)
-        perclos = self.perclos_window.time_fraction_below(self.perclos_fraction)
-        self.yawn.update(t, mar)
-
+        dt = 0.0 if self._last_t is None else max(0.0, min(0.5, t - self._last_t))
+        self._last_t = t
         yaw = pose.yaw - cal.yaw_zero
         pitch = pose.pitch - cal.pitch_zero
         roll = pose.roll - cal.roll_zero
         off_road = self.head.update(t, yaw, pitch, pose.valid)
 
+        o, o_ear, o_bs = self.personal.openness(x, pose.yaw, pose.pitch, cal)
+        self.conditions.update(t, x, mar, cal)
+        look_down = max(self.look_down_pitch, 3.0 * cal.pitch_wobble)
+        reason = self.conditions.reason(t, x, yaw, pitch, look_down) if pose.valid else "pose"
+        if not reason and off_road:
+            reason = "off_road"
+        if not reason and o_ear is not None and o_bs is not None and abs(o_ear - o_bs) > self.personal.disagree:
+            # Glare or a landmark error: the two estimates disagree. Take the
+            # more open one, so a reflection can't fake a closure.
+            reason = "disagree"
+            o = max(o_ear, o_bs)
+        reliable = not reason and o is not None
+        looking_down = reason == "looking_down"
+
+        # Nods and head drops.
+        self.nods.wobble = cal.pitch_wobble
+        nod = self.nods.update(t, pitch, o) if pose.valid else None
+
+        # Blinks (all frames tracked; only reliable ones count). Measured
+        # from where the lids currently rest: with heavy lids at 55 % a blink
+        # still closes from 55 % to 0, and must still be seen and timed.
+        rest = max(self._open_cache[1], 0.35)
+        ev = self.blinks.update(t, None if o is None else o / rest, reliable)
+
+        # Shut eyes and the microsleep bypass.
+        shut = o is not None and o <= self.shut_level
+        if o_ear is not None and o_bs is not None:
+            shut = shut and o_ear <= self.shut_each and o_bs <= self.shut_each
+        if shut:
+            if self._shut_since is None:
+                self._shut_since = t
+        else:
+            self._shut_since = None
+            self._micro_latched = False
+        shut_s = t - self._shut_since if self._shut_since is not None else 0.0
+        need = (self.micro_s if not reason or reason in ("off_road", "disagree")
+                else self.micro_down_s if reason == "looking_down" else self.micro_other_s)
+        micro = shut_s >= need
+        if micro and not self._micro_latched:
+            self._micro_latched = True
+            self._micro.append(t)
+        while self._micro and self._micro[0] < t - 60.0:
+            self._micro.popleft()
+
+        # PERCLOS and heavy lids over reliable time.
+        self.perclos_meter.push(t, o, reliable)
+        # Every reliable frame: blinks are ~3 % of frames and the median
+        # ignores them, while a held squint (which keeps the blink detector
+        # "closed") must count.
+        if reliable:
+            self._open.append((t, o))
+        while self._open and self._open[0][0] < t - self.open_window_s:
+            self._open.popleft()
+        if t - self._open_cache[0] >= 0.5:
+            vals = [v for _, v in self._open]
+            self._open_cache = (t, float(np.median(vals)) if len(vals) >= 30 else 1.0)
+        typical = self._open_cache[1]
+        if reliable:
+            self._reliable_s.append((t, dt))
+        while self._reliable_s and self._reliable_s[0][0] < t - 60.0:
+            self._reliable_s.popleft()
+
+        blinks = self.blinks.judged()
+        enough = len(blinks) >= self.min_blinks
+        rel_min = max(sum(d for _, d in self._reliable_s) / 60.0, 1e-6)
+        avrs = [b.avr for b in blinks if b.avr > 0]
+        longs = sum(1 for b in blinks if b.kind == "long")
+        yawns = len(self.conditions.yawns)
         return FeatureFrame(
-            t=t,
-            face_found=True,
-            ear_raw=ear_raw,
-            ear=ear,
-            ear_norm=ear_norm,
-            eye_closed=self.blink.is_closed,
-            ongoing_closure_s=self.blink.ongoing_closure_s,
-            microsleep_now=self.blink.microsleep_in_progress,
-            perclos=perclos,
-            blink_rate_per_min=self.blink.blink_rate_per_min(),
-            mean_blink_duration_s=self.blink.mean_blink_duration_s(),
-            microsleep_count=self.blink.microsleep_count(),
-            long_closure_count=self.blink.long_closure_count(),
-            mar=mar,
-            yawn_count=self.yawn.count(),
-            yawn_rate_per_hour=self.yawn.rate_per_hour(),
-            yaw=yaw,
-            pitch=pitch,
-            roll=roll,
-            pose_valid=pose.valid,
-            pitch_std=self.head.pitch_std(),
-            nodding=self.head.nodding(),
-            gaze_h=gaze[0] - cal.gaze_h_zero,
-            gaze_v=gaze[1] - cal.gaze_v_zero,
-            gaze_valid=gaze[2],
-            off_road=off_road,
-            off_road_alarm=self.head.off_road_alarm,
+            t=t, face_found=True, ear_raw=ear_raw,
+            ear=float(self.personal.ear(x) or 0.0), ear_norm=float(o if o is not None else 1.0),
+            eye_closed=self.blinks.closed, ongoing_closure_s=max(self.blinks.ongoing_s(t), shut_s),
+            microsleep_now=micro, shut_now=shut_s >= self.shut_label_s,
+            openness=typical,
+            slow_blink_fraction=(longs / len(blinks)) if enough else 0.0,
+            long_blinks_per_min=(longs / rel_min) if enough and rel_min > 0.25 else 0.0,
+            mean_reopen_s=float(np.median(avrs)) if enough and avrs else 0.0,
+            reopen_ratio=(float(np.median(avrs)) / max(cal.reopen_avr, 1e-3)) if enough and avrs else 1.0,
+            looking_down=looking_down, reliable=reliable, unreliable=reason,
+            expression=self.conditions.expression, yawn_now=self.conditions.yawn_now,
+            o_ear=o_ear, o_bs=o_bs,
+            perclos=self.perclos_meter.value,
+            blink_rate_per_min=(len(blinks) / rel_min) if rel_min > 0.25 else 0.0,
+            blink_rate_baseline=cal.blink_rate,
+            mean_blink_duration_s=float(np.median([b.half_s for b in blinks])) if enough else 0.0,
+            blink_baseline_s=cal.blink_half_s,
+            microsleep_count=len(self._micro),
+            long_closure_count=sum(1 for b in self.blinks.events if b.kind in ("long", "microsleep")),
+            mar=mar, yawn_count=yawns, yawn_rate_per_hour=yawns * 6.0,
+            yaw=yaw, pitch=pitch, roll=roll, pose_valid=pose.valid,
+            pitch_std=self.head.pitch_std(), nodding=nod is not None,
+            nod_count=self.nods.count(),
+            gaze_h=gaze[0] - cal.gaze_h_zero, gaze_v=gaze[1] - cal.gaze_v_zero, gaze_valid=gaze[2],
+            off_road=off_road, off_road_alarm=self.head.off_road_alarm,
             off_road_glance_s=self.head.current_glance_s,
-            glance_region=self.head.glance_region,
-            glance_dwell_s=self.head.glance_dwell_s,
-            long_glance_count=self.head.long_glance_count(),
-            interocular_px=iod,
-            blink_event=event.kind if event else None,
+            glance_region=self.head.glance_region, glance_dwell_s=self.head.glance_dwell_s,
+            long_glance_count=self.head.long_glance_count(), interocular_px=iod,
+            blink_event=(ev.kind if ev is not None else None),
         )

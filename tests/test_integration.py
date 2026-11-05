@@ -292,6 +292,10 @@ def build_stack():
     for spec in cfg["alerts"]["actuators"].values():
         if spec.get("type") == "audio":
             spec["type"] = "null"
+    # These synthetic faces don't blink during calibration; the blink and
+    # quality requirements of the look-ahead step are tested in
+    # tests/test_calibration.py.
+    cfg["calibration"].update(duration_s=12.0, min_blinks=0)
     extractor = FeatureExtractor(cfg["features"], cfg["calibration"])
     estimator = StateEstimator(cfg["state"])
     policy = EscalationPolicy(cfg["alerts"])
@@ -447,12 +451,13 @@ def test_face_loss_mid_stream_is_handled():
 def test_microsleep_threshold_actually_comes_from_the_config():
     """Regression: state.py hardcoded `ongoing_closure_s >= 0.5`.
 
-    That was a second copy of features.blink.microsleep_duration_s, so editing
+    That was a second copy of the configured microsleep time (now features.eyes.microsleep_s), so editing
     the config changed how events were labelled but not when the alert fired.
     Raise the threshold and a closure that used to trigger must not.
     """
     cfg = load_config()
-    cfg["features"]["blink"]["microsleep_duration_s"] = 1.5
+    cfg["calibration"].update(duration_s=12.0, min_blinks=0)
+    cfg["features"]["eyes"]["microsleep_s"] = 1.5
     ex = FeatureExtractor(cfg["features"], cfg["calibration"])
     est = StateEstimator(cfg["state"])
     pol = EscalationPolicy(cfg["alerts"])
@@ -475,6 +480,7 @@ def test_microsleep_threshold_actually_comes_from_the_config():
 def test_off_road_threshold_actually_comes_from_the_config():
     """Same bug class: state.py compared against its own literal 2.0 s."""
     cfg = load_config()
+    cfg["calibration"].update(duration_s=12.0, min_blinks=0)
     cfg["features"]["head"]["off_road_alert_s"] = 4.0
     ex = FeatureExtractor(cfg["features"], cfg["calibration"])
     est = StateEstimator(cfg["state"])

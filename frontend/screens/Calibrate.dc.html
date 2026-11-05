@@ -2,49 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Calibrate your eyes</title>
+<title>Calibrate</title>
 <script src="./support.js"></script>
 </head>
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
-<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}</style>
+<style>
+body{margin:0}a{color:#F4EFE6}button{font:inherit;color:inherit;cursor:pointer}
+.cb-card{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:24px;transition:transform .38s cubic-bezier(.22,1,.36,1),opacity .3s}
+.cb-card.in{animation:cbIn .42s cubic-bezier(.22,1,.36,1) both}
+.cb-card.out{transform:translateX(-110%);opacity:0}
+@keyframes cbIn{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+.cb-ring{transition:stroke-dasharray .35s linear}
+.cb-check{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transform:scale(.4);transition:all .35s cubic-bezier(.3,1.6,.5,1)}
+.cb-card.ok .cb-check{opacity:1;transform:none}
+.cb-card.ok .cb-ringwrap svg{opacity:.25}
+.cb-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:7px 14px;border-radius:99px;background:#FFB547;color:#241A26;font-weight:800;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .2s}
+.cb-hint.on{opacity:1}
+.cb-dots{display:flex;gap:6px;justify-content:center}
+.cb-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);transition:all .3s}
+.cb-dots i.done{background:#C4B5FD}
+.cb-dots i.now{background:#F4EFE6;width:20px;border-radius:9px}
+.cb-ans{flex:1;padding:15px;border:0;border-radius:999px;font-weight:800;font-size:16px}
+.cb-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;font-size:14.5px}
+.cb-row+.cb-row{border-top:1px solid rgba(255,255,255,.08)}
+.cb-row span{color:#B3A6B4}
+</style>
 </helmet>
-<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
-  <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
-    <a href="Pair.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:100%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:52px 16px 26px;box-sizing:border-box;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.32) 0%,rgba(168,132,232,0) 62%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif">
+  <div style="display:flex;align-items:center;gap:12px;height:44px">
+    <a href="Voice.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <div id="cbDots" class="cb-dots" style="flex:1"></div>
+    <span style="width:40px"></span>
   </div>
-  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center;text-wrap:balance">Let Ollie learn your eyes</h1>
-  <p style="margin:12px auto 0;max-width:30ch;text-align:center;color:#B3A6B4;font-size:15.5px;line-height:1.45">Sit in your driving position. Look straight ahead for 12 seconds and blink normally.</p>
-  <div style="position:relative;width:250px;height:250px;margin:20px auto 0;display:grid;place-items:center">
-    <svg width="250" height="250" viewBox="0 0 250 250" aria-hidden="true" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="125" cy="125" r="118" fill="none" stroke="rgba(255,255,255,.11)" stroke-width="8"></circle><circle cx="125" cy="125" r="118" fill="none" stroke="#C4B5FD" stroke-width="8" stroke-linecap="round" stroke-dasharray="741.4" stroke-dashoffset="430"></circle></svg>
-    <div style="position:relative;width:214px;height:214px;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,#3d4a42 0%,#1e2620 70%)">
-      <svg width="214" height="214" viewBox="0 0 214 214" role="img" aria-label="Infrared camera view with face landmarks">
-        <ellipse cx="107" cy="104" rx="56" ry="70" fill="#56645a"></ellipse>
-        <path d="M51 96 C 50 40, 164 40, 163 96 C 160 70, 140 52, 107 52 C 74 52, 54 70, 51 96Z" fill="#2c352f"></path>
-        <rect x="60" y="170" width="94" height="60" rx="30" fill="#46524a"></rect>
-        <ellipse cx="85" cy="102" rx="11" ry="5" fill="#1b211d"></ellipse><ellipse cx="129" cy="102" rx="11" ry="5" fill="#1b211d"></ellipse>
-        <circle cx="87" cy="101" r="1.6" fill="#fff" opacity=".9"></circle><circle cx="131" cy="101" r="1.6" fill="#fff" opacity=".9"></circle>
-        <path d="M100 128 q7 4 14 0" stroke="#2c352f" stroke-width="3" fill="none" stroke-linecap="round"></path>
-        <g fill="#F5B5C8" opacity=".9"><circle cx="72" cy="102" r="1.5"></circle><circle cx="78" cy="96" r="1.5"></circle><circle cx="86" cy="94" r="1.5"></circle><circle cx="94" cy="97" r="1.5"></circle><circle cx="98" cy="102" r="1.5"></circle><circle cx="92" cy="107" r="1.5"></circle><circle cx="84" cy="108" r="1.5"></circle><circle cx="76" cy="106" r="1.5"></circle><circle cx="116" cy="102" r="1.5"></circle><circle cx="120" cy="97" r="1.5"></circle><circle cx="128" cy="94" r="1.5"></circle><circle cx="136" cy="96" r="1.5"></circle><circle cx="142" cy="102" r="1.5"></circle><circle cx="138" cy="106" r="1.5"></circle><circle cx="130" cy="108" r="1.5"></circle><circle cx="122" cy="107" r="1.5"></circle><circle cx="107" cy="118" r="1.5"></circle><circle cx="100" cy="130" r="1.5"></circle><circle cx="114" cy="130" r="1.5"></circle><circle cx="66" cy="130" r="1.5"></circle><circle cx="148" cy="130" r="1.5"></circle><circle cx="80" cy="160" r="1.5"></circle><circle cx="134" cy="160" r="1.5"></circle><circle cx="107" cy="168" r="1.5"></circle></g>
-        <rect x="0" y="92" width="214" height="34" fill="#F5B5C8" opacity=".12"></rect>
-      </svg>
-    </div>
-    <span style="position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);background:#F4EFE6;color:#241A26;border-radius:99px;padding:6px 14px;font-weight:700;font-size:14px;white-space:nowrap">7 s left</span>
+  <div id="cmBox" style="position:relative;margin-top:10px;width:100%;aspect-ratio:16/9;border-radius:20px;overflow:hidden;background:#2B2530;flex-shrink:0">
+    <img data-live="video" alt="Live view from your Bamnun camera" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none">
+    <div data-live="cam-off" style="position:absolute;inset:0;display:grid;place-items:center;color:#B3A6B4;font-weight:700;font-size:14px"><span data-live="cam-off-text">Not connected</span></div>
+    <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+      <ellipse id="cbOval" cx="80" cy="44" rx="20" ry="27" fill="none" stroke="#C4B5FD" stroke-width="1" stroke-dasharray="3 2.5" opacity=".9"></ellipse>
+    </svg>
+    <span id="cbHint" class="cb-hint" role="status"></span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:26px">
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">2</b><span style="font-size:12px;color:#B3A6B4">Blinks</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">0.27</b><span style="font-size:12px;color:#B3A6B4">Open-eye level</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800">2°</b><span style="font-size:12px;color:#B3A6B4">Head angle</span></div>
-  </div>
-  <div style="margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);color:#B3A6B4;font-size:13.5px;line-height:1.4;display:flex;gap:10px;align-items:flex-start">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F8C4A4" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l3 3 5-6"></path></svg>
-    <span>Ollie treats your eyes as closed at <b style="color:#F4EFE6">65% of your own open level</b>, so naturally narrow eyes are never mistaken for sleep.</span>
-  </div>
-  <div style="position:absolute;left:0;right:0;bottom:0;padding:24px 22px 40px;display:flex;justify-content:center">
-    <a href="Plan.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+  <div id="cbStage" style="position:relative;flex:1;margin-top:12px;overflow:hidden;min-height:250px"></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px">
+    <button type="button" id="cGo" style="min-width:200px;padding:16px 30px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)">Start</button>
+    <a id="cLater" href="Plan.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14.5px;padding:6px 10px;text-decoration:none">Do this later</a>
   </div>
 </div>
 </x-dc>

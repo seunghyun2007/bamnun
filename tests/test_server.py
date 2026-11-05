@@ -43,6 +43,20 @@ def test_health_reports_parts_and_whether_the_camera_is_live(www):
     assert "version" in h and "device" in h
 
 
+
+def test_health_gives_a_device_id_that_stays_the_same(www, tmp_path):
+    from bamnun.store import Store
+    db = tmp_path / "d.db"
+    store = Store(db)
+    first = TestClient(create_app(Hub(), www, store)).get("/api/health").json()["device_id"]
+    assert len(first) == 32
+    assert TestClient(create_app(Hub(), www, store)).get("/api/health").json()["device_id"] == first
+    store.close()
+    again = Store(db)          # survives a restart
+    assert again.device_id() == first
+    again.close()
+    assert Store(tmp_path / "other.db").device_id() != first
+
 def test_the_app_is_served_at_the_root(www):
     client = TestClient(create_app(Hub(), www))
     r = client.get("/")

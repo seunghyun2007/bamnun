@@ -11,7 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from bamnun.alerts import Actuation, AlertDecision  # noqa: E402
-from bamnun.features import BlinkTracker, FeatureFrame  # noqa: E402
+from bamnun.eyes import BlinkDetector  # noqa: E402
+from bamnun.features import FeatureFrame  # noqa: E402
 from bamnun.state import DriverState  # noqa: E402
 from bamnun.telemetry import STALE_AFTER_S, Hub, alert_event, build_snapshot  # noqa: E402
 
@@ -114,14 +115,13 @@ def test_publishing_never_waits_on_a_reader():
     assert elapsed < 1.0, f"2000 publishes took {elapsed:.2f}s"
 
 
-def test_blink_tracker_remembers_the_last_ordinary_blink():
-    bt = BlinkTracker({"blink": {}})
-    # Shut at t=0.2, open again at t=0.4: a 0.2 s blink.
-    for t, ear in ((0.1, 0.30), (0.2, 0.10), (0.3, 0.10), (0.4, 0.30)):
-        bt.update(t, ear, 0.30)
-    assert bt.last_blink_s is not None and abs(bt.last_blink_s - 0.2) < 1e-6
-    bt.reset()
-    assert bt.last_blink_s is None
+def test_blink_detector_remembers_the_last_ordinary_blink():
+    bd = BlinkDetector({})
+    # Openness falls through 50 % between 0.1 and 0.2 and rises back through
+    # it between 0.3 and 0.4: crossings interpolated at 0.15 and 0.35.
+    for t, o in ((0.0, 1.0), (0.1, 1.0), (0.2, 0.0), (0.3, 0.0), (0.4, 1.0)):
+        bd.update(t, o, True)
+    assert bd.last_blink_s is not None and abs(bd.last_blink_s - 0.2) < 1e-6
 
 
 def test_video_is_wanted_only_while_someone_watches():

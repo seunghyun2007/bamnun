@@ -18,6 +18,7 @@ import sys
 import time
 from collections import deque
 from pathlib import Path
+from typing import Optional
 
 from rich.console import Console
 from rich.logging import RichHandler
@@ -26,19 +27,32 @@ from .air import CabinAir
 from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
+from .control import Controller, FeatureCalibration
+from .eyes import face_brightness
+from .predictor import two_process_alertness
 from .features import Calibration, FeatureExtractor, FeatureFrame
 from .landmarks import FaceLandmarker
 from .predictor import RestPlanner
 from .session import SessionLogger, load_config, repo_root
 from .state import DriverState, StateEstimator
+from .store import Store
+from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
 
+# Console output must never stop detection. A Windows console in a legacy
+# code page can't print Korean (Ollie's lines, a driver's name), and an
+# encoding error raised inside a print in the camera loop used to end the
+# program. Write UTF-8 and replace anything the terminal still can't show.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
 console = Console()
 
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.
 PUBLISH_PERIOD_S = 0.1
 HEALTH_PERIOD_S = 1.0
-VIDEO_PERIOD_S = 0.1        # Camera screen video, about 10 fps, only while watched
 log = logging.getLogger("bamnun")
 
 
@@ -122,16 +136,46 @@ class Monitor:
         # costs the same with or without --serve; only the server is optional.
         self.hub = Hub()
         self.hub.video_capable = True
+        self.hub.video_size = list(self.source.resolution) if self.source.resolution else None
+        vcfg = self.cfg.get("video") or {}
+        self.video = VideoEncoder(self.hub, width=int(vcfg.get("width", 640)),
+                                  quality=int(vcfg.get("quality", 80)),
+                                  max_fps=float(vcfg.get("max_fps", 30)))
         self.server = None
         self._last_publish = -1e9
         self._last_video = -1e9
+        self._last_window = -1e9
+        self._window_period = 1.0 / max(1.0, float(self.cfg["ui"].get("window_max_fps", 15)))
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
 
-        cal_path = args.calibration or self.cfg["calibration"].get("save_path")
-        self._cal_path = self.root / str(cal_path)
+        # Profile, settings and trips (SPEC.md, sections 0 and 1). The store
+        # is optional in the same way the server is: without it the device
+        # still detects and alerts, it just keeps no trips.
+        self.store = None
+        db = (self.cfg.get("storage") or {}).get("db", "runs/bamnun.db")
+        try:
+            self.store = Store(self.root / str(db))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("no profile or trip storage (%s); detection unaffected", exc)
+        self.controller = Controller(
+            self.hub, self.store, self.policy, estimator=self.estimator,
+            calibration=FeatureCalibration(self.features, on_commit=self._save_calibration),
+            trip_cfg=self.cfg.get("trips"))
+
+        # Calibration is per driver (SPEC.md, 15): runs/drivers/<name>/.
+        # --calibration names a file explicitly and pins it.
+        self._pinned_cal = args.calibration
+        self._driver = driver_id(self.controller.profile.get("name", ""))
+        self._cal_path = self._calibration_path()
         self._load_calibration()
+        self._last_driver_check = -1e9
+        self._proc = deque(maxlen=60)
+        self._slow_since: Optional[float] = None
+        self._last_risk = -1e9
+        self._t_started = time.monotonic()
+        self._time_risk: Optional[dict] = None
 
         self.logger.write_meta({
             "config": self.cfg,
@@ -141,6 +185,30 @@ class Monitor:
         })
 
     # ----------------------------------------------------------------- #
+
+    def _calibration_path(self) -> Path:
+        if self._pinned_cal:
+            return self.root / str(self._pinned_cal)
+        per_driver = self.root / "runs" / "drivers" / self._driver / "calibration.json"
+        legacy = self.root / str(self.cfg["calibration"].get("save_path", "runs/calibration.json"))
+        # The first time, carry an older single calibration over to "default".
+        if not per_driver.exists() and self._driver == "default" and legacy.exists():
+            return legacy
+        return per_driver
+
+    def _check_driver(self, now: float) -> None:
+        """A new profile name means a new driver: use their calibration."""
+        if self._pinned_cal or now - self._last_driver_check < 2.0:
+            return
+        self._last_driver_check = now
+        d = driver_id(self.controller.profile.get("name", ""))
+        if d == self._driver:
+            return
+        self._driver = d
+        self._cal_path = self._calibration_path()
+        console.print(f"[cyan]driver changed[/] to {d!r}")
+        if self._cal_path.exists():
+            self._load_calibration()
 
     def _load_calibration(self) -> None:
         if self._cal_path.exists():
@@ -155,6 +223,8 @@ class Monitor:
         console.print("[yellow]no calibration on file; press 'c' or wait for auto-calibration[/]")
 
     def _save_calibration(self) -> None:
+        if not self._pinned_cal:
+            self._cal_path = self.root / "runs" / "drivers" / self._driver / "calibration.json"
         self._cal_path.parent.mkdir(parents=True, exist_ok=True)
         self._cal_path.write_text(
             json.dumps(self.features.calibration.to_dict(), indent=2), encoding="utf-8"
@@ -219,7 +289,8 @@ class Monitor:
                           "pip install -r requirements.txt[/]")
             return
         try:
-            self.server = ServerThread(self.hub, self.args.host, self.args.port).start()
+            self.server = ServerThread(self.hub, self.args.host, self.args.port,
+                                       store=self.store).start()
         except Exception as exc:  # noqa: BLE001
             log.warning("could not start the server: %s", exc)
             return
@@ -257,8 +328,12 @@ class Monitor:
             return "ok" if getattr(a, "_dev", None) is not None else "simulated"
 
         ir = self.illuminator
+        guided = self.controller.guided
         return {
             "calibrated": bool(self.features.calibration.complete),
+            # The driver's Yes / No from the last device test (section 8).
+            "checks": {k: v for k, v in (guided.results if guided else {}).items()
+                       if k in ("speaker", "chime", "light", "mist")},
             "gpio": bool(_HAVE_GPIO),
             "parts": {
                 "camera": str(self.cfg["capture"].get("source", "")),
@@ -271,9 +346,36 @@ class Monitor:
             },
         }
 
+    def _watch_rate(self, now: float, fps: float) -> None:
+        """Warn once a minute if detection runs below 20 fps (audit F1)."""
+        if fps >= 20.0:
+            self._slow_since = None
+            return
+        if self._slow_since is None:
+            self._slow_since = now
+        elif now - self._slow_since > 10.0:
+            cap = len(self._proc) / max(sum(self._proc), 1e-6)
+            log.warning("detection at %.0f fps (processing could do %.0f): %s", fps, cap,
+                        "the camera is slow (low light?)" if cap > fps * 1.5
+                        else "processing is the limit: close the preview window")
+            self._slow_since = now + 50.0
+
+    def _risk(self, now: float) -> Optional[dict]:
+        """Time-of-day risk, separate from the camera score (SPEC.md, 15)."""
+        if now - self._last_risk < 30.0 and self._time_risk is not None:
+            return self._time_risk
+        self._last_risk = now
+        local = time.localtime(time.time() + self.hub.clock_offset_s)
+        hour = local.tm_hour + local.tm_min / 60.0
+        awake = float(self.args.hours_awake) + (now - self._t_started) / 3600.0
+        v = two_process_alertness(awake, hour)
+        self._time_risk = {"level": "high" if v >= 0.55 else "medium" if v >= 0.35 else "low",
+                           "value": round(v, 2), "hours_awake": round(awake, 1)}
+        return self._time_risk
+
     def _publish(self, now: float, ff: FeatureFrame, state: DriverState,
                  calibrating: bool, progress: float, fps: float,
-                 trip_s: float) -> None:
+                 trip_s: float, lms=None) -> None:
         if now - self._last_publish < PUBLISH_PERIOD_S:
             return
         self._last_publish = now
@@ -285,19 +387,26 @@ class Monitor:
             stage_name=str(self.policy.stages[self.policy.stage].get("name", "")),
             calibrated=self.features.calibration.complete,
             calibrating=calibrating, cal_progress=progress, trip_s=trip_s,
-            fps=fps, last_blink_s=self.features.blink.last_blink_s,
-            co2_ppm=air.ppm, co2_age_s=co2_age))
+            fps=fps, last_blink_s=self.features.blinks.last_blink_s,
+            co2_ppm=air.ppm, co2_age_s=co2_age, face_box=face_box(lms),
+            time_risk=self._risk(now),
+            fps_capacity=(len(self._proc) / max(sum(self._proc), 1e-6)) if self._proc else None))
         if now - self._last_health >= HEALTH_PERIOD_S:
             self._last_health = now
             self.hub.set_health(self._health())
 
+    def _control(self, t: float, ff: FeatureFrame) -> None:
+        """Phone commands, guided calibration, trips, reminders, emergency."""
+        face = bool(ff.face_found)
+        self.controller.tick(
+            t, face=face, calibrated=bool(self.features.calibration.complete),
+            eye_closed=bool(ff.eye_closed) if face and not self.features.calibrating else None,
+            microsleep=bool(ff.microsleep_now), ear_raw=ff.ear_raw if face else None,
+            co2_ppm=self.air.ppm)
+
     def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
-        """Encode a Camera-screen frame, but only while someone is watching."""
-        if not self.hub.wants_video() or now - self._last_video < VIDEO_PERIOD_S:
-            return
-        self._last_video = now
-        from .viz import video_frame
-        self.hub.publish_frame(video_frame(image, lms, ff.eye_closed))
+        """Hand the frame to the encoder thread, only while someone watches."""
+        self.video.offer(image, lms, ff.shut_now or ff.microsleep_now)
 
     # ----------------------------------------------------------------- #
 
@@ -346,8 +455,10 @@ class Monitor:
             if self.args.duration and (frame.timestamp - t_start) > self.args.duration:
                 break
 
+            t_proc = time.perf_counter()     # processing capacity = face tracking + everything after
             lms = self.landmarker.process(frame)
-            ff: FeatureFrame = self.features.update(frame.timestamp, lms)
+            bright = face_brightness(frame.image, lms.points) if lms is not None and lms.ok else None
+            ff: FeatureFrame = self.features.update(frame.timestamp, lms, brightness=bright)
 
             calibrating = self.features.calibrating
             if calibrating:
@@ -388,7 +499,8 @@ class Monitor:
                         self._voice("rest_voice", frame.timestamp)
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
-                decision = self.policy.update(state) if alerts_on else None
+                hold = self.controller.holds_ladder(frame.timestamp)
+                decision = self.policy.update(state) if alerts_on and not hold else None
                 if decision is not None:
                     self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
@@ -408,15 +520,27 @@ class Monitor:
                 for action in self.tour.due(time.monotonic()):
                     self._demo_action(action, frame.timestamp)
 
+            self._guarded(self._control, frame.timestamp, ff)
+
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
             last = now
             fps = sum(self._fps) / len(self._fps)
+            self._proc.append(time.perf_counter() - t_proc)
+            self._guarded(self._watch_rate, now, fps)
+            self._guarded(self._check_driver, now)
             self._guarded(self._publish, now, ff, state, calibrating, progress,
-                          fps, frame.timestamp - t_start)
+                          fps, frame.timestamp - t_start, lms)
             self._guarded(self._publish_video, now, frame.image, lms, ff)
 
-            if self.show_window and cv2 is not None:
+            # The laptop preview window is drawn at most window_max_fps times a
+            # second. Drawing and showing it every frame cost more than face
+            # tracking itself (34 fps without it, 13 with it on a laptop), and
+            # the app's video can only be as fast as detection.
+            draw_window = (self.show_window and cv2 is not None
+                           and now - self._last_window >= self._window_period)
+            if draw_window:
+                self._last_window = now
                 from .viz import draw_overlay
                 canvas = draw_overlay(
                     frame.image, lms, ff, state, plan=self._plan,
@@ -469,8 +593,15 @@ class Monitor:
         if self._plan is not None:
             console.print(f"[bold]final rest plan:[/] {self._plan.summary()}")
         self.logger.log_event("shutdown", {"actuations": len(self.policy.history)})
+        try:
+            self.controller.close()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("could not close the trip: %s", exc)
         if self.server is not None:
             self.server.stop()
+        if self.store is not None:
+            self.store.close()
+        self.video.close()
         self.logger.close()
         self.policy.close()
         self.air.close()
@@ -483,6 +614,24 @@ class Monitor:
         except Exception:
             pass
         console.print("[bold]stopped[/]")
+
+
+def driver_id(name: str) -> str:
+    """A folder name for a driver: their profile name, or "default"."""
+    import re
+    s = re.sub(r"[^\w-]+", "_", (name or "").strip().lower()).strip("_")
+    return s[:40] or "default"
+
+
+def face_box(lms) -> Optional[list[float]]:
+    """The face's bounding box as fractions of the frame, for the Home tile."""
+    if lms is None or not getattr(lms, "ok", False):
+        return None
+    w, h = lms.image_size
+    xs, ys = lms.points[:, 0], lms.points[:, 1]
+    x0, y0 = max(0.0, float(xs.min()) / w), max(0.0, float(ys.min()) / h)
+    x1, y1 = min(1.0, float(xs.max()) / w), min(1.0, float(ys.max()) / h)
+    return [x0, y0, x1 - x0, y1 - y0]
 
 
 def main(argv=None) -> int:

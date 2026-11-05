@@ -3787,7 +3787,13 @@ document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||
   BN_API.on("trip", (m) => { if (m.event === "ended") toast(T("Trip saved. See it in Trips."), IMG.celebrate); });
   // The device knew the driver's name before this phone did: show it.
   BN_API.on("name_changed", () => { const s = screen(); if (["Home", "Settings", "Plan"].includes(s)) BN_GO(s, { instant: true, keepScroll: true }); });
-  BN_API.on("emergency", (m) => { show(m); notify(T("Ollie"), T("Are you OK?")); });
+  // Nobody is driving during setup, so a device emergency waits for the app
+  // screens. Settings' practice run calls show() directly and isn't affected.
+  const DRIVING = ["Home", "Camera", "Trips", "Insights", "Settings", "Route", "Drive"];
+  BN_API.on("emergency", (m) => {
+    if (!DRIVING.includes(screen())) return;
+    show(m); notify(T("Ollie"), T("Are you OK?"));
+  });
 
   window.BN_EMERGENCY = { show };
 })();

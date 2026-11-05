@@ -1,12 +1,14 @@
 """Ollie's spoken lines, in English and Korean, played on the device speaker.
 
 docs/SPEC.md, section 2: Ollie always speaks through the Bamnun device, never
-the phone. Each line is a clip recorded by the team in both languages:
+the phone. Each line is a clip in both languages:
 
     assets/voice/en/<key>.wav
     assets/voice/ko/<key>.wav
 
-``tools/record_prompts.py --lang en|ko`` records them. A clip that hasn't been
+``tools/make_voice.py`` generates them offline (Supertonic, voice M1, one
+voice for both languages), and ``tools/record_prompts.py --lang en|ko``
+records the team instead, replacing a clip. A clip that hasn't been
 recorded yet is skipped, not fatal, exactly like the ladder's audio: the
 speaker part shows as "simulated" and the phone still gets a ``say`` event
 with the text, so the line can be read on screen.

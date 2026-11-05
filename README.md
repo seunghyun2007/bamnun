@@ -437,7 +437,8 @@ Where each threshold comes from (published, physical, or our choice):
 | `python tools/focus_sweep.py` | find the sharpest Pi camera lens position |
 | `python tools/bench.py --seconds 30 --source picamera` | per-stage timing and frame rate |
 | `python tools/measure_glance_zones.py` | measure the mirror zones in the real cab |
-| `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic (`--list`, `--only NAME`) |
+| `python tools/make_voice.py` | generate Ollie's lines offline with Supertonic, voice M1, English and Korean (`--voice`, `--only NAME`, `--speed`) |
+| `python3 tools/record_prompts.py` | record the spoken prompts with the Pi's mic instead (`--list`, `--only NAME`) |
 | `python tools/evaluate_detection.py` | every scenario through the real pipeline: detection rate, false alarms per hour, reaction time, resting score; `--recordings runs/recordings` adds labelled webcam sessions |
 | `python tools/record_session.py` | the 10-minute labelled test script on the webcam, one prompt at a time (calibration, normal, talking, smiling, glances, yawning, slow blinks, heavy lids, nodding off, microsleeps); `--free` labels by key press |
 | `python tools/replay_session.py runs/recordings/<time>` | run the real pipeline over a recording: every signal and the score per frame to CSV, a summary per marked stretch, `--set state.weights.perclos=0.25` to try a threshold in seconds, `--plot` for a chart |

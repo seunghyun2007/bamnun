@@ -17,6 +17,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CON=bamnun-booth
 AUTOSTART="$HOME/.config/autostart/bamnun-booth.desktop"
 
+# The hotspot comes on a few seconds later, from its own service: switching
+# drops the SSH or Pi Connect session that asked, and that session should get
+# its answer first.
+hotspot_on_soon() {
+    systemctl --user reset-failed bamnun-booth-hotspot.service >/dev/null 2>&1 || true
+    systemd-run --user --quiet --unit=bamnun-booth-hotspot --on-active=3s \
+        sudo nmcli connection up "$CON"
+    echo "The hotspot comes on in 3 seconds; this Pi then leaves your Wi-Fi."
+}
+
 # Its own service, so it outlives the SSH or Pi Connect session that started it.
 start_booth() {
     pgrep -f "bamnun.app.*--booth" >/dev/null && return
@@ -34,10 +44,8 @@ try)
     systemd-run --user --quiet --unit=bamnun-booth-revert --on-active="${MIN}m" \
         "$ROOT/tools/booth/booth.sh" off
     echo "Booth on for $MIN minutes, then back to normal Wi-Fi by itself."
-    echo "Your remote session will drop now and come back after that."
-    sleep 2
     start_booth
-    sudo nmcli connection up "$CON"
+    hotspot_on_soon
     ;;
 on)
     sudo nmcli connection modify "$CON" connection.autoconnect yes connection.autoconnect-priority 100
@@ -45,7 +53,7 @@ on)
     cp "$HOME/.local/share/applications/bamnun-booth.desktop" "$AUTOSTART"
     echo "Hotspot on. Phones: join 'Bamnun-Demo'. The booth starts at every login."
     start_booth
-    sudo nmcli connection up "$CON"
+    hotspot_on_soon
     ;;
 home)
     start_booth

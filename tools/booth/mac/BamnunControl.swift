@@ -60,12 +60,30 @@ final class Pi: ObservableObject {
             let pipe = Pipe()
             p.standardOutput = pipe
             p.standardError = pipe
+            // Read as it comes, and stop waiting after 60 s: a Pi that just
+            // switched to its hotspot never answers.
+            let lock = NSLock()
+            var data = Data()
+            pipe.fileHandleForReading.readabilityHandler = { h in
+                let chunk = h.availableData
+                lock.lock(); data.append(chunk); lock.unlock()
+            }
+            let done = DispatchSemaphore(value: 0)
+            p.terminationHandler = { _ in done.signal() }
             var text = ""
             do {
                 try p.run()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                p.waitUntilExit()
-                text = String(decoding: data, as: UTF8.self)
+                if done.wait(timeout: .now() + 60) == .timedOut {
+                    let kill = Process()
+                    kill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+                    kill.arguments = ["-P", "\(p.processIdentifier)"]
+                    try? kill.run(); kill.waitUntilExit()
+                    p.terminate()
+                    text = "(No answer after 60 s. If the Pi just switched to its hotspot, that's expected: press Refresh.)\n"
+                }
+                Thread.sleep(forTimeInterval: 0.2)
+                pipe.fileHandleForReading.readabilityHandler = nil
+                lock.lock(); text = String(decoding: data, as: UTF8.self) + text; lock.unlock()
             } catch {
                 text = "Couldn't run \(script.path): \(error.localizedDescription)"
             }

@@ -52,7 +52,10 @@ pick() {
 on_pi() {   # run a command on the Pi; BatchMode so nothing waits for typing
     local host; host="$(pick)"
     echo "(via $host)"
-    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$host" "cd $REPO && $*"
+    # ServerAlive: when the Pi drops off (it switched to its hotspot), give up
+    # in about 10 s instead of waiting for TCP to notice.
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+        -o ServerAliveInterval=5 -o ServerAliveCountMax=2 "$host" "cd $REPO && $*"
 }
 run() { on_pi "tools/booth/booth.sh $*"; }   # a booth.sh command
 

@@ -27,6 +27,8 @@ capture:
     manual_focus: true
     lens_position: 4.5         # dioptres ~= 1/distance(m); 4.5 -> ~22 cm. TUNE.
     noise_reduction: fast
+    # The camera is mounted upside down: turn the picture the right way up.
+    rotate_180: true
 
   # 3 W IR LED with its own constant-current driver, switched by a MOSFET
   # board on GPIO25. On only while a listed source is running; a webcam or a

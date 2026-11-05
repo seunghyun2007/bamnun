@@ -22,6 +22,7 @@ import queue
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -203,6 +204,21 @@ class Store:
         with self._lock, self._db:
             self._db.execute("INSERT OR REPLACE INTO kv(key, value) VALUES(?, ?)",
                              (key, json.dumps(value, ensure_ascii=False)))
+
+    def device_id(self) -> str:
+        """A random ID made once and kept, so the phone can tell devices apart.
+
+        The hostname isn't enough (every Pi starts as "raspberrypi"), and the
+        cloud copy of a trip is keyed by this plus the trip's number here, so
+        uploading the same trip twice updates it instead of duplicating it.
+        """
+        with self._lock, self._db:
+            row = self._db.execute("SELECT value FROM kv WHERE key='device_id'").fetchone()
+            if row is not None:
+                return str(row["value"])
+            new = uuid.uuid4().hex
+            self._db.execute("INSERT INTO kv(key, value) VALUES('device_id', ?)", (new,))
+            return new
 
     def profile(self) -> dict[str, Any]:
         p = self._get("profile", DEFAULT_PROFILE)

@@ -36,6 +36,7 @@ a,button{-webkit-tap-highlight-color:transparent}
 .mp-pin.pick{background:#C4B5FD}
 .mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
 @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.35}}
+#s-Home,#s-Trips,#s-Insights{min-height:100%;display:flex;flex-direction:column}
 /*__STYLES__*/
 </style>
 </head>
@@ -141,7 +142,7 @@ function go(name,opts={}){
   try{ history.replaceState(null,"","#"+name); }catch(e){}
   if(DYN[name]) try{ DYN[name](root,{go,forward,setLang,rerender:()=>go(name,{instant:true,keepScroll:true})}); }catch(err){ console.error(name,err); }
   if(window.BN_LIVE) BN_LIVE.paint();
-  if(name==="Plan") setTimeout(()=>SFX.play("success"),350);
+  if(name==="Plan"){ setTimeout(()=>SFX.play("success"),350); if(window.BN_SYNC) BN_SYNC.markOnboarded(); }
 }
 window.BN_GO=go;
 // A setup screen opened from the app (Settings, Home, Camera...) goes back
@@ -177,8 +178,18 @@ phone.addEventListener("click",e=>{
 });
 phone.addEventListener("submit",e=>e.preventDefault());
 const start=(location.hash||"").slice(1);
-// After the rest of this script (live data, API) has loaded.
-setTimeout(()=>go(ORDER.includes(start)?start:"Main",{instant:true}),0);
+// After the rest of this script (live data, API, account) has loaded.
+// Back from Google's sign-in page: finish on the Account screen. A signed-in
+// driver who has finished setup opens straight on Home.
+setTimeout(()=>{
+  const A=window.BN_ACCOUNT,S=window.BN_SYNC;
+  let first=ORDER.includes(start)?start:"Main";
+  if(A&&A.pendingReturn())first="Account";
+  else if(!start&&A&&A.user()&&S&&S.onboarded())first="Home";
+  go(first,{instant:true});
+},0);
+// The app was restarted while Google's page was open, then signed in.
+document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||cur==="Account")go("Account",{instant:true});});
 })();
 /*__LIVE__*/
 </script>

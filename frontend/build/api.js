@@ -82,12 +82,15 @@
     if (kind === "profile") { const vl = profile.voice_lang, oldName = profile.name; profile = merge(PROFILE, saved); if (profile.name !== oldName) { try { localStorage.setItem("bn-name", profile.name); } catch (e) {} setTimeout(() => emit({ type: "name_changed" }), 0); } if (saved.voice_lang && vl === null && !pending.profile.voice_lang) profile.voice_lang = saved.voice_lang; store("bn-profile", profile); }
     else { settings = merge(SETTINGS, saved); store("bn-settings", settings); }
     emit({ type: kind + "_changed" });
+    // The Pi's copy is the master; the cloud keeps a copy of it.
+    if (window.BN_SYNC) BN_SYNC.profileChanged();
   }
   function save(kind, patch) {
     if (kind === "profile") { profile = merge(profile, patch); store("bn-profile", profile); if ("name" in patch) { try { localStorage.setItem("bn-name", patch.name); } catch (e) {} } }
     else { settings = merge(settings, patch); store("bn-settings", settings); }
     pending[kind] = merge(pending[kind], patch); store("bn-pending-" + kind, pending[kind]);
     flush();
+    if (window.BN_SYNC) BN_SYNC.profileChanged();
   }
 
   // Called by live.js on every (re)connect: send what changed offline, then
@@ -100,6 +103,8 @@
       if (!Object.keys(pending.settings).length) apply("settings", await req("GET", "/api/settings"));
       emit({ type: "health", health });
     } catch (e) {}
+    // Copy finished trips into the cloud outbox (signed in only).
+    if (window.BN_SYNC) BN_SYNC.collect();
   }
 
   // -- the demo stand-in ------------------------------------------------- //

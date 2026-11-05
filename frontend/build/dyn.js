@@ -18,6 +18,10 @@ const SHIFTS = { day: ['06:00', '14:00'], eve: ['14:00', '22:00'], night: ['22:0
 const SHIFT_NAMES = { day: 'Day shift', eve: 'Evening shift', night: 'Night shift', custom: 'Custom hours', variable: 'Hours change weekly' };
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+// Trips from the cloud and the device together when signed in (sync.js).
+const SYNC_TRIPS = (n) => (window.BN_SYNC ? BN_SYNC.trips(n) : API().get('/api/trips?limit=' + n));
+const ACC = () => window.BN_ACCOUNT;
+
 const locale = () => (BN_LANG() === 'ko' ? 'ko-KR' : 'en-US');
 function clock(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
@@ -308,7 +312,7 @@ const DYN = {
     const card = root.querySelector('#hTrip');
     async function load() {
       let trips = null;
-      try { trips = await API().get('/api/trips?limit=1'); } catch (e) {}
+      try { trips = await SYNC_TRIPS(1); } catch (e) {}
       if (!root.isConnected) return;
       const t = trips && trips[0];
       if (!t) {
@@ -344,10 +348,10 @@ const DYN = {
       $('#tAlerts').textContent = list.reduce((a, t) => a + (t.summary.alerts || 0), 0);
       if (!list.length) { $('#tList').innerHTML = emptyCard(all.length ? 'No trips in this range' : 'No trips yet', 'Drive with Bamnun and Ollie keeps count.', IMG.driving); return; }
       $('#tList').innerHTML = list.map((t) => {
-        const s = t.summary || {}, open = openId === t.id, n = s.alerts || 0;
+        const s = t.summary || {}, open = openId === String(t.id), n = s.alerts || 0;
         const detail = open ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.08)">
             ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>` : '';
-        return `<section data-trip="${t.id}" role="button" aria-expanded="${open}" style="${GLASS};border-radius:22px;overflow:hidden;cursor:pointer">
+        return `<section data-trip="${esc(t.id)}" role="button" aria-expanded="${open}" style="${GLASS};border-radius:22px;overflow:hidden;cursor:pointer">
           <div style="padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;color:#B3A6B4">${esc(when(t.started_at))}</span>${t.open ? `<span style="font-size:11px;font-weight:700;color:#241A26;background:#F48FB1;padding:3px 8px;border-radius:99px">${esc(T('Now'))}</span>` : ''}</div>
             <h2 style="margin:2px 0 0;${HEAD_FONT};font-size:21px">${esc(tripTitle(t))}</h2>
@@ -357,10 +361,11 @@ const DYN = {
     }
     root.addEventListener('click', (e) => {
       const r = e.target.closest('[data-r]'); if (r) { range = r.dataset.r; draw(); return; }
-      const c = e.target.closest('[data-trip]'); if (c) { openId = openId === +c.dataset.trip ? null : +c.dataset.trip; draw(); }
+      const c = e.target.closest('[data-trip]'); if (c) { openId = openId === c.dataset.trip ? null : c.dataset.trip; draw(); }
     });
-    async function load() { try { all = await API().get('/api/trips?limit=500'); } catch (e) {} if (root.isConnected) draw(); }
+    async function load() { try { all = await SYNC_TRIPS(500); } catch (e) {} if (root.isConnected) draw(); }
     API().on('trip', load, root);
+    API().on('sync', (m) => m.status.state === 'done' && load(), root);
     draw(); load();
   },
 
@@ -413,10 +418,12 @@ const DYN = {
     async function load() {
       paintSeg(root, 'r', range);
       let d = null;
-      try { d = await API().get('/api/insights?range=' + range + '&tz=' + (-new Date().getTimezoneOffset())); } catch (e) {}
+      const tz = -new Date().getTimezoneOffset();
+      try { d = window.BN_SYNC ? await BN_SYNC.insights(range, tz) : await API().get('/api/insights?range=' + range + '&tz=' + tz); } catch (e) {}
       if (root.isConnected) draw(d);
     }
     root.addEventListener('click', (e) => { const r = e.target.closest('[data-r]'); if (r) { range = r.dataset.r; load(); } });
+    API().on('sync', (m) => m.status.state === 'done' && load(), root);
     draw(null); load();
   },
 
@@ -438,6 +445,22 @@ const DYN = {
       $('#sDev').textContent = API().demo ? T('Bamnun · demo') : h ? 'Bamnun · ' + h.device : 'Bamnun';
       $('#sDevSub').textContent = API().demo ? T('Simulated driver, in this page') : API().online() ? T(h && h.simulated ? 'Connected · simulated device' : 'Connected · Raspberry Pi 5') : T('Not connected');
       if (h && h.version) $('#sVer').textContent = 'v' + h.version;
+      paintAccount();
+    }
+    function paintAccount() {
+      const u = ACC() && ACC().user(), btn = $('#sAcctBtn');
+      if (!btn) return;
+      btn.textContent = T('Sign in');
+      btn.style.display = u ? 'none' : '';
+      // Signed in: Log out and Delete account. Signed out: Start over.
+      $('#sAcctActions').style.display = u ? 'flex' : 'none';
+      $('#sReset').style.display = u ? 'none' : 'block';
+      $('#sAcct').textContent = u ? (u.email || T('Signed in')) : T('Not signed in');
+      if (!u) { $('#sAcctSub').textContent = T('Sign in to keep your trips in the cloud'); return; }
+      const st = BN_SYNC.status(), n = BN_SYNC.pending();
+      $('#sAcctSub').textContent = n ? (n === 1 ? T('1 trip waiting to upload') : T('{n} trips waiting to upload', { n }))
+        : st.state === 'syncing' ? T('Syncing…') : st.state === 'offline' ? T('Offline · syncs when you have internet')
+        : st.state === 'error' ? T('Sync problem · will try again') : T('Profile and trips synced');
     }
     root.addEventListener('click', (e) => {
       const b = e.target.closest('button,[data-go]'); if (!b) return;
@@ -446,9 +469,34 @@ const DYN = {
       if (b.dataset.sens) API().saveSettings({ sensitivity: b.dataset.sens });
       if (b.id === 'sBreak') { const cur = API().settings().break_every_min; API().saveSettings({ break_every_min: BREAKS[(BREAKS.indexOf(cur) + 1) % BREAKS.length] }); }
       if (b.id === 'sTryEm') { window.BN_EMERGENCY && BN_EMERGENCY.show({ practice: true }); return; }
+      const restart = () => { try { history.replaceState(null, '', location.pathname + location.search); } catch (er) {} location.reload(); };
+      if (b.id === 'sAcctBtn') {
+        // Signing in on a phone that's already set up keeps its answers.
+        try { localStorage.setItem('bn-acct-from', 'Settings'); } catch (er) {}
+        ctx.forward('Account');
+        return;
+      }
+      if (b.id === 'sLogout') {
+        if (!confirm(T('Log out? Your trips stay on the device and in your account.'))) return;
+        b.disabled = true;
+        BN_SYNC.signOut().finally(restart);
+        return;
+      }
+      if (b.id === 'sDelete') {
+        if (!confirm(T("Delete your account? Your profile and trip history are deleted from the cloud for good. Trips on the device stay. This can't be undone."))) return;
+        b.disabled = true;
+        BN_SYNC.deleteAccount().then(restart, (er) => {
+          console.error(er);
+          b.disabled = false;
+          alert(T("Your account wasn't deleted. Check your internet and try again.") + (er && er.message ? ' (' + er.message + ')' : ''));
+        });
+        return;
+      }
       if (b.id === 'sReset') {
         if (!confirm(T('Start over? This clears your name and choices on this phone. Your trips stay on the device.'))) { e.preventDefault(); e.stopPropagation(); return; }
-        try { Object.keys(localStorage).filter((k) => k.startsWith('bn-') && k !== 'bn-lang' && k !== 'bn-pi').forEach((k) => localStorage.removeItem(k)); } catch (er) {}
+        // Signs out too. Trips not uploaded yet (bn-sync-*) are kept for that account.
+        if (ACC() && ACC().user()) ACC().signOut();
+        try { Object.keys(localStorage).filter((k) => k.startsWith('bn-') && !k.startsWith('bn-sync-') && k !== 'bn-lang' && k !== 'bn-pi').forEach((k) => localStorage.removeItem(k)); } catch (er) {}
         setTimeout(() => location.reload(), 50);
         return;
       }
@@ -468,6 +516,59 @@ const DYN = {
     API().on('profile_changed', () => root.isConnected && paint(), root);
     API().on('settings_changed', () => root.isConnected && paint(), root);
     API().on('health', () => root.isConnected && paint(), root);
+    API().on('sync', () => root.isConnected && paintAccount(), root);
     paint();
+  },
+
+  Welcome(root) {
+    root.querySelectorAll('[data-go="Account"]').forEach((a) => a.addEventListener('click', () => { try { localStorage.removeItem('bn-acct-from'); } catch (e) {} }));
+  },
+
+  // Sign in with Google (account.js), then on through setup or straight home.
+  Account(root, ctx) {
+    const $ = (q) => root.querySelector(q);
+    const btn = $('#aGoogle'), msg = $('#aMsg'), G = $('#aIcon').innerHTML;
+    let from = null;
+    try { from = localStorage.getItem('bn-acct-from'); } catch (e) {}
+    // From Settings the phone is already set up: no "Not now" into setup.
+    if (from === 'Settings') { const sk = $('#aSkip'); sk.setAttribute('data-go', 'Settings'); sk.setAttribute('data-back', ''); sk.setAttribute('href', '#Settings'); }
+    const say = (t, err) => { msg.textContent = t; msg.style.color = err ? '#F49AC1' : '#B3A6B4'; };
+    function busy(on, label) {
+      btn.disabled = on;
+      $('#aLabel').textContent = T(label || 'Continue with Google');
+      $('#aIcon').innerHTML = on ? '<span class="ac-spin"></span>' : G;
+    }
+    async function signedIn() {
+      busy(true, 'Loading your profile…'); say('');
+      try {
+        const to = await BN_SYNC.afterSignIn(ctx.setLang, { keepPhone: from === 'Settings' });
+        try { localStorage.removeItem('bn-acct-from'); } catch (e) {}
+        if (!root.isConnected) return;
+        SFX.play('success');
+        ctx.go(to);
+      } catch (e) {
+        console.error(e);
+        if (!root.isConnected) return;
+        busy(false, 'Try again');
+        say(T("Signed in, but your profile didn't load. Check your internet and try again."), true);
+      }
+    }
+    function failed(e) {
+      console.error(e);
+      if (!root.isConnected) return;
+      busy(false);
+      say(e && e.cancelled ? T('Sign-in was cancelled.') : T("Sign-in didn't finish. Please try again.") + (e && e.message ? ' (' + e.message + ')' : ''), !(e && e.cancelled));
+    }
+    btn.addEventListener('click', () => {
+      if (ACC().user()) { signedIn(); return; }
+      busy(true, 'Opening Google…'); say('');
+      ACC().signIn().then(signedIn, failed);
+    });
+    if (ACC().pendingReturn()) { busy(true, 'Signing you in…'); ACC().returned().then(signedIn, failed); }
+    else if (ACC().user()) signedIn();
+    else if (!ACC().ready()) {
+      btn.disabled = true;
+      say(T(ACC().configured() ? 'Sign-in works in the Bamnun app, or from a page at http://localhost.' : "Sign-in isn't set up in this copy of the app."));
+    }
   },
 };

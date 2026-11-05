@@ -100,8 +100,11 @@ def create_app(hub: Hub, www: Optional[Path] = None,
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        return {"device": socket.gethostname(), "version": __version__,
-                **hub.health()}
+        out = {"device": socket.gethostname(), "version": __version__,
+               **hub.health()}
+        if store is not None:
+            out["device_id"] = store.device_id()
+        return out
 
     def need_store() -> Store:
         if store is None:

@@ -23,6 +23,8 @@ Double-click `Bamnun_app.html`. It opens in any browser and plays a simulated dr
   - `dyn.js` holds the interactive screens: name, vehicle, work week, wake-up ladder, permissions, emergency contact, device search, Ollie's voice language, guided calibration, Home, Trips, Insights and Settings.
   - `live.js` connects to the device's `/ws` and paints the live values; it also holds the demo driver.
   - `api.js` is the device API for the screens: the profile and settings cached on the phone and sent to the device (queued while offline), REST calls, and the device's events (`say`, `calibration`, `trip`, `reminder`, `emergency`...). In the demo it answers by itself, with sample trips.
+  - `account.js` is the Google sign-in (Supabase Auth, PKCE, in the phone's own browser) and the signed-in database calls.
+  - `sync.js` carries data between the device and Supabase: an outbox of finished trips filled from the device and uploaded whenever there's internet, the profile uploaded after each change and downloaded at sign-in, and Trips and Insights read from the cloud.
   - `overlay.js` shows things over any screen: the emergency countdown, and short notes for Ollie's lines, break reminders and saved trips.
   - `route.js` is the Kakao map: Route, the live Home card and Drive.
   - `camera.js` is the Camera screen: the Signals panel, Retry, and full screen in landscape (`@capacitor/screen-orientation` on the phone, CSS rotation in a browser).
@@ -51,6 +53,23 @@ KAKAO_REST_KEY=your REST API key
 - The JS key is public by design and only works from registered addresses. The build puts it into `www/index.html` only; `Bamnun_app.html` stays key-free and asks the device.
 - The REST key stays on the device: the app calls `GET /api/route` and the device calls Kakao. Restart the device program after editing `.env`.
 - Kakao's routing is car routing: truck height and weight limits aren't checked, and the screen says so.
+
+## Accounts and cloud sync (Supabase)
+
+Drivers can sign in with Google so their profile and trip history live in a Supabase database and come back on a new phone. Signing in is optional: the device and the app work without it.
+
+- The database is `../supabase/schema.sql` (profiles, devices, trips, alert events). Row Level Security lets each user read and write only their own rows.
+- Put the project's URL and its **anon / publishable** key in `frontend/.env` (not in git). The build puts them only into `www/index.html`, never into `Bamnun_app.html`:
+
+  ```
+  SUPABASE_URL=https://xxxxxxxx.supabase.co
+  SUPABASE_ANON_KEY=sb_publishable_...
+  ```
+
+  The service role / secret key never goes in the app or the repo; the build refuses it.
+- The Pi has no internet in the truck and stays the source of truth while driving. On each connect the phone copies finished trips into its outbox, and uploads them when it's online. Each trip is keyed by the device's own ID (`device_id` in `/api/health`) and its trip number there, and every write is an upsert on that key, so nothing is duplicated.
+- Sign-in on Android and iOS opens Google in the system browser and comes back through `kr.bamnun.app://auth-callback` (`@capacitor/app` and `@capacitor/browser`). In a desktop browser it works from `http://localhost:8000`. It can't work from the file opened from disk, or from the Pi's hotspot, which has no internet.
+- Setup, step by step, is in `../docs/accounts.md`.
 
 ## Rebuild
 

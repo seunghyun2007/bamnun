@@ -76,3 +76,10 @@ def test_an_untouched_briefing_closes():
     m.mode, m._brief_at = "briefing", 0.0
     Monitor._update_mode(m, 50.0, True)
     assert m.mode == "live"
+
+
+def test_screens_are_drawn_at_the_window_size_not_stretched():
+    s = Screens(ROOT)
+    cam = np.zeros((480, 640, 3), np.uint8)
+    assert s.standby(0.0, cam, (1920, 1080)).shape == (1080, 1920, 3)
+    assert s.briefing(4, 0.0, (1366, 768)).shape == (768, 1366, 3)

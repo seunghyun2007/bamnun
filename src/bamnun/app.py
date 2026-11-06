@@ -42,7 +42,8 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
-from .viz import Dashboard, DashboardData, button_at, fit_to_window, window_to_canvas
+from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, fit_to_window,
+                  window_to_canvas)
 
 # Console output must never stop detection. A Windows console in a legacy
 # code page can't print Korean (Ollie's lines, a driver's name), and an
@@ -788,10 +789,11 @@ class Monitor:
                     if self._screens is None:
                         from .attract import Screens
                         self._screens = Screens(self.root)
-                    canvas = (self._screens.standby(now, frame.image) if self.mode == "standby"
-                              else self._screens.briefing(self._brief_step, now))
+                    # Drawn at the window's own size: stretched, the text went soft.
                     _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
-                    canvas = fit_to_window(canvas, win_w, win_h)
+                    size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    canvas = (self._screens.standby(now, frame.image, size) if self.mode == "standby"
+                              else self._screens.briefing(self._brief_step, now, size))
                 else:
                     canvas = draw_overlay(
                         frame.image, lms, ff, state,

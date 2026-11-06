@@ -364,6 +364,12 @@ ui:
   # The preview window is redrawn at most this often. Drawing it every frame
   # slowed detection from ~34 to ~13 fps on a laptop; 15 still looks smooth.
   window_max_fps: 15
+  # dashboard: the camera beside large panels of what the detector sees, for
+  # presenting (the booth always uses it). overlay: the camera alone with a
+  # small panel. l switches between them while running, f toggles full screen.
+  layout: dashboard
+  fullscreen: false
+  dashboard_refresh_s: 0.2   # the panels are redrawn this often; the camera every frame
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.

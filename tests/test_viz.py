@@ -304,3 +304,25 @@ def test_calibration_banner_short_circuits_before_the_state_panel():
                        ui_cfg=UI, calibrating=0.5, cal_stats=CAL_OK)
     # No red alert border, no bottom banner: calibration outranks both.
     assert out[-20:, :, 2].max() < 150
+
+
+def test_dashboard_draws_the_camera_beside_its_panels():
+    pytest.importorskip("cv2")
+    import numpy as np
+
+    from bamnun.features import FeatureFrame
+    from bamnun.state import DriverState
+    from bamnun.viz import DASH_H, DASH_W, Dashboard, DashboardData, fit_to_window
+
+    ff = FeatureFrame(t=10.0)
+    ff.face_found, ff.pose_valid = True, True
+    state = DriverState(t=10.0, score=0.5, level=2, level_name="drowsy", calibrated=True,
+                        components={"perclos": 0.6, "heavy_lids": 0.4})
+    data = DashboardData(now=10.0, score_history=[(9.0, 0.4), (10.0, 0.5)], stage=2,
+                         stage_name="scent", co2_connected=False)
+    dash = Dashboard()
+    assert dash.due(10.0)
+    dash.refresh(ff, state, data)
+    out = dash.compose(np.zeros((864, 1536, 3), np.uint8))
+    assert out.shape == (DASH_H, DASH_W, 3)
+    assert fit_to_window(out, 1920, 1080).shape == (1080, 1920, 3)

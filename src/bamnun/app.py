@@ -5,7 +5,8 @@
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
-Keys in the window: c recalibrate, s snapshot, a toggle actuators, q quit.
+Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
+camera-only layout, f full screen, q quit.
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from .air import CabinAir
-from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
+from .alerts import (_HAVE_GPIO, AlertDecision, AtomizerActuator, AudioActuator,
+                     EscalationPolicy, LightActuator)
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
 from .control import Controller, FeatureCalibration
@@ -38,6 +40,7 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
+from .viz import Dashboard, DashboardData, fit_to_window
 
 # Console output must never stop detection. A Windows console in a legacy
 # code page can't print Korean (Ollie's lines, a driver's name), and an
@@ -52,6 +55,9 @@ console = Console()
 
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.
 PUBLISH_PERIOD_S = 0.1
+# The dashboard's score chart: one sample every half second, the last 2 min.
+SCORE_SAMPLE_S = 0.5
+SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
 HEALTH_PERIOD_S = 1.0
 log = logging.getLogger("bamnun")
 
@@ -149,6 +155,16 @@ class Monitor:
         self._last_video = -1e9
         self._last_window = -1e9
         self._window_period = 1.0 / max(1.0, float(self.cfg["ui"].get("window_max_fps", 15)))
+        # The presenting layout: the camera beside large panels of what the
+        # detector sees (viz.Dashboard). l switches to the camera alone.
+        ui = self.cfg["ui"]
+        self._dash_refresh_s = float(ui.get("dashboard_refresh_s", 0.2))
+        layout = "dashboard" if args.booth else ui.get("layout", "overlay")
+        self.dashboard = Dashboard(self._dash_refresh_s) if layout == "dashboard" else None
+        self._score_history: deque = deque(maxlen=int(120.0 / SCORE_SAMPLE_S))
+        self._co2_history: deque = deque(maxlen=120)     # 10 min at the sensor's 5 s
+        self._co2_recorded_at: Optional[float] = None
+        self._last_score_t = -1e9
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -411,6 +427,53 @@ class Monitor:
         """Hand the frame to the encoder thread, only while someone watches."""
         self.video.offer(image, lms, ff.shut_now or ff.microsleep_now)
 
+    def _record_history(self, t: float, state: DriverState, calibrating: bool) -> None:
+        """Samples for the dashboard's charts."""
+        if not calibrating and t - self._last_score_t >= SCORE_SAMPLE_S:
+            self._last_score_t = t
+            self._score_history.append((t, float(state.score)))
+        air = self.air
+        if air.ppm is not None and air.updated_at != self._co2_recorded_at:
+            self._co2_recorded_at = air.updated_at
+            self._co2_history.append((t, float(air.ppm)))
+
+    def _dashboard_data(self, t: float, session_s: float, fps: float, progress: float,
+                        alerts_on: bool) -> DashboardData:
+        acts = list(self.policy.actuators.values())
+        sound_on = any(isinstance(a, AudioActuator) and a._last_fired is not None
+                       and time.monotonic() - a._last_fired < SOUND_LIGHT_S for a in acts)
+        mist_on = any(isinstance(a, AtomizerActuator) and a._last_fired is not None
+                      and time.monotonic() - a._last_fired < max(a.duration, 1.0) for a in acts)
+        stages = self.policy.stages
+        stage = self.policy.stage
+        air = self.air
+        last = self._last_alert
+        last_words = ""
+        if last is not None and last.fired:
+            names = ", ".join(a.actuator for a in last.fired)
+            last_words = f"{last.stage_name}: {names}"
+        return DashboardData(
+            now=t, fps=fps, session_s=session_s, calibrating=progress,
+            score_history=self._score_history, co2_history=self._co2_history,
+            co2_connected=air.enabled, co2_ppm=air.ppm,
+            co2_age_s=(time.monotonic() - air.updated_at
+                       if air.updated_at is not None else None),
+            temp_c=air.temp_c, rh=air.rh,
+            co2_elevated_ppm=air.drowsy_prompt_ppm, co2_high_ppm=air.prompt_ppm,
+            score_ticks=[float(lv["min_score"]) for lv in self.cfg["state"].get("levels", [])
+                         if lv.get("min_score")],
+            ir_on=self.illuminator.is_on,
+            blue_on=any(isinstance(a, LightActuator) and a.is_on for a in acts),
+            mist_on=mist_on, sound_on=sound_on,
+            alerts_on=alerts_on and bool(self.cfg["alerts"].get("enabled", True)),
+            stage=stage,
+            stage_name=str(stages[min(stage, len(stages) - 1)].get("name", "")),
+            last_alert=last_words,
+            plan=self._plan,
+            note=("booth: nothing fires by itself; stages play from the app"
+                  if self.args.booth else demo_mode.HELP if self.demo else ""),
+        )
+
     # ----------------------------------------------------------------- #
 
     def run(self) -> int:
@@ -418,12 +481,16 @@ class Monitor:
         signal.signal(signal.SIGTERM, self.stop)
 
         cv2 = None
+        fullscreen = bool(self.args.booth or self.cfg["ui"].get("fullscreen", False))
         if self.show_window:
             try:
                 import cv2 as _cv2
                 cv2 = _cv2
-                cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL)
-                if self.args.booth:   # the booth's big screen shows only this
+                # No Qt toolbar, and fit_to_window keeps the dashboard's
+                # shape, so nothing is left for Qt to letterbox in grey.
+                cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL
+                                | cv2.WINDOW_FREERATIO)
+                if fullscreen:   # the booth's big screen shows only this
                     cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
                                           cv2.WINDOW_FULLSCREEN)
             except Exception as exc:  # noqa: BLE001
@@ -446,7 +513,8 @@ class Monitor:
         if self.args.serve or self.args.booth:
             self.start_server()
 
-        console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")
+        console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  "
+                      "l layout  f full screen  q quit")
         if self.demo:
             console.print(f"[bold magenta]{demo_mode.HELP}[/]")
             if not self.show_window:
@@ -527,6 +595,7 @@ class Monitor:
                     self._demo_action(action, frame.timestamp)
 
             self._guarded(self._control, frame.timestamp, ff)
+            self._guarded(self._record_history, frame.timestamp, state, calibrating)
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -548,26 +617,46 @@ class Monitor:
             if draw_window:
                 self._last_window = now
                 from .viz import draw_overlay
+                dash = self.dashboard
                 canvas = draw_overlay(
-                    frame.image, lms, ff, state, plan=self._plan,
-                    alert=self._last_alert, ui_cfg=self.cfg["ui"], fps=fps,
+                    frame.image, lms, ff, state,
+                    plan=None if dash else self._plan,
+                    alert=None if dash else self._last_alert,
+                    # The dashboard's panels say it all; keep the camera clean.
+                    ui_cfg={**self.cfg["ui"], "draw_gauges": False} if dash else self.cfg["ui"],
+                    fps=fps,
                     calibrating=progress if calibrating else -1.0,
                     cal_stats=(self.features.calibrator.stats(frame.timestamp)
-                               if calibrating else None),
+                               if calibrating and not dash else None),
                 )
-                if self.demo:
+                if dash is not None:
+                    if dash.due(frame.timestamp):
+                        dash.refresh(ff, state, self._dashboard_data(
+                            frame.timestamp, frame.timestamp - t_start, fps,
+                            progress if calibrating else -1.0, alerts_on))
+                    canvas = dash.compose(canvas)
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    canvas = fit_to_window(canvas, win_w, win_h)
+                if self.demo and dash is None:
                     h = canvas.shape[0]
                     label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
                     cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
                     cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
                                 (230, 120, 230), 1, cv2.LINE_AA)
                 scale = float(self.cfg["ui"].get("window_scale", 1.0))
-                if scale != 1.0:
+                if scale != 1.0 and dash is None:
                     canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
                 cv2.imshow("bamnun", canvas)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord("q"):
                     break
+                if key == ord("l"):
+                    self.dashboard = None if dash else Dashboard(self._dash_refresh_s)
+                if key == ord("f"):
+                    fullscreen = not fullscreen
+                    cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
+                                          cv2.WINDOW_FULLSCREEN if fullscreen
+                                          else cv2.WINDOW_NORMAL)
                 if key == ord("c"):
                     self.features.start_calibration(frame.timestamp)
                     self._cal_run = True

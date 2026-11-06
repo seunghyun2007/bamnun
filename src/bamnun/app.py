@@ -42,6 +42,7 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
+from .thermal import PiHealth
 from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, draw_face_mesh,
                   fit_to_window, window_to_canvas)
 
@@ -241,6 +242,10 @@ class Monitor:
         self._brief_at = 0.0
         self._screens = None
         self._cal_notice: Optional[tuple[str, float]] = None
+        # The Pi's temperature and power (thermal.py): shown on the dashboard,
+        # and a warning bar on every screen when it runs hot.
+        self.health = PiHealth(self.cfg.get("thermal"))
+        self._health_level = "ok"
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -554,6 +559,18 @@ class Monitor:
             console.print(f"[yellow]calibration stopped after {cal.attempts} tries[/]: {why}")
             self.logger.log_event("calibration_gave_up", {"attempts": cal.attempts, "reason": why})
 
+    def _check_health(self, now: float) -> None:
+        self.health.update(now)
+        level = self.health.level
+        if level != self._health_level:
+            self._health_level = level
+            c = self.health.celsius
+            console.print(f"[{'green' if level == 'ok' else 'bold red'}]Pi {level}[/]"
+                          + (f" ({c:.0f} C)" if c is not None else ""))
+            self.logger.log_event("pi_health", {"level": level, "celsius": c,
+                                                "throttled": self.health.throttled,
+                                                "under_voltage": self.health.under_voltage})
+
     def _update_mode(self, now: float, face: bool) -> None:
         """Standby after standby_after_s with no face. It stays up when someone
         sits down, so they can read it and press space; Esc skips it."""
@@ -637,6 +654,8 @@ class Monitor:
             notice=(self._cal_notice[0] if self._cal_notice
                     and time.monotonic() < self._cal_notice[1] else ""),
             volume=self.volume.percent,
+            pi_celsius=self.health.celsius,
+            pi_warm=self.health.level != "ok",
             note=("booth: nothing fires by itself; stages play from the app"
                   if self.args.booth else demo_mode.HELP if self.demo else ""),
         )
@@ -767,6 +786,7 @@ class Monitor:
             self._guarded(self._record_history, frame.timestamp, state, calibrating)
             self._guarded(self._give_up_calibration, frame.timestamp)
             self._guarded(self._update_mode, time.monotonic(), bool(ff.face_found))
+            self._guarded(self._check_health, time.monotonic())
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -836,6 +856,13 @@ class Monitor:
                     scale = float(self.cfg["ui"].get("window_scale", 1.0))
                     if scale != 1.0 and dash is None:
                         canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
+                if self.health.level != "ok":
+                    from .attract import health_banner
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    canvas = health_banner(self._screens, canvas, self.health.level,
+                                           self.health.celsius)
                 cv2.imshow("bamnun", canvas)
                 key = cv2.waitKey(1) & 0xFF
                 # Caps Lock or Shift sends the upper case; treat it the same.

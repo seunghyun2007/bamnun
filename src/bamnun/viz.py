@@ -438,6 +438,8 @@ class DashboardData:
     note: str = ""                            # small print for the presenter
     notice: str = ""                          # e.g. why the last calibration didn't work
     volume: Optional[int] = None              # the speaker, %; None: no mixer found
+    pi_celsius: Optional[float] = None        # the Pi's chip; None off a Pi
+    pi_warm: bool = False
 
 
 def level_words(name: str) -> str:
@@ -681,7 +683,10 @@ def _footer_card(img, x: int, y: int, w: int, h: int, state,
        _WARN if urgent else _WHITE, 2 if urgent else 1)
     mins, secs = divmod(int(max(data.session_s, 0.0)), 60)
     _t(img, f"session {mins:02d}:{secs:02d}", x + 12, y + 64, 0.46, _GREY)
-    _draw_right(img, f"{data.fps:0.1f} fps", x + w - 12, y + 64, 0.46, _GREY)
+    fps_text = f"{data.fps:0.1f} fps"
+    if data.pi_celsius is not None:
+        fps_text = f"Pi {data.pi_celsius:0.0f} C   " + fps_text
+    _draw_right(img, fps_text, x + w - 12, y + 64, 0.46, _BAD if data.pi_warm else _GREY)
     if data.note:
         _t(img, _shorten(data.note, w - 24, 0.4), x + 12, y + 84, 0.4, (230, 120, 230))
 

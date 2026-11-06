@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (303 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (312 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -64,6 +64,14 @@ the Wi-Fi hotspot.
   which now spans the whole grey panel under a smaller Ollie.
 - **Ollie's voice**: 17 lines EN + KO generated with Supertonic voice M1
   (`tools/make_voice.py`), in `assets/voice/{en,ko}/`.
+- **Pi temperature watch** (`thermal.py` PiHealth, config `thermal:`): reads
+  the chip temperature every 2 s and `vcgencmd get_throttled` every 10 s. The
+  dashboard footer always shows "Pi NN C". At 75 °C an orange bar appears on
+  top of the window ("Pi가 뜨거워지고 있어요 / The Pi is getting warm"); at
+  80 °C or when the Pi throttles, a red bar ("너무 뜨거워요: 잠시 꺼서 식혀
+  주세요"); a weak power supply gets its own red bar. The screen shrinks to fit
+  under the bar, nothing is covered. Changes are logged as `pi_health` events.
+  (Pi 5 throttles itself at 85 °C; normal at the booth was about 59 °C.)
 - Normal (non-booth) mode still fires the real light/mist/alarm when drowsy.
 
 Other pieces on the branch, built earlier and set aside by the owner: the
@@ -89,6 +97,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: Pi temperature/power warning bar + "Pi NN C" in the footer.
 - 2026-11-06: face mesh (outlines + 478 dots); standby camera as wide as the
   grey panel.
 - 2026-11-06: opened PR #5, demo-booth -> main.

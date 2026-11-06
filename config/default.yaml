@@ -399,3 +399,13 @@ trips:
   auto_start: true
   break_min_s: 180
   end_after_s: 900
+
+# The Pi's own health (thermal.py). The temperature shows on the dashboard;
+# at warm_c a warning bar appears on every screen, at hot_c (or when the
+# firmware throttles) a red one. The Pi 5 throttles at 85 C. A weak power
+# supply (under-voltage) also gets a red bar. It only warns.
+thermal:
+  warm_c: 75
+  hot_c: 80
+  every_s: 2           # temperature reads
+  flags_every_s: 10    # vcgencmd get_throttled

@@ -395,3 +395,57 @@ class Screens:
         x, y = f.x(_SPLIT / 2) - w // 2, f.y(310)
         canvas[y:y + h, x:x + w] = thumb
         cv2.rectangle(canvas, (x - 1, y - 1), (x + w, y + h), (120, 120, 120), 1)
+
+
+# The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
+HEALTH_WORDS = {
+    "warm": ("Pi가 뜨거워지고 있어요", "The Pi is getting warm", (0, 130, 230)),
+    "hot": ("Pi가 너무 뜨거워요: 잠시 꺼서 식혀 주세요", "The Pi is too hot: turn it off to cool down",
+            (40, 40, 200)),
+    "power": ("전원이 약해요: 전원 어댑터를 확인하세요", "Power too weak: check the power adapter",
+              (40, 40, 200)),
+}
+
+
+def health_banner(screens: Optional["Screens"], canvas: np.ndarray, level: str,
+                  celsius: Optional[float]) -> np.ndarray:
+    """``canvas`` with the warning bar on top: the screen is fitted into the
+    rest of the height, so the bar covers nothing."""
+    import cv2
+
+    from .viz import fit_to_window
+
+    if level not in HEALTH_WORDS:
+        return canvas
+    ko, en, colour = HEALTH_WORDS[level]
+    temp = f" ({celsius:.0f}°C)" if celsius is not None else ""
+    h, w = canvas.shape[:2]
+    bar = max(28, h // 16)
+    key = ("health", level, temp, w, bar)
+    cache = screens._cache if screens is not None else {}
+    if key not in cache:
+        strip = np.empty((bar, w, 3), np.uint8)
+        strip[:] = colour
+        text = f"{ko}{temp}   ·   {en}"
+        if screens is not None and screens._pil and screens.korean:
+            from PIL import Image, ImageDraw
+
+            img = Image.fromarray(strip[:, :, ::-1])
+            d = ImageDraw.Draw(img)
+            px = int(bar * 0.5)
+            font = screens._font("bold", px)
+            tw = d.textlength(text, font=font)
+            if tw > w * 0.96:
+                px = max(8, int(px * w * 0.96 / tw))
+                font = screens._font("bold", px)
+                tw = d.textlength(text, font=font)
+            d.text(((w - tw) / 2, (bar - px) / 2 - 1), text, font=font, fill=(255, 255, 255))
+            strip = np.asarray(img)[:, :, ::-1].copy()
+        else:
+            text = f"{en}{temp.replace('°', ' ')}"
+            scale = bar / 48.0
+            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 2)
+            cv2.putText(strip, text, ((w - tw) // 2, (bar + th) // 2), cv2.FONT_HERSHEY_SIMPLEX,
+                        scale, (255, 255, 255), 2, cv2.LINE_AA)
+        cache[key] = strip
+    return np.vstack([cache[key], fit_to_window(canvas, w, h - bar)])

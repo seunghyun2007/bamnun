@@ -7,7 +7,7 @@
 
 Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
 camera-only layout, f full screen, - and = speaker volume, space the visitor
-briefing, q quit. The dashboard also has Calibrate, Full screen and volume
+briefing, Esc skip the standby or briefing screen, q quit. The dashboard also has Calibrate, Full screen and volume
 buttons to click; on the standby and briefing screens a click is space.
 """
 
@@ -61,7 +61,6 @@ PUBLISH_PERIOD_S = 0.1
 SCORE_SAMPLE_S = 0.5
 SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
 CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
-BACK_AFTER_FACE_S = 1.5  # standby ends once a face has been seen this long
 BRIEFING_IDLE_S = 45.0   # an untouched briefing page closes after this
 VOLUME_STEP = 10
 
@@ -551,7 +550,8 @@ class Monitor:
             self.logger.log_event("calibration_gave_up", {"attempts": cal.attempts, "reason": why})
 
     def _update_mode(self, now: float, face: bool) -> None:
-        """Standby after standby_after_s with no face; back when one is seen."""
+        """Standby after standby_after_s with no face. It stays up when someone
+        sits down, so they can read it and press space; Esc skips it."""
         if face:
             self._no_face_since = None
             if self._face_since is None:
@@ -566,10 +566,6 @@ class Monitor:
             self._last_alert = self.policy.reset(now)     # lights off; nobody to wake
             self.logger.log_event("standby", {"after_s": self._standby_after_s})
             console.print("[dim]standby: nobody at the wheel[/]")
-        elif self.mode == "standby" and self._face_since is not None \
-                and now - self._face_since >= BACK_AFTER_FACE_S:
-            self.mode = "live"
-            console.print("[dim]someone sat down[/]")
         elif self.mode == "briefing" and now - self._brief_at >= BRIEFING_IDLE_S:
             self.mode = "live"
 
@@ -841,6 +837,8 @@ class Monitor:
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if go_next:
                     self._next(now, frame.timestamp)
+                if key == 27 and self.mode != "live":     # Esc: skip to the dashboard
+                    self.mode = "live"
                 if key == ord("q"):
                     break
                 if key == ord("l"):

@@ -45,17 +45,18 @@ def stub():
     return m, events
 
 
-def test_nobody_for_30_s_is_standby_and_a_face_brings_the_dashboard_back():
+def test_nobody_for_30_s_is_standby_and_it_waits_for_the_visitor():
     m, events = stub()
     Monitor._update_mode(m, 0.0, False)
     Monitor._update_mode(m, 29.0, False)
     assert m.mode == "live"
     Monitor._update_mode(m, 30.5, False)
     assert m.mode == "standby" and m._last_alert == "reset" and "standby" in events
-    Monitor._update_mode(m, 40.0, True)          # someone sits down ...
+    Monitor._update_mode(m, 40.0, True)          # someone sits down and reads it:
+    Monitor._update_mode(m, 60.0, True)          # it stays until they press space
     assert m.mode == "standby"
-    Monitor._update_mode(m, 41.6, True)          # ... and stays
-    assert m.mode == "live"
+    Monitor._next(m, 61.0, 61.0)
+    assert m.mode == "briefing"
 
 
 def test_space_runs_the_briefing_then_starts_calibrating():

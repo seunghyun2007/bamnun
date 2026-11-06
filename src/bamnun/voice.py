@@ -43,6 +43,8 @@ LINES: dict[str, tuple[str, str]] = {
               "안녕하세요! 저는 올리예요. 어떤 언어로 말할까요?"),
     "sample": ("I'll keep watch while you drive.",
                "운전하는 동안 제가 지켜볼게요."),
+    "try_sleepy": ("Now try being sleepy. Close your eyes for two seconds.",
+                   "이제 졸린 척 해 보세요. 눈을 2초 동안 감아 보세요."),
     "stage3": ("Your eyes are closing. Let's find a place to rest.",
                "눈이 감기고 있어요. 쉴 곳을 찾아봐요."),
     "stage4": ("Wake up! Pull over now.",

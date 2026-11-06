@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (324 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (328 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -35,10 +35,12 @@ the Wi-Fi hotspot.
 
 - **Dashboard** layout (viz.Dashboard): camera + panels (state, CO2 air, eyes,
   head, system response lights, rest plan, charts, what drives the score).
-  Buttons drawn on it: QR + STAGES (above NEXT PERSON: opens the learn-more
+  Buttons drawn on it: GUIDE (top of the left stack: the guided tour again),
+  VOICE: KOREAN/ENGLISH (Ollie's language; Korean at every start,
+  `ui.voice_lang`), QR + STAGES (above NEXT PERSON: opens the learn-more
   screen straight away), NEXT PERSON (bottom-left: lights off, the briefing
   from page 1, a fresh pop-up), VOL -, VOL +, CALIBRATE, FULL SCREEN (clicks
-  work over Pi Connect; keys don't always). Keys: m learn-more screen, n next person, c calibrate, f full screen, l layout,
+  work over Pi Connect; keys don't always). Keys: g guided tour, v voice language, m learn-more screen, n next person, c calibrate, f full screen, l layout,
   - / = volume, space briefing, Esc skip standby/briefing, q quit.
 - **Speaker** (USB, ALSA card `UACDemoV10`, control `PCM`) set to **80% at
   every start**; VOL buttons change it in 10% steps.
@@ -48,6 +50,9 @@ the Wi-Fi hotspot.
   relaxed for the side camera. While calibrating, a full-screen page says
   "게임 화면을 보세요 / Look at the game screen" with a big moving arrow to
   the right, a progress bar and the live hint.
+- **Lights end on time on any screen** (`policy.tick`): a stage card's blue
+  light stayed on, because lights only switched off inside the ladder's
+  update, which the booth screens skip.
 - **Booth screens are never interrupted** (`app._mode_changed`): on the QR,
   briefing and standby screens no ladder alert, rest or CO2 voice prompt, or
   "are you OK?" check; opening the QR screen turns the lights off; coming
@@ -66,9 +71,18 @@ the Wi-Fi hotspot.
 - **Standby** after 30 s with no face: invitation screen (Ollie, animated),
   ladder rests (lights off, no chimes). It stays when someone sits down until
   space/click, which starts the **briefing** (6 pages, Korean first: Ollie,
-  sit at the wheel, **click Drive in the game** (game screenshot
-  `assets/booth/game_drive.jpg` with an arrow), 15 s calibration, try being
-  sleepy, four wake-up steps). The last page starts calibration.
+  sit at the wheel, **center your face** (live camera with an oval that turns
+  green when the face fits, hints closer/back/into the oval, a big arrow down
+  to the device), **click Drive in the game** (game screenshot
+  `assets/booth/game_drive.jpg` with an arrow), 15 s calibration, four
+  wake-up steps). The last page starts calibration. "Try being sleepy" is no
+  longer a page: 20 s into the drive a card (sleepy Ollie) and Ollie's voice
+  (`try_sleepy`) suggest closing the eyes for 2 s; it hides after 15 s or when
+  an alert answers it. The learn-more pop-up now comes at 60 s, after it.
+- **Guided tour** (`attract.TOUR`, mode "tour"): right after a calibration,
+  like a new app's first run, 7 steps each light one part of the dashboard
+  (camera, state, eyes, head, wake-up stages, history, buttons) with a card;
+  click = next, Esc = skip, 12 s untouched = next. No alerts during it.
 - **Look**: like the owner's lecture slides (Mandel Cabrera's deck): light grey
   left panel with one picture, charcoal right panel, white serif text
   (NanumMyeongjo on the Pi, `fonts-nanum`), title in a thin white box. No
@@ -143,6 +157,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: face-centring page, sleepy tip while driving, guided tour, Korean voice + toggle, blue light off on time.
 - 2026-11-06: nothing interrupts the booth screens; hover highlights on every button and card.
 - 2026-11-06: QR + STAGES button and m key open the learn-more screen directly.
 - 2026-11-06: learn-more screen gets four stage cards that play on the real device.

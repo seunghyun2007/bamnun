@@ -381,10 +381,15 @@ BUTTONS = {"vol_down": (_BTN_R - 458, _BTN_Y, 66, 36),
            # Bottom-left: start over for the next visitor (the briefing again).
            "next_visitor": (_CAM_RECT[0] + 8, _BTN_Y, 196, 36),
            # Above it: straight to the learn-more screen (QR code, stage cards).
-           "learn_more": (_CAM_RECT[0] + 8, _BTN_Y - 44, 196, 36)}
+           "learn_more": (_CAM_RECT[0] + 8, _BTN_Y - 44, 196, 36),
+           # Above that: Ollie's voice, Korean or English.
+           "voice": (_CAM_RECT[0] + 8, _BTN_Y - 88, 196, 36),
+           # Top of the stack: the guided tour of this screen again.
+           "guide": (_CAM_RECT[0] + 8, _BTN_Y - 132, 196, 36)}
 _BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
                  "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
-                 "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)"}
+                 "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)",
+                 "voice": "VOICE: KOREAN (v)", "guide": "GUIDE (g)"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)
@@ -764,7 +769,8 @@ def button_at(x: int, y: int) -> Optional[str]:
     return None
 
 
-def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None) -> None:
+def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None,
+             voice: Optional[str] = None) -> None:
     import cv2
 
     x, y, w, h = BUTTONS["vol_down"]
@@ -777,6 +783,8 @@ def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None) -> 
         cv2.rectangle(img, (x, y), (x + w, y + h), (240, 240, 240) if lit else (40, 40, 44), -1)
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255) if lit else (200, 200, 200), 2 if lit else 1)
         text = _BUTTON_WORDS[name]
+        if name == "voice" and voice == "en":
+            text = "VOICE: ENGLISH (v)"
         _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5,
            (30, 30, 34) if lit else _WHITE)
 
@@ -815,6 +823,7 @@ class Dashboard:
         self._drawn_at: Optional[float] = None
         self._volume: Optional[int] = None
         self.hover: Optional[str] = None      # the button under the mouse, drawn lit
+        self.voice: Optional[str] = None      # Ollie's language, on the VOICE button
 
     def due(self, now: float) -> bool:
         return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
@@ -839,5 +848,5 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
-        _buttons(canvas, self._volume, self.hover)
+        _buttons(canvas, self._volume, self.hover, self.voice)
         return canvas

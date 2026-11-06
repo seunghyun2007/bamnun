@@ -36,10 +36,11 @@ def stub():
     m = SimpleNamespace(
         mode="live", _standby_after_s=30.0, _no_face_since=None, _face_since=None,
         _brief_step=0, _brief_at=0.0, _last_alert=None,
-        policy=SimpleNamespace(reset=lambda t: "reset"),
+        policy=SimpleNamespace(reset=lambda t: "reset", stage=0),
         logger=SimpleNamespace(log_event=lambda kind, payload: events.append(kind)),
         calibrations=[], features=SimpleNamespace(calibrating=False),
         _learn_url="https://example.org/", _learn_after_s=45.0, _learn_hide_s=40.0,
+        _tip_after_s=0.0, _tip_hide_s=15.0, _tip_at=None, _tip_shown=False,
         _qr_close_s=60.0, _driven_s=0.0, _learn_shown=False, _popup_at=None, _qr_at=0.0,
         _mode_t=None,
     )
@@ -266,3 +267,56 @@ def test_hover_lights_up_what_the_mouse_is_on():
     d.hover = "calibrate"
     b = d.compose(cam)[by + 3, bx + 3].mean()
     assert b > a + 100
+
+
+def test_the_sleepy_tip_comes_first_then_learn_more():
+    m, events = stub()
+    voices = []
+    m._voice = lambda key, t: voices.append(key)
+    m._tip_after_s, m._learn_after_s = 20.0, 60.0
+    t = drive(m, 0.0, 21.0)
+    assert m._tip_at is not None and voices == ["sleepy_voice"] and "sleepy_tip" in events
+    m.policy.stage = 4                           # they shut their eyes: an alert answers it
+    t = drive(m, t, 1.0)
+    assert m._tip_at is None
+    m.policy.stage = 0
+    t = drive(m, t, 40.0)
+    assert m._popup_at is not None and voices == ["sleepy_voice"]   # once per visitor
+
+
+def test_the_centring_page_knows_a_good_fit():
+    from bamnun.attract import face_fit
+    assert face_fit(None) == "none"
+    assert face_fit((0.5, 0.5, 0.3)) == "good"
+    assert face_fit((0.85, 0.5, 0.3)) == "off"
+    assert face_fit((0.5, 0.5, 0.08)) == "far"
+    assert face_fit((0.5, 0.5, 0.8)) == "near"
+    s = Screens(ROOT)
+    i = [k for k, st in enumerate(STEPS) if st[0] == "center"][0]
+    cam = np.zeros((480, 640, 3), np.uint8)
+    assert s.briefing(i, 0.0, (1280, 720), cam, (0.5, 0.5, 0.3)).shape == (720, 1280, 3)
+    assert not any(st[0] == "sleepy" for st in STEPS)    # now a tip while driving
+
+
+def test_the_guided_tour_walks_every_part_then_hands_back():
+    from bamnun.attract import TOUR
+    m, events = stub()
+    m._popup_at = m._tip_at = None
+    Monitor._start_tour(m, 0.0)
+    assert m.mode == "tour" and m._tour_step == 0 and "tour" in events
+    for i in range(1, len(TOUR)):
+        Monitor._next(m, float(i), float(i))
+        assert m._tour_step == i
+    Monitor._next(m, 99.0, 99.0)
+    assert m.mode == "live"
+
+
+def test_each_tour_step_draws_with_its_part_lit():
+    from bamnun.attract import TOUR
+    s = Screens(ROOT)
+    for i, ((x, y, w, h), *_rest) in enumerate(TOUR):
+        c = np.full((1080, 1920, 3), 200, np.uint8)
+        s.tour_overlay(c, i, 0.0, 1.0)
+        inside = c[int((y + h / 2) * 1.5), int((x + w / 2) * 1.5)]
+        assert inside.mean() >= 195 or i == 0          # the card may sit on a corner
+        assert c[3, 1917].mean() < 120 or x + w > 1270  # elsewhere dimmed

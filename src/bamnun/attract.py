@@ -57,15 +57,15 @@ STEPS = [
     ("driving", "핸들 앞에 앉으세요", "Sit at the wheel",
      "왼쪽 카메라 말고, 오른쪽 게임 화면을 보세요.",
      "Look at the game screen on the right, not the camera."),
+    ("center", "카메라에 얼굴을 맞추세요", "Line your face up with the camera",
+     "타원이 초록색이 되게 얼굴을 맞추세요.",
+     "Move until the oval turns green."),
     ("game", "게임에서 Drive를 누르세요", "Click Drive in the game",
      "게임 화면 왼쪽 아래의 Drive 버튼을 누르면 출발해요.",
      "The Drive button is at the bottom left of the game screen."),
     ("thinking", "15초 동안 눈을 익혀요", "15 seconds to learn your eyes",
      "게임 화면을 보며 평소처럼 눈을 깜빡이세요.",
      "Look at the game screen and blink normally."),
-    ("sleepy", "졸린 척 해 보세요", "Then try being sleepy",
-     "2초 동안 눈을 감거나, 고개를 떨구거나, 화면에서 눈을 떼 보세요.",
-     "Close your eyes for 2 s, let your head nod, or look away."),
     ("wake", "네 단계로 깨워요", "Four steps to wake you",
      "파란 불빛, 민트 미스트, 차임과 목소리, 점점 커지는 알람.",
      "Blue light, mint mist, chime and voice, rising alarm."),
@@ -86,6 +86,12 @@ _DRIVE_AT = (326, 915)
 # The "learn more" pop-up on the dashboard (1280x720 units): over the camera's
 # top-right corner, clear of the face and of the buttons along its bottom.
 POPUP = (318, 18, 512, 184)                   # x, y, w, h
+# The two cards that use it: "learn more" (a button), and the tip a while into
+# a drive to try being sleepy (the dark box is just the instruction).
+POPUP_WORDS = {
+    "learn": ("밤눈이 궁금하세요?", "Want to learn more about Bamnun?", "QR 코드 보기  ·  Learn more"),
+    "sleepy": ("이제 졸린 척 해 보세요", "Now try being sleepy", "눈을 2초 감기  ·  Close your eyes 2 s"),
+}
 _POPUP_TEXT_X = 150                           # Ollie to the left of this
 POPUP_BUTTON = (POPUP[0] + 168, POPUP[1] + 116, 318, 50)
 POPUP_CLOSE = (POPUP[0] + POPUP[2] - 48, POPUP[1], 48, 48)
@@ -119,6 +125,32 @@ def learn_hit(x: int, y: int, size: tuple[int, int]) -> Optional[str]:
         if inside(_card_rect(n)):
             return f"stage{n}"
     return "qr_back" if inside(QR_BACK) else None
+
+
+# The centring page: the oval (a fraction of the camera's width and height)
+# and how a face fits it. face = (centre x, centre y, width), all 0-1.
+FIT_RX, FIT_RY = 0.2, 0.36
+_GOOD = (90, 190, 70)
+FIT_WORDS = {
+    "good": ("좋아요! 딱 맞아요", "Great, that's it"),
+    "none": ("얼굴이 보이지 않아요", "Can't see your face yet"),
+    "far": ("조금 더 가까이 오세요", "Come a little closer"),
+    "near": ("조금 뒤로 가세요", "Move back a little"),
+    "off": ("얼굴을 타원 가운데로", "Move your face into the oval"),
+}
+
+
+def face_fit(face: Optional[tuple[float, float, float]]) -> str:
+    """good, none, far, near or off, for the centring page."""
+    if face is None:
+        return "none"
+    cx, cy, fw = face
+    if fw < 0.16:
+        return "far"
+    if fw > 0.6:
+        return "near"
+    dx, dy = (cx - 0.5) / (FIT_RX * 0.75), (cy - 0.5) / (FIT_RY * 0.75)
+    return "good" if dx * dx + dy * dy <= 1.0 else "off"
 
 
 def popup_hit(x: int, y: int) -> Optional[str]:
@@ -367,7 +399,9 @@ class Screens:
         self._prompt(canvas, f, t, "스페이스바를 누르거나 클릭하세요", "Press SPACE or click to start")
         return canvas
 
-    def briefing(self, step: int, t: float, size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
+    def briefing(self, step: int, t: float, size: tuple[int, int] = (DASH_W, DASH_H),
+                 camera: Optional[np.ndarray] = None,
+                 face: Optional[tuple[float, float, float]] = None) -> np.ndarray:
         """One page of the briefing, with progress dots."""
         import cv2
 
@@ -386,6 +420,8 @@ class Screens:
         canvas = self._cache[key].copy()
         if pic == "game":
             self._draw_game(canvas, f, t)
+        elif pic == "center":
+            self._draw_center(canvas, f, t, camera, face)
         else:
             self._draw_owl(canvas, f, pic, t)
         if step == len(STEPS) - 1:
@@ -427,6 +463,55 @@ class Screens:
             canvas[y0:y1, xs:] = strip
         return canvas
 
+    def _draw_center(self, canvas: np.ndarray, f: _Frame, t: float,
+                     camera: Optional[np.ndarray], face: Optional[tuple[float, float, float]]) -> None:
+        """The centring page's left panel: the live camera with an oval to fit
+        the face in (green when it fits), what to do, and an arrow down to
+        the camera itself."""
+        import cv2
+
+        state = face_fit(face)
+        good = state == "good"
+        if camera is not None:
+            w = f.n(_SPLIT - 70)
+            h = int(camera.shape[0] * w / camera.shape[1])
+            if h > f.n(380):
+                h = f.n(380)
+                w = int(camera.shape[1] * h / camera.shape[0])
+            view = cv2.resize(camera, (w, h), interpolation=cv2.INTER_AREA)
+            if view.ndim == 2:
+                view = cv2.cvtColor(view, cv2.COLOR_GRAY2BGR)
+            col = _GOOD if good else (255, 255, 255)
+            cv2.ellipse(view, (w // 2, h // 2), (int(w * FIT_RX), int(h * FIT_RY)), 0, 0, 360,
+                        (0, 0, 0), max(3, f.n(7)), cv2.LINE_AA)
+            cv2.ellipse(view, (w // 2, h // 2), (int(w * FIT_RX), int(h * FIT_RY)), 0, 0, 360,
+                        col, max(2, f.n(4)), cv2.LINE_AA)
+            x, y = f.x(_SPLIT / 2) - w // 2, f.y(30)
+            canvas[y:y + h, x:x + w] = view
+            edge = f.n(6) if good else 1
+            cv2.rectangle(canvas, (x - edge, y - edge), (x + w + edge - 1, y + h + edge - 1),
+                          _GOOD if good else (120, 120, 120), edge)
+        key = ("fit", state, f.w, f.h)
+        if key not in self._cache:
+            ko, en = FIT_WORDS[state]
+            band = self._base(f)
+            if good:
+                cv2.rectangle(band, (f.x(70), f.y(424)), (f.x(_SPLIT - 70), f.y(494)), _GOOD, -1, cv2.LINE_AA)
+            band, _ = self._text(band, f, [(ko, "bold", 28, _WHITE if good else _BOARD, 430),
+                                           (en, "regular", 19, _WHITE if good else (90, 90, 90), 466),
+                                           ("밤눈 카메라는 이 아래에 있어요", "bold", 22, _BOARD, 520),
+                                           ("The Bamnun camera is down here", "regular", 17, (90, 90, 90), 552)],
+                                 cx=_SPLIT / 2, max_w=_SPLIT - 80)
+            y0, y1 = f.y(418), f.y(580)
+            self._cache[key] = (y0, y1, band[y0:y1, :f.x(_SPLIT)].copy())
+        y0, y1, strip = self._cache[key]
+        canvas[y0:y1, :strip.shape[1]] = strip
+        # A big arrow, nudging down towards the device under the screen.
+        bob = f.n(12) * (0.5 + 0.5 * math.sin(t * 4.0))
+        cx = f.x(_SPLIT / 2)
+        tail, tip = (cx, int(f.y(588) + bob)), (cx, int(f.y(692) + bob))
+        cv2.arrowedLine(canvas, tail, tip, _BOARD, f.n(14), cv2.LINE_AA, tipLength=0.45)
+
     @staticmethod
     def _thumbnail(canvas: np.ndarray, f: _Frame, camera: np.ndarray) -> None:
         """The live camera across the grey panel: people see themselves, and
@@ -445,11 +530,59 @@ class Screens:
         canvas[y:y + h, x:x + w] = thumb
         cv2.rectangle(canvas, (x - 1, y - 1), (x + w, y + h), (120, 120, 120), 1)
 
+    # -- the guided tour ----------------------------------------------------- #
 
-# The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
+    def _tour_card(self, f: _Frame, step: int) -> np.ndarray:
+        import cv2
+
+        key = ("tour", step, f.w, f.h)
+        if key not in self._cache:
+            w, h = TOUR_CARD
+            card = np.empty((f.n(h), f.n(w), 3), np.uint8)
+            card[:] = (250, 250, 250)
+            cf = _Frame((card.shape[1], card.shape[0]))
+            cf.s, cf.ox, cf.oy = f.s, 0.0, 0.0
+            _r, _x, _y, ko, en, lko, len_ = TOUR[step]
+            last = step == len(TOUR) - 1
+            card, _ = self._text(card, cf, [
+                (f"{step + 1} / {len(TOUR)}", "regular", 15, (130, 130, 130), 12),
+                (ko, "bold", 30, _BOARD, 32),
+                (en, "regular", 18, (105, 105, 105), 70),
+                (lko, "regular", 18, _BOARD, 100),
+                (len_, "regular", 14, (105, 105, 105), 124),
+                ("클릭: 시작하기  ·  Click: start driving" if last
+                 else "클릭: 다음  ·  Click: next     Esc: 건너뛰기", "bold", 14, (60, 60, 60), 148),
+            ], cx=w / 2, max_w=w - 30)
+            cv2.rectangle(card, (0, 0), (card.shape[1] - 1, card.shape[0] - 1), (205, 205, 205), 1)
+            self._cache[key] = card
+        return self._cache[key]
+
+    def tour_overlay(self, canvas: np.ndarray, step: int, t: float, age: float) -> None:
+        """Dim the window-sized dashboard except one part, outline it, and put
+        the step's card beside it."""
+        import cv2
+
+        step = max(0, min(step, len(TOUR) - 1))
+        f = _Frame((canvas.shape[1], canvas.shape[0]))
+        (x, y, w, h), cx, cy, *_ = TOUR[step]
+        x0, y0, x1, y1 = f.x(x), f.y(y), f.x(x + w), f.y(y + h)
+        k = min(1.0, age / 0.3)
+        keep = canvas[y0:y1, x0:x1].copy()
+        canvas[:] = (canvas * (1 - 0.68 * k)).astype(np.uint8)
+        canvas[y0:y1, x0:x1] = keep
+        pulse = f.n(3 + 3 * (0.5 + 0.5 * math.sin(t * 4.0)))
+        cv2.rectangle(canvas, (x0 - pulse, y0 - pulse), (x1 + pulse, y1 + pulse), _WHITE,
+                      max(2, f.n(3)), cv2.LINE_AA)
+        card = self._tour_card(f, step)
+        ch, cw = card.shape[:2]
+        left, top = f.x(cx), f.y(cy) - int(f.n(14) * (1 - k))
+        H, W = canvas.shape[:2]
+        left, top = max(0, min(W - cw, left)), max(0, min(H - ch, top))
+        canvas[top:top + ch, left:left + cw] = card
+
     # -- learn more: the pop-up and the QR code --------------------------------- #
 
-    def _popup_card(self, f: _Frame, hot: bool = False) -> tuple[np.ndarray, _Frame]:
+    def _popup_card(self, f: _Frame, hot: bool = False, kind: str = "learn") -> tuple[np.ndarray, _Frame]:
         """The pop-up's still parts, drawn once per window size at that size
         (drawn small and scaled up, the text went soft): a white card like a
         website's, a question, a dark button and a close cross. Ollie and the
@@ -457,7 +590,7 @@ class Screens:
         import cv2
 
         x, y, w, h = POPUP
-        key = ("popup", f.w, f.h, hot)
+        key = ("popup", f.w, f.h, hot, kind)
         if key not in self._cache:
             card = np.empty((f.n(h), f.n(w), 3), np.uint8)
             card[:] = (250, 250, 250)
@@ -468,11 +601,12 @@ class Screens:
             cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)),
                           (88, 88, 94) if hot else _BOARD, -1, cv2.LINE_AA)
             tx = _POPUP_TEXT_X + (w - _POPUP_TEXT_X - 46) / 2
+            title, sub, box = POPUP_WORDS[kind]
             card, _ = self._text(card, cf, [
-                ("밤눈이 궁금하세요?", "bold", 36, _BOARD, 22),
-                ("Want to learn more about Bamnun?", "regular", 21, (105, 105, 105), 72),
+                (title, "bold", 36, _BOARD, 22),
+                (sub, "regular", 21, (105, 105, 105), 72),
             ], cx=tx, max_w=w - _POPUP_TEXT_X - 60)
-            card, _ = self._text(card, cf, [("QR 코드 보기  ·  Learn more", "bold", 24, _WHITE,
+            card, _ = self._text(card, cf, [(box, "bold", 24, _WHITE,
                                              by + (bh - 25) / 2)], cx=bx + bw / 2, max_w=bw - 24)
             cx, cy, r = cf.x(w - 24), cf.y(24), cf.n(9)   # the close cross
             for p0, p1 in (((cx - r, cy - r), (cx + r, cy + r)), ((cx - r, cy + r), (cx + r, cy - r))):
@@ -481,13 +615,14 @@ class Screens:
             self._cache[key] = (card, cf)
         return self._cache[key]
 
-    def learn_popup(self, canvas: np.ndarray, age: float, t: float, hover: Optional[str] = None) -> None:
+    def learn_popup(self, canvas: np.ndarray, age: float, t: float, hover: Optional[str] = None,
+                    kind: str = "learn") -> None:
         """Draw the pop-up on the window-sized dashboard (fit_to_window's
         layout): it springs down into place, Ollie waves, the button glows."""
         import cv2
 
         f = _Frame((canvas.shape[1], canvas.shape[0]))
-        card, cf = self._popup_card(f, hover == "learn_more")
+        card, cf = self._popup_card(f, hover == "learn_more" and kind == "learn", kind)
         card = card.copy()
         if hover == "learn_close":                  # a grey disc behind the cross
             cv2.circle(card, (cf.x(w - 24), cf.y(24)), cf.n(19), (222, 222, 222), -1, cv2.LINE_AA)
@@ -497,7 +632,7 @@ class Screens:
                 cv2.line(card, p0, p1, (60, 60, 60), cf.n(2.5), cv2.LINE_AA)
         x, y, w, h = POPUP
         # Ollie, waving: a bigger swing than on the slides.
-        owl = self._owl("hello", cf.n(132))
+        owl = self._owl("hello" if kind == "learn" else "sleepy", cf.n(132))
         if owl is not None:
             oh, ow = owl.shape[:2]
             m = cv2.getRotationMatrix2D((ow / 2, oh * 0.85), 7.0 * math.sin(t * 3.0), 1.0)
@@ -506,7 +641,7 @@ class Screens:
             self._paste(card, moved, cf.x(_POPUP_TEXT_X / 2 + 4), cf.y(h / 2 + 4 * math.sin(t * 2.2)))
         # The button breathes: a soft ring that grows and fades.
         bx, by, bw, bh = (POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3])
-        ph = (t * 0.8) % 1.0
+        ph = (t * 0.8) % 1.0 if kind == "learn" else 0.99   # only a button glows
         grow = cf.n(2 + 9 * ph)
         ring = card.copy()
         cv2.rectangle(ring, (cf.x(bx) - grow, cf.y(by) - grow), (cf.x(bx + bw) + grow, cf.y(by + bh) + grow),
@@ -641,6 +776,30 @@ class Screens:
         return canvas
 
 
+# The guided tour of the dashboard after calibration, like a new app's first
+# run: each step lights one part (1280x720 units) and explains it in a card.
+# (rect, card x, card y, Korean title, English title, Korean line, English line)
+TOUR = [
+    ((8, 8, 832, 468), 860, 230, "카메라", "The camera",
+     "얼굴 위의 점과 선이 밤눈이 따라가는 곳이에요", "The dots and lines are what Bamnun tracks"),
+    ((848, 8, 424, 136), 410, 30, "지금 상태", "Right now",
+     "졸음 점수: 깨어 있음부터 위험까지", "How sleepy you are, from alert to danger"),
+    ((848, 260, 424, 152), 410, 240, "눈", "Your eyes",
+     "눈이 감긴 정도, 깜빡임, 미세수면", "How closed they are, blinks, microsleeps"),
+    ((848, 418, 424, 54), 410, 330, "머리", "Your head",
+     "고개와 시선이 도로를 향하는지", "Whether your head and eyes face the road"),
+    ((848, 478, 424, 134), 410, 450, "깨우기 단계", "Wake-up stages",
+     "졸리면 불빛, 미스트, 소리, 알람이 여기 켜져요", "Light, mist, sound and alarm light up here"),
+    ((8, 482, 832, 230), 260, 250, "기록", "History",
+     "최근 2분의 졸음, 공기, 점수의 이유", "The last 2 minutes, the air, and why"),
+    ((12, 290, 824, 182), 260, 60, "버튼", "Buttons",
+     "가이드, 목소리, QR과 단계 체험, 다음 사람, 소리, 다시 보정",
+     "Guide, voice, QR + stages, next person, volume, recalibrate"),
+]
+TOUR_CARD = (400, 172)                        # w, h
+
+
+# The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
 HEALTH_WORDS = {
     "warm": ("Pi가 뜨거워지고 있어요", "The Pi is getting warm", (0, 130, 230)),
     "hot": ("Pi가 너무 뜨거워요: 잠시 꺼서 식혀 주세요", "The Pi is too hot: turn it off to cool down",

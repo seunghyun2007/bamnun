@@ -348,6 +348,9 @@ alerts:
     calibrated_voice:
       type: audio
       file: "assets/voice/{lang}/cal_done.wav"
+    sleepy_voice:                # the "now try being sleepy" tip while driving
+      type: audio
+      file: "assets/voice/{lang}/try_sleepy.wav"
 
 # Cabin CO2 (SCD41 on I2C). Fires the open_window prompt once per excursion.
 air:
@@ -400,7 +403,9 @@ ui:
   # keys 1-4). Back, Esc or qr_close_s untouched closes it. Once per visitor. url "": off.
   learn_more:
     url: https://seunghyun2007.github.io/bamnun/
-    after_s: 45
+    sleepy_tip_after_s: 20     # first, Ollie suggests trying to be sleepy (card + voice) ...
+    sleepy_tip_hide_s: 15      # ... gone after this, or as soon as an alert answers it
+    after_s: 60
     hide_after_s: 40
     qr_close_s: 60
 

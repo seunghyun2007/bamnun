@@ -575,6 +575,13 @@ class EscalationPolicy:
                 return a
         return None
 
+    def tick(self, t: float) -> None:
+        """Let timed outputs end (a light's hold) on a frame the ladder skips:
+        a booth screen or calibration. Without it a light lit from the stage
+        cards stayed on until the dashboard came back."""
+        for act in self.actuators.values():
+            act.tick(t)
+
     def update(self, state, distracted_override: Optional[bool] = None) -> AlertDecision:
         t = state.t
         if not self.enabled:

@@ -175,3 +175,21 @@ def test_the_next_person_button_is_on_the_dashboard():
     from bamnun.viz import BUTTONS, button_at
     x, y, w, h = BUTTONS["next_visitor"]
     assert button_at(x + w // 2, y + h // 2) == "next_visitor"
+
+
+def test_a_blocked_camera_is_not_a_head_drop_at_the_booth():
+    """2026-11-06: the driver's arm passed in front of the side camera; the
+    face vanished right after a jump in the landmarks, which read as a head
+    drop and fired stage 4. With head_drop_when_lost off it's just unseen."""
+    import yaml
+    from bamnun.eyes import NodDetector
+    cfg = yaml.safe_load((ROOT / "config" / "default.yaml").read_text())
+    nod_cfg = cfg["features"]["nod"]
+    assert nod_cfg["head_drop_when_lost"] is False
+    for on, expected in ((True, True), (False, False)):
+        n = NodDetector({**nod_cfg, "head_drop_when_lost": on})
+        t = 0.0
+        for p in (0, 0, 2, 6, 10, 14):           # a fast move "down" (the arm drags the mesh) ...
+            t += 0.07
+            n.update(t, float(p), 0.9)
+        assert n.lost(t + 0.07) is expected      # ... then the face is gone

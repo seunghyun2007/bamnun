@@ -113,6 +113,14 @@ features:
     head_drop_lost_window_s: 0.6   # face lost within this of a downward movement = the head dropped
     head_drop_min_speed_deg_s: 8.0 # ... if it was going down at least this fast
     head_drop_microsleep_s: 0.5    # a head drop with the face lost this long counts as a microsleep
+    # A face that vanishes just after moving down counts as a head drop (a
+    # microsleep, straight to the top stage). Off at the booth: the camera
+    # sits low on the driver's left, and their arm on the wheel passes in
+    # front of it; the face is lost with a jump in the landmarks first, which
+    # looked exactly like a drop (2026-11-06 log: four false stage-4 alarms).
+    # Shut eyes and nods with the face in view still count. true: a camera
+    # nothing can block, straight ahead of the driver.
+    head_drop_when_lost: false
 
   perclos_window_s: 60.0
   openness_window_s: 45.0          # heavy lids: median openness of reliable, non-blink frames over this

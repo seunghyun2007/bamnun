@@ -470,6 +470,9 @@ class NodDetector:
         self.recover_s = _cfg(cfg, "nod_recovery_window_s", 2.5)
         self.lost_window = _cfg(cfg, "head_drop_lost_window_s", 0.6)
         self.lost_speed = _cfg(cfg, "head_drop_min_speed_deg_s", 8.0)
+        # Off where the camera can be blocked: a face that vanishes is unseen,
+        # not a sleeper (see head_drop_when_lost in config/default.yaml).
+        self.drop_when_lost = bool((cfg or {}).get("head_drop_when_lost", True))
         self.window = _cfg(cfg, "nod_window_s", 120.0)
         self.events: Deque[Nod] = deque()
         self._hist: Deque[tuple[float, float, Optional[float]]] = deque()
@@ -539,6 +542,8 @@ class NodDetector:
 
     def lost(self, t: float) -> bool:
         """The face just vanished. True if it went down with the head."""
+        if not self.drop_when_lost:
+            return False
         if self.head_drop_since is not None:
             return True
         if not self._hist:

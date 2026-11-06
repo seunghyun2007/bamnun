@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (318 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (319 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -47,6 +47,11 @@ the Wi-Fi hotspot.
   relaxed for the side camera. While calibrating, a full-screen page says
   "게임 화면을 보세요 / Look at the game screen" with a big moving arrow to
   the right, a progress bar and the live hint.
+- **Blocked camera is not a head drop** (`features.nod.head_drop_when_lost:
+  false`): the driver's arm passes in front of the low left camera; the face
+  vanished after a jump in the landmarks, which read as a head drop and fired
+  stage 4 (four false alarms in the 2026-11-06 22:32 log). Now a lost face is
+  just unseen; shut eyes and nods with the face in view still count.
 - **Side camera fix**: eye readings past 55° from the camera itself are
   "turned" (unseen, not shut): no closure, microsleep or PERCLOS from them.
 - **Standby** after 30 s with no face: invitation screen (Ollie, animated),
@@ -82,7 +87,10 @@ the Wi-Fi hotspot.
   GitHub Pages from the `gh-pages` branch (just `index.html` + `.nojekyll`).
   There's no Pi behind it, so on `*.github.io` the app runs its built-in demo
   (`live.js` WEBSITE): Product demo = simulated driver, labelled "Demo";
-  Product control = sound preview on the phone.
+  Product control = sound preview on the phone. The website skips the
+  splash and the Product demo / control choice: it opens straight on the demo
+  Home, in the phone's language (`shell.html` start logic). "‹ Start" still
+  leads back to the choice.
   To update it: `cd frontend && npm run build` (reads `frontend/.env`), then
   copy `frontend/www/index.html` onto the `gh-pages` branch and push. Google
   sign-in there needs this address in Supabase → Authentication → URL
@@ -121,6 +129,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: arm blocking the camera no longer fires stage 4; website opens straight on the demo.
 - 2026-11-06: NEXT PERSON button (n); pop-up bigger, sharp, animated.
 - 2026-11-06: website runs the built-in demo drive (Product demo was stuck on "connecting").
 - 2026-11-06: website address added to Supabase redirect URLs.

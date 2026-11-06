@@ -77,6 +77,9 @@ the Wi-Fi hotspot.
   "Are you OK? … tap your phone". Stop it with Ctrl+C when not needed.
 - **Website** (the phone app as a web page): **https://seunghyun2007.github.io/bamnun/**,
   GitHub Pages from the `gh-pages` branch (just `index.html` + `.nojekyll`).
+  There's no Pi behind it, so on `*.github.io` the app runs its built-in demo
+  (`live.js` WEBSITE): Product demo = simulated driver, labelled "Demo";
+  Product control = sound preview on the phone.
   To update it: `cd frontend && npm run build` (reads `frontend/.env`), then
   copy `frontend/www/index.html` onto the `gh-pages` branch and push. Google
   sign-in there needs this address in Supabase → Authentication → URL
@@ -115,6 +118,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: website runs the built-in demo drive (Product demo was stuck on "connecting").
 - 2026-11-06: website address added to Supabase redirect URLs.
 - 2026-11-06: website on GitHub Pages; "learn more" pop-up after 45 s of driving -> QR screen.
 - 2026-11-06: Pi temperature/power warning bar + "Pi NN C" in the footer.

@@ -34,9 +34,11 @@
   let ws = null, last = null, conn = "connecting", retry = 0;
   // Demo: a simulated driver inside the page, so the live screens can be seen
   // with nothing installed. Only ever on request (?demo, or opening the file
-  // directly), and labelled on screen: a real app that has lost its Pi must
-  // never show made-up numbers.
-  const DEMO = new URLSearchParams(location.search).has("demo") || location.protocol === "file:";
+  // directly, or the public website on GitHub Pages, which has no Pi behind
+  // it), and labelled on screen: a real app that has lost its Pi must never
+  // show made-up numbers.
+  const WEBSITE = /\.github\.io$/i.test(location.hostname);
+  const DEMO = new URLSearchParams(location.search).has("demo") || location.protocol === "file:" || WEBSITE;
 
   // Which device to talk to. A page served by the Pi talks back to the Pi;
   // the Capacitor app or a file uses ?pi=host:port, remembered, or the

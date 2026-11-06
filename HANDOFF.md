@@ -72,12 +72,16 @@ the Wi-Fi hotspot.
   click, Esc or 60 s goes back. The × or 40 s untouched hides it. Once per
   visitor (reset at standby). QR made by OpenCV (`cv2.QRCodeEncoder`), no new
   package.
+- **Mac simulator**: `tools/sim_server.py` (port 8000) plays a fake sleepy
+  driver on repeat; an app tab open on localhost:8000 then rings alarms and
+  "Are you OK? … tap your phone". Stop it with Ctrl+C when not needed.
 - **Website** (the phone app as a web page): **https://seunghyun2007.github.io/bamnun/**,
   GitHub Pages from the `gh-pages` branch (just `index.html` + `.nojekyll`).
   To update it: `cd frontend && npm run build` (reads `frontend/.env`), then
   copy `frontend/www/index.html` onto the `gh-pages` branch and push. Google
   sign-in there needs this address in Supabase → Authentication → URL
-  Configuration (redirect URLs) — not added yet.
+  Configuration (redirect URLs): `https://seunghyun2007.github.io/bamnun/**`
+  added 2026-11-06 (also `http://localhost:8000/**`, `kr.bamnun.app://auth-callback`).
 - **Pi temperature watch** (`thermal.py` PiHealth, config `thermal:`): reads
   the chip temperature every 2 s and `vcgencmd get_throttled` every 10 s. The
   dashboard footer always shows "Pi NN C". At 75 °C an orange bar appears on
@@ -102,8 +106,6 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Open items
 
-- Add https://seunghyun2007.github.io/bamnun/ to Supabase redirect URLs so
-  Google sign-in works on the website.
 - PR #5 (`demo-booth` -> `main`) is open: the friend should review it before
   it's merged. No CI on the repo.
 - Compare `local-wip` with the friend's detection code.
@@ -113,6 +115,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: website address added to Supabase redirect URLs.
 - 2026-11-06: website on GitHub Pages; "learn more" pop-up after 45 s of driving -> QR screen.
 - 2026-11-06: Pi temperature/power warning bar + "Pi NN C" in the footer.
 - 2026-11-06: face mesh (outlines + 478 dots); standby camera as wide as the

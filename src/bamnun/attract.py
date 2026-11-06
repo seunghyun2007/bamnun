@@ -217,7 +217,7 @@ class Screens:
 
     @staticmethod
     def _thumbnail(canvas: np.ndarray, camera: np.ndarray) -> None:
-        """The live camera, small, bottom right: people see themselves."""
+        """The live camera, small, top right: people see themselves."""
         import cv2
 
         w = 240
@@ -225,6 +225,6 @@ class Screens:
         thumb = cv2.resize(camera, (w, h), interpolation=cv2.INTER_AREA)
         if thumb.ndim == 2:
             thumb = cv2.cvtColor(thumb, cv2.COLOR_GRAY2BGR)
-        x, y = DASH_W - w - 20, DASH_H - h - 20
+        x, y = DASH_W - w - 20, 20
         canvas[y:y + h, x:x + w] = thumb
         cv2.rectangle(canvas, (x - 1, y - 1), (x + w, y + h), (120, 110, 120), 1)

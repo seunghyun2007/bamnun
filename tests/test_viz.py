@@ -348,5 +348,7 @@ def test_the_volume_buttons_are_clickable_and_do_not_overlap_the_others():
 
     for name, (x, y, w, h) in BUTTONS.items():
         assert button_at(x + w // 2, y + h // 2) == name
-    spans = sorted((x, x + w) for x, _y, w, _h in BUTTONS.values())
-    assert all(a_end < b_start for (_a, a_end), (b_start, _b) in zip(spans, spans[1:]))
+    rects = list(BUTTONS.values())
+    for i, (ax, ay, aw, ah) in enumerate(rects):        # no two buttons overlap
+        for bx, by, bw, bh in rects[i + 1:]:
+            assert ax + aw < bx or bx + bw < ax or ay + ah < by or by + bh < ay

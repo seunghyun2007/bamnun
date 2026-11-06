@@ -173,8 +173,9 @@ def test_next_person_starts_the_briefing_over_with_a_fresh_popup():
 
 def test_the_next_person_button_is_on_the_dashboard():
     from bamnun.viz import BUTTONS, button_at
-    x, y, w, h = BUTTONS["next_visitor"]
-    assert button_at(x + w // 2, y + h // 2) == "next_visitor"
+    for name in ("next_visitor", "learn_more"):
+        x, y, w, h = BUTTONS[name]
+        assert button_at(x + w // 2, y + h // 2) == name
 
 
 def test_a_blocked_camera_is_not_a_head_drop_at_the_booth():

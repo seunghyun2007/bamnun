@@ -5,7 +5,7 @@
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
-Keys in the window: n next person (the briefing again), c recalibrate, s snapshot, a toggle actuators, l dashboard or
+Keys in the window: n next person (the briefing again), m the QR code and stage cards, c recalibrate, s snapshot, a toggle actuators, l dashboard or
 camera-only layout, f full screen, - and = speaker volume, space the visitor
 briefing, Esc skip the standby or briefing screen, q quit. The dashboard also has Calibrate, Full screen and volume
 buttons to click; on the standby and briefing screens a click is space.
@@ -981,6 +981,8 @@ class Monitor:
                     self._next(now, frame.timestamp)
                 if self.mode == "qr" and key in (ord("1"), ord("2"), ord("3"), ord("4")):
                     self._play_stage(key - ord("0"), now, frame.timestamp)
+                if key == ord("m") and self.mode != "qr":  # straight to the learn-more screen
+                    self._open_qr(now)
                 if key == ord("n"):                       # next person: the briefing again
                     self._next_visitor(now)
                 if key == 27 and self.mode != "live":     # Esc: skip to the dashboard

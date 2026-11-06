@@ -35,9 +35,10 @@ the Wi-Fi hotspot.
 
 - **Dashboard** layout (viz.Dashboard): camera + panels (state, CO2 air, eyes,
   head, system response lights, rest plan, charts, what drives the score).
-  Buttons drawn on it: NEXT PERSON (bottom-left: lights off, the briefing
+  Buttons drawn on it: QR + STAGES (above NEXT PERSON: opens the learn-more
+  screen straight away), NEXT PERSON (bottom-left: lights off, the briefing
   from page 1, a fresh pop-up), VOL -, VOL +, CALIBRATE, FULL SCREEN (clicks
-  work over Pi Connect; keys don't always). Keys: n next person, c calibrate, f full screen, l layout,
+  work over Pi Connect; keys don't always). Keys: m learn-more screen, n next person, c calibrate, f full screen, l layout,
   - / = volume, space briefing, Esc skip standby/briefing, q quit.
 - **Speaker** (USB, ALSA card `UACDemoV10`, control `PCM`) set to **80% at
   every start**; VOL buttons change it in 10% steps.
@@ -134,6 +135,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: QR + STAGES button and m key open the learn-more screen directly.
 - 2026-11-06: learn-more screen gets four stage cards that play on the real device.
 - 2026-11-06: arm blocking the camera no longer fires stage 4; website opens straight on the demo.
 - 2026-11-06: NEXT PERSON button (n); pop-up bigger, sharp, animated.

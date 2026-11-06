@@ -16,7 +16,8 @@ the Wi-Fi hotspot.
 ## Where things are
 
 - Repo: `github.com/seunghyun2007/bamnun`, working branch **`demo-booth`**
-  (pushed, **not merged into `main`**). `main` = the merged app + friend's
+  (pushed; **PR #5 into `main` is open**, not merged:
+  https://github.com/seunghyun2007/bamnun/pull/5). `main` = the merged app + friend's
   detection rework (PR #4).
 - Mac copy: `~/Downloads/bamnun` (on `demo-booth`).
 - Pi: Raspberry Pi 5 called **`inpi`**, user `inpi`, repo at `~/bamnun`, on
@@ -75,7 +76,8 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Open items
 
-- Merge `demo-booth` into `main` (ask first; the friend should see it).
+- PR #5 (`demo-booth` -> `main`) is open: the friend should review it before
+  it's merged. No CI on the repo.
 - Compare `local-wip` with the friend's detection code.
 - Check the sources for the "why we chose it" text (phone app stage cards).
 - An old Wi-Fi profile called "hotspot" on the Pi (not Bamnun's) autoconnects.
@@ -83,6 +85,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: opened PR #5, demo-booth -> main.
 - 2026-11-06: owner checked the new look, Drive page and calibration screen on
   the Pi: approved.
 - 2026-11-06: new calm look (grey/charcoal, serif), animated Ollie, "click

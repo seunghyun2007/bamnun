@@ -2802,6 +2802,14 @@ setTimeout(()=>{
   let first=ORDER.includes(start)?start:"Main";
   if(A&&A.pendingReturn())first="Account";
   else if(!start&&A&&A.user()&&S&&S.onboarded())first="Home";
+  // The public website (GitHub Pages, opened from the booth's QR code) has no
+  // Pi behind it: straight into the demo drive, in the phone's language.
+  else if(/\.github\.io$/i.test(location.hostname)&&(!start||start==="Main"||start==="Welcome")){
+    let saved=null;try{saved=localStorage.getItem("bn-lang")}catch(e){}
+    if(!saved)setLang(/^ko/i.test(navigator.language||"")?"ko":"en");
+    try{localStorage.setItem("bn-showcase","1")}catch(e){}
+    first="Home";
+  }
   go(first,{instant:true});
 },0);
 // The app was restarted while Google's page was open, then signed in.

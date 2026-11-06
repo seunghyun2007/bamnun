@@ -5,7 +5,7 @@
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
-Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
+Keys in the window: n next person (the briefing again), c recalibrate, s snapshot, a toggle actuators, l dashboard or
 camera-only layout, f full screen, - and = speaker volume, space the visitor
 briefing, Esc skip the standby or briefing screen, q quit. The dashboard also has Calibrate, Full screen and volume
 buttons to click; on the standby and briefing screens a click is space.
@@ -628,6 +628,15 @@ class Monitor:
                                            or now - self._popup_at >= self._learn_hide_s):
             self._popup_at = None
 
+    def _next_visitor(self, now: float) -> None:
+        """Start over for the next person: lights off, their own pop-up later,
+        and the briefing from its first page (which ends in calibration)."""
+        self._last_alert = self.policy.reset(now)
+        self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
+        self.mode, self._brief_step, self._brief_at = "briefing", 0, now
+        self.logger.log_event("next_visitor", {})
+        console.print("[cyan]next visitor: briefing from the start[/]")
+
     def _open_qr(self, now: float) -> None:
         self.mode, self._qr_at, self._popup_at = "qr", now, None
         self.logger.log_event("learn_more_qr", {})
@@ -891,13 +900,13 @@ class Monitor:
                                 frame.timestamp, frame.timestamp - t_start, fps,
                                 progress if calibrating else -1.0, alerts_on))
                         canvas = dash.compose(canvas)
-                        if self._popup_at is not None:
+                        _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                        canvas = fit_to_window(canvas, win_w, win_h)
+                        if self._popup_at is not None:     # at the window's size: sharp
                             if self._screens is None:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
-                            self._screens.learn_popup(canvas, now - self._popup_at)
-                        _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
-                        canvas = fit_to_window(canvas, win_w, win_h)
+                            self._screens.learn_popup(canvas, now - self._popup_at, now)
                     if self.demo and dash is None:
                         h = canvas.shape[0]
                         label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
@@ -930,10 +939,14 @@ class Monitor:
                         self._open_qr(now)
                     elif btn == "learn_close":
                         self._popup_at = None
+                    elif btn == "next_visitor":
+                        key = ord("n")
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if go_next:
                     self._next(now, frame.timestamp)
+                if key == ord("n"):                       # next person: the briefing again
+                    self._next_visitor(now)
                 if key == 27 and self.mode != "live":     # Esc: skip to the dashboard
                     self.mode = "live"
                 if key == ord("q"):

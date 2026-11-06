@@ -150,10 +150,28 @@ def test_a_click_on_the_popup_opens_the_code_and_the_cross_closes_it():
 def test_the_popup_and_a_scannable_qr_code_draw():
     s = Screens(ROOT)
     dash = np.zeros((DASH_H, DASH_W, 3), np.uint8)
-    s.learn_popup(dash, 1.0)
+    s.learn_popup(dash, 1.0, 1.0)
     x, y, w, h = POPUP
     assert dash[y + h // 2, x + w // 2].any() and not dash[600, 100].any()
+    big = np.zeros((1080, 1920, 3), np.uint8)    # drawn at the window's size, where it lands
+    s.learn_popup(big, 1.0, 1.0)
+    assert big[int((y + h / 2) * 1.5), int((x + w / 2) * 1.5)].any() and not big[900, 150].any()
     url = "https://seunghyun2007.github.io/bamnun/"
     screen = s.learn_more(0.0, url, (1366, 768))
     assert screen.shape == (768, 1366, 3)
     assert cv2.QRCodeDetector().detectAndDecode(screen)[0] == url
+
+
+def test_next_person_starts_the_briefing_over_with_a_fresh_popup():
+    m, events = stub()
+    m._driven_s, m._learn_shown, m._popup_at = 80.0, True, 50.0
+    Monitor._next_visitor(m, 100.0)
+    assert m.mode == "briefing" and m._brief_step == 0 and m._last_alert == "reset"
+    assert (m._driven_s, m._learn_shown, m._popup_at) == (0.0, False, None)
+    assert "next_visitor" in events
+
+
+def test_the_next_person_button_is_on_the_dashboard():
+    from bamnun.viz import BUTTONS, button_at
+    x, y, w, h = BUTTONS["next_visitor"]
+    assert button_at(x + w // 2, y + h // 2) == "next_visitor"

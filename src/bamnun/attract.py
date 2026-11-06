@@ -85,9 +85,10 @@ _DRIVE_AT = (326, 915)
 
 # The "learn more" pop-up on the dashboard (1280x720 units): over the camera's
 # top-right corner, clear of the face and of the buttons along its bottom.
-POPUP = (444, 18, 380, 132)                   # x, y, w, h
-POPUP_BUTTON = (POPUP[0] + 120, POPUP[1] + 80, 240, 38)
-POPUP_CLOSE = (POPUP[0] + POPUP[2] - 40, POPUP[1], 40, 40)
+POPUP = (318, 18, 512, 184)                   # x, y, w, h
+_POPUP_TEXT_X = 150                           # Ollie to the left of this
+POPUP_BUTTON = (POPUP[0] + 168, POPUP[1] + 116, 318, 50)
+POPUP_CLOSE = (POPUP[0] + POPUP[2] - 48, POPUP[1], 48, 48)
 
 
 def popup_hit(x: int, y: int) -> Optional[str]:
@@ -418,53 +419,82 @@ class Screens:
 # The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
     # -- learn more: the pop-up and the QR code --------------------------------- #
 
-    def _popup_card(self) -> np.ndarray:
-        """The pop-up, drawn once: a white card like a website's, Ollie, a
-        question, a dark button and a close cross."""
+    def _popup_card(self, f: _Frame) -> tuple[np.ndarray, _Frame]:
+        """The pop-up's still parts, drawn once per window size at that size
+        (drawn small and scaled up, the text went soft): a white card like a
+        website's, a question, a dark button and a close cross. Ollie and the
+        button's glow move, so they are added each frame."""
         import cv2
 
-        key = ("popup",)
+        x, y, w, h = POPUP
+        key = ("popup", f.w, f.h)
         if key not in self._cache:
-            x, y, w, h = POPUP
-            card = np.empty((h, w, 3), np.uint8)
+            card = np.empty((f.n(h), f.n(w), 3), np.uint8)
             card[:] = (250, 250, 250)
-            f = _Frame((w, h))
-            f.s, f.ox, f.oy = 1.0, 0.0, 0.0
-            owl = self._owl("hello", 92)
-            if owl is not None:
-                self._paste(card, owl, 62, h // 2)
-            bx, by, bw, bh = POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3]
-            cv2.rectangle(card, (bx, by), (bx + bw, by + bh), _BOARD, -1, cv2.LINE_AA)
-            tx = 120 + (w - 120 - 40) / 2
-            card, _ = self._text(card, f, [
-                ("밤눈이 궁금하세요?", "bold", 24, _BOARD, 20),
-                ("Want to learn more about Bamnun?", "regular", 16, (110, 110, 110), 50),
-            ], cx=tx, max_w=w - 120 - 50)
-            card, _ = self._text(card, f, [("QR 코드 보기  ·  Learn more", "bold", 18, _WHITE,
-                                            by + (bh - 19) / 2)], cx=bx + bw / 2, max_w=bw - 16)
-            cx, cy, r = w - 20, 20, 7               # the close cross
-            for a, b in (((cx - r, cy - r), (cx + r, cy + r)), ((cx - r, cy + r), (cx + r, cy - r))):
-                cv2.line(card, a, b, (120, 120, 120), 2, cv2.LINE_AA)
-            cv2.rectangle(card, (0, 0), (w - 1, h - 1), (200, 200, 200), 1)
-            self._cache[key] = card
+            cf = _Frame((card.shape[1], card.shape[0]))
+            cf.s, cf.ox, cf.oy = f.s, 0.0, 0.0
+            bx, by, bw, bh = (POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3])
+            cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)), _BOARD, -1, cv2.LINE_AA)
+            tx = _POPUP_TEXT_X + (w - _POPUP_TEXT_X - 46) / 2
+            card, _ = self._text(card, cf, [
+                ("밤눈이 궁금하세요?", "bold", 36, _BOARD, 22),
+                ("Want to learn more about Bamnun?", "regular", 21, (105, 105, 105), 72),
+            ], cx=tx, max_w=w - _POPUP_TEXT_X - 60)
+            card, _ = self._text(card, cf, [("QR 코드 보기  ·  Learn more", "bold", 24, _WHITE,
+                                             by + (bh - 25) / 2)], cx=bx + bw / 2, max_w=bw - 24)
+            cx, cy, r = cf.x(w - 24), cf.y(24), cf.n(9)   # the close cross
+            for p0, p1 in (((cx - r, cy - r), (cx + r, cy + r)), ((cx - r, cy + r), (cx + r, cy - r))):
+                cv2.line(card, p0, p1, (120, 120, 120), cf.n(2.5), cv2.LINE_AA)
+            cv2.rectangle(card, (0, 0), (card.shape[1] - 1, card.shape[0] - 1), (205, 205, 205), 1)
+            self._cache[key] = (card, cf)
         return self._cache[key]
 
-    def learn_popup(self, canvas: np.ndarray, age: float) -> None:
-        """Draw the pop-up on a dashboard canvas (1280x720), sliding in."""
+    def learn_popup(self, canvas: np.ndarray, age: float, t: float) -> None:
+        """Draw the pop-up on the window-sized dashboard (fit_to_window's
+        layout): it springs down into place, Ollie waves, the button glows."""
+        import cv2
+
+        f = _Frame((canvas.shape[1], canvas.shape[0]))
+        card, cf = self._popup_card(f)
+        card = card.copy()
         x, y, w, h = POPUP
-        k = min(1.0, max(0.0, age / 0.35))
-        k = 1 - (1 - k) ** 3
-        top = int(y - 24 * (1 - k))
-        card = self._popup_card()
-        y0, y1 = max(0, top), min(canvas.shape[0], top + h)
-        if y1 <= y0:
+        # Ollie, waving: a bigger swing than on the slides.
+        owl = self._owl("hello", cf.n(132))
+        if owl is not None:
+            oh, ow = owl.shape[:2]
+            m = cv2.getRotationMatrix2D((ow / 2, oh * 0.85), 7.0 * math.sin(t * 3.0), 1.0)
+            moved = cv2.warpAffine(owl, m, (ow, oh), flags=cv2.INTER_LINEAR,
+                                   borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+            self._paste(card, moved, cf.x(_POPUP_TEXT_X / 2 + 4), cf.y(h / 2 + 4 * math.sin(t * 2.2)))
+        # The button breathes: a soft ring that grows and fades.
+        bx, by, bw, bh = (POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3])
+        ph = (t * 0.8) % 1.0
+        grow = cf.n(2 + 9 * ph)
+        ring = card.copy()
+        cv2.rectangle(ring, (cf.x(bx) - grow, cf.y(by) - grow), (cf.x(bx + bw) + grow, cf.y(by + bh) + grow),
+                      _BOARD, cf.n(2.5), cv2.LINE_AA)
+        a = 0.55 * (1 - ph)
+        card = cv2.addWeighted(ring, a, card, 1 - a, 0)
+        cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)), _BOARD, 1, cv2.LINE_AA)
+        # In: drop from above with a little overshoot, fading in.
+        k = min(1.0, max(0.0, age / 0.55))
+        c1 = 1.70158
+        ease = 1 + (c1 + 1) * (k - 1) ** 3 + c1 * (k - 1) ** 2
+        alpha = min(1.0, age / 0.25)
+        ch, cw = card.shape[:2]
+        left = f.x(x)
+        top = int(f.y(y) - f.n(70) * (1 - ease))
+        H, W = canvas.shape[:2]
+        y0, y1 = max(0, top), min(H, top + ch)
+        x1 = min(W, left + cw)
+        if y1 <= y0 or x1 <= left:
             return
-        src = card[y0 - top:y1 - top]
-        dst = canvas[y0:y1, x:x + w]
-        # A soft shadow, then the card.
-        sh = canvas[min(canvas.shape[0] - 1, y0 + 4):min(canvas.shape[0], y1 + 4), x + 4:x + w + 4]
-        sh[:] = (sh * (1 - 0.35 * k)).astype(np.uint8)
-        dst[:] = (src * k + dst * (1 - k)).astype(np.uint8)
+        sd = f.n(6)                                   # a soft shadow below-right
+        sh = canvas[min(H, y0 + sd):min(H, y1 + sd), min(W, left + sd):min(W, x1 + sd)]
+        sh[:] = (sh * (1 - 0.4 * alpha)).astype(np.uint8)
+        src = card[y0 - top:y1 - top, :x1 - left]
+        dst = canvas[y0:y1, left:x1]
+        dst[:] = (src * alpha + dst * (1 - alpha)).astype(np.uint8)
 
     def _qr(self, url: str, px: int) -> Optional[np.ndarray]:
         key = ("qr", url, px)

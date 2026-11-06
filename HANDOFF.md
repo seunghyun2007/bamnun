@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (316 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (318 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -35,8 +35,9 @@ the Wi-Fi hotspot.
 
 - **Dashboard** layout (viz.Dashboard): camera + panels (state, CO2 air, eyes,
   head, system response lights, rest plan, charts, what drives the score).
-  Buttons drawn on it: VOL -, VOL +, CALIBRATE, FULL SCREEN (clicks work over
-  Pi Connect; keys don't always). Keys: c calibrate, f full screen, l layout,
+  Buttons drawn on it: NEXT PERSON (bottom-left: lights off, the briefing
+  from page 1, a fresh pop-up), VOL -, VOL +, CALIBRATE, FULL SCREEN (clicks
+  work over Pi Connect; keys don't always). Keys: n next person, c calibrate, f full screen, l layout,
   - / = volume, space briefing, Esc skip standby/briefing, q quit.
 - **Speaker** (USB, ALSA card `UACDemoV10`, control `PCM`) set to **80% at
   every start**; VOL buttons change it in 10% steps.
@@ -66,7 +67,9 @@ the Wi-Fi hotspot.
   (`tools/make_voice.py`), in `assets/voice/{en,ko}/`.
 - **Learn more pop-up** (`ui.learn_more`): after a visitor has driven 45 s
   (face seen, on the dashboard, not calibrating), a white website-style card
-  slides in over the camera's top-right corner: Ollie, "밤눈이 궁금하세요? /
+  (bigger, drawn at the window's own size so it's sharp) drops in with a
+  little bounce over the camera's top-right corner, Ollie waving and the
+  button glowing: Ollie, "밤눈이 궁금하세요? /
   Want to learn more about Bamnun?" and a "QR 코드 보기 · Learn more" button.
   A click opens a full-screen QR code (calm slide style) for the website; a
   click, Esc or 60 s goes back. The × or 40 s untouched hides it. Once per
@@ -118,6 +121,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: NEXT PERSON button (n); pop-up bigger, sharp, animated.
 - 2026-11-06: website runs the built-in demo drive (Product demo was stuck on "connecting").
 - 2026-11-06: website address added to Supabase redirect URLs.
 - 2026-11-06: website on GitHub Pages; "learn more" pop-up after 45 s of driving -> QR screen.

@@ -377,9 +377,12 @@ _BTN_R = _CAM_RECT[0] + _CAM_RECT[2] - 8
 BUTTONS = {"vol_down": (_BTN_R - 458, _BTN_Y, 66, 36),
            "vol_up": (_BTN_R - 386, _BTN_Y, 66, 36),
            "calibrate": (_BTN_R - 304, _BTN_Y, 150, 36),
-           "fullscreen": (_BTN_R - 146, _BTN_Y, 146, 36)}
+           "fullscreen": (_BTN_R - 146, _BTN_Y, 146, 36),
+           # Bottom-left: start over for the next visitor (the briefing again).
+           "next_visitor": (_CAM_RECT[0] + 8, _BTN_Y, 196, 36)}
 _BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
-                 "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)"}
+                 "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
+                 "next_visitor": "NEXT PERSON (n)"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)

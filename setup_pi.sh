@@ -32,7 +32,8 @@ apt-cache show "$GLIB" >/dev/null 2>&1 || GLIB=libglib2.0-0   # bookworm
 sudo apt-get install -y \
   python3-picamera2 python3-libcamera python3-venv python3-dev \
   libgl1 "$GLIB" \
-  python3-lgpio
+  python3-lgpio \
+  fonts-nanum   # Korean on the booth's standby and briefing screens (attract.py)
 
 echo "== virtual environment =="
 if [ ! -d .venv ]; then

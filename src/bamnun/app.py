@@ -6,8 +6,9 @@
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
 Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
-camera-only layout, f full screen, - and = speaker volume, q quit. The dashboard
-also has Calibrate, Full screen and volume buttons to click.
+camera-only layout, f full screen, - and = speaker volume, space the visitor
+briefing, q quit. The dashboard also has Calibrate, Full screen and volume
+buttons to click; on the standby and briefing screens a click is space.
 """
 
 from __future__ import annotations
@@ -60,6 +61,8 @@ PUBLISH_PERIOD_S = 0.1
 SCORE_SAMPLE_S = 0.5
 SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
 CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
+BACK_AFTER_FACE_S = 1.5  # standby ends once a face has been seen this long
+BRIEFING_IDLE_S = 45.0   # an untouched briefing page closes after this
 VOLUME_STEP = 10
 
 # The calibrator's live hints, as a person reads them.
@@ -224,6 +227,15 @@ class Monitor:
         self._last_score_t = -1e9
         self.volume = SpeakerVolume(ui.get("speaker_mixer"))
         self._max_cal_attempts = int(self.cfg["calibration"].get("max_attempts", 3))
+        # Booth screens (attract.py): standby after a while with nobody at the
+        # wheel, and the briefing a visitor starts with space or a click.
+        self.mode = "live"                       # live | standby | briefing
+        self._standby_after_s = float(ui.get("standby_after_s", 30.0))
+        self._no_face_since: Optional[float] = None
+        self._face_since: Optional[float] = None
+        self._brief_step = 0
+        self._brief_at = 0.0
+        self._screens = None
         self._cal_notice: Optional[tuple[str, float]] = None
         self._last_health = -1e9
         self._published_stage = 0
@@ -491,7 +503,12 @@ class Monitor:
         """A click on a dashboard button; acted on in the camera loop."""
         import cv2
 
-        if event != cv2.EVENT_LBUTTONUP or self.dashboard is None:
+        if event != cv2.EVENT_LBUTTONUP:
+            return
+        if self.mode != "live":
+            self._clicks.append("next")
+            return
+        if self.dashboard is None:
             return
         try:
             _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
@@ -532,6 +549,44 @@ class Monitor:
             self._cal_notice = (f"Kept the last calibration. {why}", time.monotonic() + CAL_NOTICE_S)
             console.print(f"[yellow]calibration stopped after {cal.attempts} tries[/]: {why}")
             self.logger.log_event("calibration_gave_up", {"attempts": cal.attempts, "reason": why})
+
+    def _update_mode(self, now: float, face: bool) -> None:
+        """Standby after standby_after_s with no face; back when one is seen."""
+        if face:
+            self._no_face_since = None
+            if self._face_since is None:
+                self._face_since = now
+        else:
+            self._face_since = None
+            if self._no_face_since is None:
+                self._no_face_since = now
+        if self.mode == "live" and self._standby_after_s > 0 and self._no_face_since is not None \
+                and now - self._no_face_since >= self._standby_after_s:
+            self.mode = "standby"
+            self._last_alert = self.policy.reset(now)     # lights off; nobody to wake
+            self.logger.log_event("standby", {"after_s": self._standby_after_s})
+            console.print("[dim]standby: nobody at the wheel[/]")
+        elif self.mode == "standby" and self._face_since is not None \
+                and now - self._face_since >= BACK_AFTER_FACE_S:
+            self.mode = "live"
+            console.print("[dim]someone sat down[/]")
+        elif self.mode == "briefing" and now - self._brief_at >= BRIEFING_IDLE_S:
+            self.mode = "live"
+
+    def _next(self, now: float, t: float) -> None:
+        """Space or a click: start the briefing, or turn its page."""
+        from .attract import STEPS
+
+        if self.mode != "briefing":
+            self.mode, self._brief_step = "briefing", 0
+            self.logger.log_event("briefing", {})
+        elif self._brief_step < len(STEPS) - 1:
+            self._brief_step += 1
+        else:                                         # the last page: calibrate now
+            self.mode = "live"
+            self._start_calibration(t)
+            self._voice("calibrate_voice", t)
+        self._brief_at = now
 
     def _record_history(self, t: float, state: DriverState, calibrating: bool) -> None:
         """Samples for the dashboard's charts."""
@@ -686,7 +741,8 @@ class Monitor:
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
                 hold = self.controller.holds_ladder(frame.timestamp)
-                decision = self.policy.update(state) if alerts_on and not hold else None
+                decision = (self.policy.update(state)
+                            if alerts_on and not hold and self.mode == "live" else None)
                 if decision is not None:
                     self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
@@ -709,6 +765,7 @@ class Monitor:
             self._guarded(self._control, frame.timestamp, ff)
             self._guarded(self._record_history, frame.timestamp, state, calibrating)
             self._guarded(self._give_up_calibration, frame.timestamp)
+            self._guarded(self._update_mode, time.monotonic(), bool(ff.face_found))
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -731,34 +788,43 @@ class Monitor:
                 self._last_window = now
                 from .viz import draw_overlay
                 dash = self.dashboard
-                canvas = draw_overlay(
-                    frame.image, lms, ff, state,
-                    plan=None if dash else self._plan,
-                    alert=None if dash else self._last_alert,
-                    # The dashboard's panels say it all; keep the camera clean.
-                    ui_cfg={**self.cfg["ui"], "draw_gauges": False} if dash else self.cfg["ui"],
-                    fps=fps,
-                    calibrating=progress if calibrating else -1.0,
-                    cal_stats=(self.features.calibrator.stats(frame.timestamp)
-                               if calibrating and not dash else None),
-                )
-                if dash is not None:
-                    if dash.due(frame.timestamp):
-                        dash.refresh(ff, state, self._dashboard_data(
-                            frame.timestamp, frame.timestamp - t_start, fps,
-                            progress if calibrating else -1.0, alerts_on))
-                    canvas = dash.compose(canvas)
+                if self.mode != "live":
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    canvas = (self._screens.standby(now, frame.image) if self.mode == "standby"
+                              else self._screens.briefing(self._brief_step, now))
                     _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
                     canvas = fit_to_window(canvas, win_w, win_h)
-                if self.demo and dash is None:
-                    h = canvas.shape[0]
-                    label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
-                    cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
-                    cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                                (230, 120, 230), 1, cv2.LINE_AA)
-                scale = float(self.cfg["ui"].get("window_scale", 1.0))
-                if scale != 1.0 and dash is None:
-                    canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
+                else:
+                    canvas = draw_overlay(
+                        frame.image, lms, ff, state,
+                        plan=None if dash else self._plan,
+                        alert=None if dash else self._last_alert,
+                        # The dashboard's panels say it all; keep the camera clean.
+                        ui_cfg={**self.cfg["ui"], "draw_gauges": False} if dash else self.cfg["ui"],
+                        fps=fps,
+                        calibrating=progress if calibrating else -1.0,
+                        cal_stats=(self.features.calibrator.stats(frame.timestamp)
+                                   if calibrating and not dash else None),
+                    )
+                    if dash is not None:
+                        if dash.due(frame.timestamp):
+                            dash.refresh(ff, state, self._dashboard_data(
+                                frame.timestamp, frame.timestamp - t_start, fps,
+                                progress if calibrating else -1.0, alerts_on))
+                        canvas = dash.compose(canvas)
+                        _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                        canvas = fit_to_window(canvas, win_w, win_h)
+                    if self.demo and dash is None:
+                        h = canvas.shape[0]
+                        label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
+                        cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
+                        cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+                                    (230, 120, 230), 1, cv2.LINE_AA)
+                    scale = float(self.cfg["ui"].get("window_scale", 1.0))
+                    if scale != 1.0 and dash is None:
+                        canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
                 cv2.imshow("bamnun", canvas)
                 key = cv2.waitKey(1) & 0xFF
                 # Caps Lock or Shift sends the upper case; treat it the same.
@@ -766,10 +832,15 @@ class Monitor:
                     key += 32
                 # A click on a dashboard button counts as its key: over Pi
                 # Connect, a key press doesn't always reach this window.
+                go_next = key == ord(" ")
                 while self._clicks:
                     btn = self._clicks.popleft()
+                    if btn == "next":
+                        go_next = True
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
+                if go_next:
+                    self._next(now, frame.timestamp)
                 if key == ord("q"):
                     break
                 if key == ord("l"):

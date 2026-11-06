@@ -379,6 +379,10 @@ ui:
   layout: dashboard
   fullscreen: false
   dashboard_refresh_s: 0.2   # the panels are redrawn this often; the camera every frame
+  # Nobody at the wheel this long: the standby screen invites the next person,
+  # and the ladder rests (no "driver not visible" chimes). A face brings the
+  # dashboard back; space or a click starts the visitor briefing. 0: never.
+  standby_after_s: 30
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.

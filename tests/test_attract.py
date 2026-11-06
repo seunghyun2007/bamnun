@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 cv2 = pytest.importorskip("cv2")
 
 from bamnun.app import Monitor  # noqa: E402
-from bamnun.attract import STEPS, Screens  # noqa: E402
+from bamnun.attract import POPUP, POPUP_CLOSE, STEPS, Screens, popup_hit  # noqa: E402
 from bamnun.viz import DASH_H, DASH_W  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,8 +38,13 @@ def stub():
         _brief_step=0, _brief_at=0.0, _last_alert=None,
         policy=SimpleNamespace(reset=lambda t: "reset"),
         logger=SimpleNamespace(log_event=lambda kind, payload: events.append(kind)),
-        calibrations=[],
+        calibrations=[], features=SimpleNamespace(calibrating=False),
+        _learn_url="https://example.org/", _learn_after_s=45.0, _learn_hide_s=40.0,
+        _qr_close_s=60.0, _driven_s=0.0, _learn_shown=False, _popup_at=None, _qr_at=0.0,
+        _mode_t=None,
     )
+    m._update_learn_more = lambda now, face: Monitor._update_learn_more(m, now, face)
+    m._open_qr = lambda now: Monitor._open_qr(m, now)
     m._start_calibration = lambda t: m.calibrations.append(t)
     m._voice = lambda key, t: None
     return m, events
@@ -90,3 +95,65 @@ def test_the_calibration_screen_and_the_drive_page_draw():
     assert s.calibrating(0.5, 0.4, "still", (1366, 768)).shape == (768, 1366, 3)
     drive = [i for i, step in enumerate(STEPS) if step[0] == "game"]
     assert drive and s.briefing(drive[0], 0.0).shape == (DASH_H, DASH_W, 3)
+
+
+def drive(m, start: float, seconds: float, face: bool = True) -> float:
+    t = start
+    while t < start + seconds:
+        t += 0.5
+        Monitor._update_mode(m, t, face)
+    return t
+
+
+def test_learn_more_pops_up_after_45_s_of_driving_once_per_visitor():
+    m, events = stub()
+    t = drive(m, 0.0, 30.0)
+    assert m._popup_at is None
+    m.features.calibrating = True                # calibration doesn't count as driving
+    t = drive(m, t, 30.0)
+    assert m._popup_at is None
+    m.features.calibrating = False
+    t = drive(m, t, 16.0)
+    assert m._popup_at is not None and "learn_more_popup" in events
+    t = drive(m, t, 41.0)                        # nobody clicked: it goes away
+    assert m._popup_at is None
+    t = drive(m, t, 120.0)
+    assert m._popup_at is None                   # not again for the same visitor
+    t = drive(m, t, 31.0, face=False)            # they leave: standby
+    assert m.mode == "standby" and not m._learn_shown
+    Monitor._next(m, t, t)
+    m.mode = "live"
+    drive(m, t, 46.0)
+    assert m._popup_at is not None               # the next visitor gets one
+
+
+def test_the_qr_screen_closes_on_a_click_or_by_itself():
+    m, events = stub()
+    Monitor._open_qr(m, 5.0)
+    assert m.mode == "qr" and "learn_more_qr" in events
+    Monitor._next(m, 6.0, 6.0)
+    assert m.mode == "live"
+    Monitor._open_qr(m, 10.0)
+    Monitor._update_mode(m, 69.0, True)
+    assert m.mode == "qr"
+    Monitor._update_mode(m, 71.0, True)
+    assert m.mode == "live"
+
+
+def test_a_click_on_the_popup_opens_the_code_and_the_cross_closes_it():
+    x, y, w, h = POPUP
+    assert popup_hit(x + 200, y + 100) == "learn_more"
+    assert popup_hit(POPUP_CLOSE[0] + 20, POPUP_CLOSE[1] + 20) == "learn_close"
+    assert popup_hit(x - 5, y + 10) is None
+
+
+def test_the_popup_and_a_scannable_qr_code_draw():
+    s = Screens(ROOT)
+    dash = np.zeros((DASH_H, DASH_W, 3), np.uint8)
+    s.learn_popup(dash, 1.0)
+    x, y, w, h = POPUP
+    assert dash[y + h // 2, x + w // 2].any() and not dash[600, 100].any()
+    url = "https://seunghyun2007.github.io/bamnun/"
+    screen = s.learn_more(0.0, url, (1366, 768))
+    assert screen.shape == (768, 1366, 3)
+    assert cv2.QRCodeDetector().detectAndDecode(screen)[0] == url

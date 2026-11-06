@@ -386,6 +386,14 @@ ui:
   # The device speaker (the USB one in ~/.asoundrc): set to start_percent at
   # every start; the dashboard's VOL buttons and - / = change it from there.
   speaker_mixer: {card: UACDemoV10, control: PCM, start_percent: 80}
+  # After a visitor has driven after_s seconds (face seen, on the dashboard),
+  # a pop-up offers "learn more"; a click opens a full-screen QR code for url,
+  # which closes on a click, Esc or after qr_close_s. Once per visitor. url "": off.
+  learn_more:
+    url: https://seunghyun2007.github.io/bamnun/
+    after_s: 45
+    hide_after_s: 40
+    qr_close_s: 60
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.

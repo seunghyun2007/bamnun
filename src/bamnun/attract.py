@@ -1,5 +1,7 @@
 """The booth's own screens: standby (nobody at the wheel), the visitor
-briefing (space or a click), and calibration (look at the game screen).
+briefing (space or a click), calibration (look at the game screen), and
+"learn more": a small pop-up on the dashboard after a visitor has driven a
+while, which opens a QR code for the website.
 
 The look follows a plain lecture slide: a light grey panel on the left with
 one picture (Ollie, gently moving, or the game's Drive button), a charcoal
@@ -80,6 +82,22 @@ HINTS = {"no_face": ("얼굴이 보이지 않아요", "Can't see your face"),
 
 # The Drive button in assets/booth/game_drive.jpg (1600 x 999 pixels).
 _DRIVE_AT = (326, 915)
+
+# The "learn more" pop-up on the dashboard (1280x720 units): over the camera's
+# top-right corner, clear of the face and of the buttons along its bottom.
+POPUP = (444, 18, 380, 132)                   # x, y, w, h
+POPUP_BUTTON = (POPUP[0] + 120, POPUP[1] + 80, 240, 38)
+POPUP_CLOSE = (POPUP[0] + POPUP[2] - 40, POPUP[1], 40, 40)
+
+
+def popup_hit(x: int, y: int) -> Optional[str]:
+    """A click at dashboard (x, y) on the pop-up: "learn_close" on the cross,
+    "learn_more" anywhere else on it, None off it."""
+    def inside(r) -> bool:
+        return r[0] <= x < r[0] + r[2] and r[1] <= y < r[1] + r[3]
+    if inside(POPUP_CLOSE):
+        return "learn_close"
+    return "learn_more" if inside(POPUP) else None
 
 
 def _first(paths: tuple[str, ...]) -> Optional[str]:
@@ -398,6 +416,101 @@ class Screens:
 
 
 # The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
+    # -- learn more: the pop-up and the QR code --------------------------------- #
+
+    def _popup_card(self) -> np.ndarray:
+        """The pop-up, drawn once: a white card like a website's, Ollie, a
+        question, a dark button and a close cross."""
+        import cv2
+
+        key = ("popup",)
+        if key not in self._cache:
+            x, y, w, h = POPUP
+            card = np.empty((h, w, 3), np.uint8)
+            card[:] = (250, 250, 250)
+            f = _Frame((w, h))
+            f.s, f.ox, f.oy = 1.0, 0.0, 0.0
+            owl = self._owl("hello", 92)
+            if owl is not None:
+                self._paste(card, owl, 62, h // 2)
+            bx, by, bw, bh = POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3]
+            cv2.rectangle(card, (bx, by), (bx + bw, by + bh), _BOARD, -1, cv2.LINE_AA)
+            tx = 120 + (w - 120 - 40) / 2
+            card, _ = self._text(card, f, [
+                ("밤눈이 궁금하세요?", "bold", 24, _BOARD, 20),
+                ("Want to learn more about Bamnun?", "regular", 16, (110, 110, 110), 50),
+            ], cx=tx, max_w=w - 120 - 50)
+            card, _ = self._text(card, f, [("QR 코드 보기  ·  Learn more", "bold", 18, _WHITE,
+                                            by + (bh - 19) / 2)], cx=bx + bw / 2, max_w=bw - 16)
+            cx, cy, r = w - 20, 20, 7               # the close cross
+            for a, b in (((cx - r, cy - r), (cx + r, cy + r)), ((cx - r, cy + r), (cx + r, cy - r))):
+                cv2.line(card, a, b, (120, 120, 120), 2, cv2.LINE_AA)
+            cv2.rectangle(card, (0, 0), (w - 1, h - 1), (200, 200, 200), 1)
+            self._cache[key] = card
+        return self._cache[key]
+
+    def learn_popup(self, canvas: np.ndarray, age: float) -> None:
+        """Draw the pop-up on a dashboard canvas (1280x720), sliding in."""
+        x, y, w, h = POPUP
+        k = min(1.0, max(0.0, age / 0.35))
+        k = 1 - (1 - k) ** 3
+        top = int(y - 24 * (1 - k))
+        card = self._popup_card()
+        y0, y1 = max(0, top), min(canvas.shape[0], top + h)
+        if y1 <= y0:
+            return
+        src = card[y0 - top:y1 - top]
+        dst = canvas[y0:y1, x:x + w]
+        # A soft shadow, then the card.
+        sh = canvas[min(canvas.shape[0] - 1, y0 + 4):min(canvas.shape[0], y1 + 4), x + 4:x + w + 4]
+        sh[:] = (sh * (1 - 0.35 * k)).astype(np.uint8)
+        dst[:] = (src * k + dst * (1 - k)).astype(np.uint8)
+
+    def _qr(self, url: str, px: int) -> Optional[np.ndarray]:
+        key = ("qr", url, px)
+        if key not in self._images:
+            import cv2
+
+            try:
+                code = cv2.QRCodeEncoder.create().encode(url)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("could not make the QR code: %s", exc)
+                code = None
+            if code is not None and code.size:
+                code = cv2.copyMakeBorder(code, 4, 4, 4, 4, cv2.BORDER_CONSTANT, value=255)
+                k = max(1, px // code.shape[0])
+                code = cv2.resize(code, (code.shape[1] * k, code.shape[0] * k),
+                                  interpolation=cv2.INTER_NEAREST)
+                code = cv2.cvtColor(code, cv2.COLOR_GRAY2BGR)
+            else:
+                code = None
+            self._images[key] = code
+        return self._images[key]
+
+    def learn_more(self, t: float, url: str, size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
+        """The QR code for the website, big on the left; what to do on the right."""
+        import cv2
+
+        f = _Frame(size)
+        key = ("learn", url, f.w, f.h)
+        if key not in self._cache:
+            c = self._titled(f, "더 알아보기", "Learn more about Bamnun",
+                             [("휴대폰 카메라로 QR 코드를 찍어 보세요", "Point your phone's camera at the code"),
+                              ("밤눈 앱을 바로 써 볼 수 있어요", "and try the Bamnun app in your browser")])
+            short = url.split("://", 1)[-1].rstrip("/")
+            c, _ = self._text(c, f, [(short, "regular", 22, _GREY, 525)])
+            code = self._qr(url, f.n(430))
+            if code is not None:
+                h, w = code.shape[:2]
+                x0, y0 = f.x(_SPLIT / 2) - w // 2, f.y(360) - h // 2
+                pad = f.n(10)
+                cv2.rectangle(c, (x0 - pad, y0 - pad), (x0 + w + pad, y0 + h + pad), (255, 255, 255), -1)
+                c[y0:y0 + h, x0:x0 + w] = code
+            self._cache[key] = c
+        canvas = self._cache[key].copy()
+        self._prompt(canvas, f, t, "클릭하면 돌아가요", "Click to go back", y=610)
+        return canvas
+
 HEALTH_WORDS = {
     "warm": ("Pi가 뜨거워지고 있어요", "The Pi is getting warm", (0, 130, 230)),
     "hot": ("Pi가 너무 뜨거워요: 잠시 꺼서 식혀 주세요", "The Pi is too hot: turn it off to cool down",

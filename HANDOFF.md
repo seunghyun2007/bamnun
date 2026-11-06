@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (312 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (316 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -64,6 +64,20 @@ the Wi-Fi hotspot.
   which now spans the whole grey panel under a smaller Ollie.
 - **Ollie's voice**: 17 lines EN + KO generated with Supertonic voice M1
   (`tools/make_voice.py`), in `assets/voice/{en,ko}/`.
+- **Learn more pop-up** (`ui.learn_more`): after a visitor has driven 45 s
+  (face seen, on the dashboard, not calibrating), a white website-style card
+  slides in over the camera's top-right corner: Ollie, "밤눈이 궁금하세요? /
+  Want to learn more about Bamnun?" and a "QR 코드 보기 · Learn more" button.
+  A click opens a full-screen QR code (calm slide style) for the website; a
+  click, Esc or 60 s goes back. The × or 40 s untouched hides it. Once per
+  visitor (reset at standby). QR made by OpenCV (`cv2.QRCodeEncoder`), no new
+  package.
+- **Website** (the phone app as a web page): **https://seunghyun2007.github.io/bamnun/**,
+  GitHub Pages from the `gh-pages` branch (just `index.html` + `.nojekyll`).
+  To update it: `cd frontend && npm run build` (reads `frontend/.env`), then
+  copy `frontend/www/index.html` onto the `gh-pages` branch and push. Google
+  sign-in there needs this address in Supabase → Authentication → URL
+  Configuration (redirect URLs) — not added yet.
 - **Pi temperature watch** (`thermal.py` PiHealth, config `thermal:`): reads
   the chip temperature every 2 s and `vcgencmd get_throttled` every 10 s. The
   dashboard footer always shows "Pi NN C". At 75 °C an orange bar appears on
@@ -88,6 +102,8 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Open items
 
+- Add https://seunghyun2007.github.io/bamnun/ to Supabase redirect URLs so
+  Google sign-in works on the website.
 - PR #5 (`demo-booth` -> `main`) is open: the friend should review it before
   it's merged. No CI on the repo.
 - Compare `local-wip` with the friend's detection code.
@@ -97,6 +113,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: website on GitHub Pages; "learn more" pop-up after 45 s of driving -> QR screen.
 - 2026-11-06: Pi temperature/power warning bar + "Pi NN C" in the footer.
 - 2026-11-06: face mesh (outlines + 478 dots); standby camera as wide as the
   grey panel.

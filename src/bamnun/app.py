@@ -234,13 +234,25 @@ class Monitor:
         self._max_cal_attempts = int(self.cfg["calibration"].get("max_attempts", 3))
         # Booth screens (attract.py): standby after a while with nobody at the
         # wheel, and the briefing a visitor starts with space or a click.
-        self.mode = "live"                       # live | standby | briefing
+        self.mode = "live"                       # live | standby | briefing | qr
         self._standby_after_s = float(ui.get("standby_after_s", 30.0))
         self._no_face_since: Optional[float] = None
         self._face_since: Optional[float] = None
         self._brief_step = 0
         self._brief_at = 0.0
         self._screens = None
+        # "Learn more": once a visitor has driven a while, a pop-up on the
+        # dashboard offers the website's QR code (a full screen, "qr" mode).
+        lm = ui.get("learn_more") or {}
+        self._learn_url = str(lm.get("url") or "")
+        self._learn_after_s = float(lm.get("after_s", 45.0))
+        self._learn_hide_s = float(lm.get("hide_after_s", 40.0))
+        self._qr_close_s = float(lm.get("qr_close_s", 60.0))
+        self._driven_s = 0.0
+        self._learn_shown = False
+        self._popup_at: Optional[float] = None
+        self._qr_at = 0.0
+        self._mode_t: Optional[float] = None
         self._cal_notice: Optional[tuple[str, float]] = None
         # The Pi's temperature and power (thermal.py): shown on the dashboard,
         # and a warning bar on every screen when it runs hot.
@@ -523,7 +535,12 @@ class Monitor:
             _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
         except Exception:  # noqa: BLE001
             return
-        name = button_at(*window_to_canvas(x, y, win_w, win_h))
+        cx, cy = window_to_canvas(x, y, win_w, win_h)
+        name = None
+        if self._popup_at is not None:
+            from .attract import popup_hit
+            name = popup_hit(cx, cy)
+        name = name or button_at(cx, cy)
         if name:
             self._clicks.append(name)
 
@@ -586,15 +603,42 @@ class Monitor:
                 and now - self._no_face_since >= self._standby_after_s:
             self.mode = "standby"
             self._last_alert = self.policy.reset(now)     # lights off; nobody to wake
+            # The next visitor gets their own "learn more" pop-up.
+            self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
             self.logger.log_event("standby", {"after_s": self._standby_after_s})
             console.print("[dim]standby: nobody at the wheel[/]")
         elif self.mode == "briefing" and now - self._brief_at >= BRIEFING_IDLE_S:
             self.mode = "live"
+        elif self.mode == "qr" and now - self._qr_at >= self._qr_close_s:
+            self.mode = "live"
+        self._update_learn_more(now, face)
+
+    def _update_learn_more(self, now: float, face: bool) -> None:
+        """Count the time a visitor drives (face seen, on the dashboard, not
+        calibrating); after learn_more.after_s, pop the offer up once."""
+        dt = 0.0 if self._mode_t is None else min(1.0, max(0.0, now - self._mode_t))
+        self._mode_t = now
+        if self.mode == "live" and face and not self.features.calibrating:
+            self._driven_s += dt
+        if (self._learn_url and not self._learn_shown and self.mode == "live"
+                and self._driven_s >= self._learn_after_s):
+            self._learn_shown, self._popup_at = True, now
+            self.logger.log_event("learn_more_popup", {"driven_s": round(self._driven_s, 1)})
+        if self._popup_at is not None and (self.mode != "live"
+                                           or now - self._popup_at >= self._learn_hide_s):
+            self._popup_at = None
+
+    def _open_qr(self, now: float) -> None:
+        self.mode, self._qr_at, self._popup_at = "qr", now, None
+        self.logger.log_event("learn_more_qr", {})
 
     def _next(self, now: float, t: float) -> None:
         """Space or a click: start the briefing, or turn its page."""
         from .attract import STEPS
 
+        if self.mode == "qr":                         # the QR screen: back to the dashboard
+            self.mode = "live"
+            return
         if self.mode != "briefing":
             self.mode, self._brief_step = "briefing", 0
             self.logger.log_event("briefing", {})
@@ -824,6 +868,8 @@ class Monitor:
                         canvas = self._screens.standby(now, cam, size)
                     elif self.mode == "briefing":
                         canvas = self._screens.briefing(self._brief_step, now, size)
+                    elif self.mode == "qr":
+                        canvas = self._screens.learn_more(now, self._learn_url, size)
                     else:      # calibrating: look at the game screen, to the right
                         canvas = self._screens.calibrating(now, progress,
                                                            self.features.calibrator.hint or "", size)
@@ -845,6 +891,11 @@ class Monitor:
                                 frame.timestamp, frame.timestamp - t_start, fps,
                                 progress if calibrating else -1.0, alerts_on))
                         canvas = dash.compose(canvas)
+                        if self._popup_at is not None:
+                            if self._screens is None:
+                                from .attract import Screens
+                                self._screens = Screens(self.root)
+                            self._screens.learn_popup(canvas, now - self._popup_at)
                         _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
                         canvas = fit_to_window(canvas, win_w, win_h)
                     if self.demo and dash is None:
@@ -875,6 +926,10 @@ class Monitor:
                     btn = self._clicks.popleft()
                     if btn == "next":
                         go_next = True
+                    elif btn == "learn_more":
+                        self._open_qr(now)
+                    elif btn == "learn_close":
+                        self._popup_at = None
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if go_next:

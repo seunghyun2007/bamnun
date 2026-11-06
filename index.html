@@ -1563,6 +1563,23 @@ const DYN = {
     const p = API().profile(), h = new Date().getHours();
     const hello = h >= 5 && h < 12 ? 'Good morning,' : h >= 12 && h < 17 ? 'Good afternoon,' : h >= 17 && h < 22 ? 'Good evening,' : 'Good night,';
     root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+    // A booth visitor (visit.js): their photo from the booth as the profile.
+    const paintVisit = () => {
+      if (!root.isConnected) return;
+      root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+      const ph = window.BN_VISIT && BN_VISIT.photo();
+      let av = root.querySelector('#hAvatar');
+      if (ph && !av) {
+        av = document.createElement('img');
+        av.id = 'hAvatar'; av.alt = '';
+        av.style.cssText = 'display:block;width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid #F4EFE6;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,.35)';
+        root.querySelector('#hHello').before(av);
+      }
+      if (av && ph) av.src = ph;
+      load();
+    };
+    window.addEventListener('bn-visit', paintVisit);
+    if (window.BN_VISIT && BN_VISIT.photo()) setTimeout(paintVisit, 0);
     root.querySelector('#hShift').textContent = T(SHIFT_NAMES[shiftOf(p.work)]);
     // Came from Product demo on the Welcome screen: offer the way back.
     let showcase = false; try { showcase = localStorage.getItem('bn-showcase') === '1'; } catch (e) {}
@@ -1614,7 +1631,7 @@ const DYN = {
       $('#tList').innerHTML = list.map((t) => {
         const s = t.summary || {}, open = openId === String(t.id), n = s.alerts || 0;
         const detail = open ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.08)">
-            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>` : '';
+            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>${window.BN_VISIT ? `<div style="padding:0 16px 16px">${BN_VISIT.caughtHtml(t)}${BN_VISIT.curveSvg(t)}${BN_VISIT.mapSvg(t)}</div>` : ''}` : '';
         return `<section data-trip="${esc(t.id)}" role="button" aria-expanded="${open}" style="${GLASS};border-radius:22px;overflow:hidden;cursor:pointer">
           <div style="padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;color:#B3A6B4">${esc(when(t.started_at))}</span>${t.open ? `<span style="font-size:11px;font-weight:700;color:#241A26;background:#F48FB1;padding:3px 8px;border-radius:99px">${esc(T('Now'))}</span>` : ''}</div>
@@ -1630,6 +1647,7 @@ const DYN = {
     async function load() { try { all = await SYNC_TRIPS(500); } catch (e) {} if (root.isConnected) draw(); }
     API().on('trip', load, root);
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(); load();
   },
 
@@ -1688,6 +1706,7 @@ const DYN = {
     }
     root.addEventListener('click', (e) => { const r = e.target.closest('[data-r]'); if (r) { range = r.dataset.r; load(); } });
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(null); load();
   },
 
@@ -2676,7 +2695,7 @@ const KO={"text": {"Bamnun": "밤눈", "Choose your language · 언어를 선택
 const DAYS=["M","T","W","T","F","S","S"],KDAYS=["월","화","수","목","금","토","일"];
 let LANG="en";try{LANG=localStorage.getItem("bn-lang")||"en"}catch(e){}
 window.BN_LANG=()=>LANG;
-window.BN_NAME=()=>{let n=window.BN_API?(BN_API.profile().name||""):"";if(!n)try{n=localStorage.getItem("bn-name")||""}catch(e){}n=n.trim();return n||BN_T("Driver");};
+window.BN_NAME=()=>{if(window.BN_VISIT&&BN_VISIT.name())return BN_VISIT.name();let n=window.BN_API?(BN_API.profile().name||""):"";if(!n)try{n=localStorage.getItem("bn-name")||""}catch(e){}n=n.trim();return n||BN_T("Driver");};
 function fillNames(node){const w=document.createTreeWalker(node,4);let t;const nm=BN_NAME();while(t=w.nextNode())if(t.data.includes("{name}"))t.data=t.data.split("{name}").join(nm);}
 window.BN_T=(s,v)=>{let o=LANG==="ko"&&KO.text[s]||s;if(v)for(const k in v)o=o.split("{"+k+"}").join(v[k]);return o;};
 const phone=document.getElementById("phone");
@@ -3345,6 +3364,235 @@ document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||
   };
 })();
 
+/* Booth visitors (2026 exhibition, until 24 Nov).
+
+   The website opened from a visitor's own QR code (?v=<code>) loads their
+   booth drive and photo from Supabase (supabase/booth_visits.sql,
+   get_visit), and shows it as the newest trip of a believable history:
+   about 35 night drives over two months on real Korean expressway routes
+   (routes_kr.json, fetched once from OSRM), the same history every time for
+   the same code. Without a code the history is the same kind, with Ollie
+   as the picture. A short guided tour walks a visitor through their data
+   once.
+
+   window.BN_VISIT: trips(), visit(), name(), photo(), state(), mapSvg(t),
+   curveSvg(t), tour() */
+(function () {
+  "use strict";
+  const ROUTES = [{"from":"서울","from_en":"Seoul","to":"부산","to_en":"Busan","km":398,"min":295,"path":[[37.5547,126.9698],[37.5423,126.9726],[37.5338,126.9881],[37.5027,127.0029],[37.4823,127.0189],[37.443,127.0582],[37.3503,127.1033],[37.2897,127.1071],[37.2873,127.159],[37.2456,127.2479],[37.2408,127.2981],[37.2518,127.3366],[37.2397,127.3978],[37.2453,127.4935],[37.2381,127.5754],[37.2146,127.6041],[37.1833,127.6131],[37.16,127.6381],[37.1326,127.6579],[37.1144,127.7013],[37.0427,127.7416],[37.0272,127.8308],[36.9937,127.8472],[36.9465,127.8475],[36.8907,127.8922],[36.864,127.9332],[36.8363,127.9575],[36.7883,127.9839],[36.7555,127.9983],[36.7464,128.0662],[36.7191,128.1013],[36.6951,128.1112],[36.656,128.1392],[36.5891,128.1583],[36.5469,128.146],[36.499,128.1892],[36.4373,128.2127],[36.3911,128.2407],[36.3396,128.223],[36.2735,128.253],[36.2282,128.2648],[36.1616,128.2646],[36.1433,128.3016],[36.1227,128.355],[36.0718,128.3614],[36.0664,128.3988],[36.0263,128.4175],[36.0027,128.4268],[35.9665,128.451],[35.9329,128.4723],[35.8944,128.5028],[35.8998,128.5543],[35.917,128.6248],[35.8977,128.6768],[35.8832,128.6905],[35.8293,128.7031],[35.7671,128.7297],[35.7142,128.7431],[35.6402,128.7508],[35.5819,128.7687],[35.5067,128.7955],[35.4464,128.7753],[35.3957,128.8306],[35.3599,128.9046],[35.3198,128.9417],[35.281,128.9851],[35.2325,128.9794],[35.1876,128.9886],[35.1326,129.0522],[35.1157,129.042]]},{"from":"인천","from_en":"Incheon","to":"대전","to_en":"Daejeon","km":175,"min":137,"path":[[37.4565,126.7052],[37.4557,126.7216],[37.4538,126.735],[37.4482,126.745],[37.4379,126.7396],[37.3962,126.743],[37.379,126.766],[37.3625,126.769],[37.3523,126.7981],[37.3502,126.8198],[37.3484,126.8402],[37.3426,126.8677],[37.3232,126.8948],[37.3232,126.9125],[37.328,126.9487],[37.3198,126.9723],[37.315,126.9984],[37.3127,127.0212],[37.3007,127.0483],[37.2911,127.0878],[37.2873,127.1033],[37.2564,127.1037],[37.2313,127.107],[37.209,127.0954],[37.1801,127.096],[37.1574,127.0873],[37.1402,127.0852],[37.1151,127.112],[37.0818,127.1272],[37.0689,127.1345],[37.0418,127.1374],[37.0154,127.1449],[36.9875,127.1567],[36.9561,127.1813],[36.9216,127.1889],[36.8708,127.1872],[36.842,127.1757],[36.8262,127.1685],[36.7992,127.1667],[36.776,127.177],[36.7668,127.1942],[36.7613,127.2156],[36.7519,127.2191],[36.7368,127.2523],[36.7327,127.2755],[36.7257,127.3113],[36.7155,127.3472],[36.7048,127.3471],[36.6866,127.3592],[36.6759,127.3739],[36.6578,127.3712],[36.6182,127.3879],[36.5967,127.4215],[36.579,127.4264],[36.5581,127.4324],[36.5461,127.4322],[36.5244,127.4326],[36.5021,127.4291],[36.4713,127.4273],[36.4447,127.4193],[36.4244,127.4171],[36.4124,127.4221],[36.396,127.4191],[36.3722,127.433],[36.367,127.4479],[36.362,127.4497],[36.3511,127.4418],[36.3468,127.4324],[36.3378,127.438],[36.332,127.4345]]},{"from":"평택항","from_en":"Pyeongtaek Port","to":"광주","to_en":"Gwangju","km":236,"min":173,"path":[[36.973,126.8367],[36.9602,126.8558],[36.9404,126.8839],[36.9476,126.8848],[36.9482,126.8978],[36.9275,126.9157],[36.8944,126.9125],[36.8825,126.9209],[36.8642,126.9194],[36.8483,126.9064],[36.8288,126.901],[36.8148,126.8913],[36.7983,126.8933],[36.783,126.8834],[36.762,126.8527],[36.75,126.8158],[36.7277,126.8028],[36.6864,126.7829],[36.6652,126.7872],[36.6223,126.7797],[36.5909,126.7854],[36.553,126.7676],[36.5215,126.7644],[36.5022,126.7671],[36.489,126.7648],[36.4709,126.7735],[36.452,126.7771],[36.4307,126.7861],[36.4016,126.7907],[36.3761,126.7951],[36.3447,126.8093],[36.3191,126.8194],[36.2893,126.8338],[36.2768,126.8185],[36.2459,126.792],[36.212,126.7769],[36.1726,126.7749],[36.1346,126.7677],[36.0956,126.7753],[36.059,126.7703],[36.0514,126.7842],[36.0018,126.8051],[35.9719,126.8358],[35.9343,126.832],[35.9003,126.845],[35.8616,126.843],[35.8146,126.8359],[35.7748,126.8112],[35.7265,126.769],[35.6778,126.7373],[35.6386,126.708],[35.6048,126.6956],[35.5582,126.6925],[35.4988,126.6827],[35.4563,126.6697],[35.4193,126.6539],[35.4069,126.6668],[35.3843,126.6966],[35.3503,126.7588],[35.345,126.7836],[35.3307,126.8021],[35.314,126.7931],[35.2992,126.7886],[35.2838,126.7881],[35.2576,126.8026],[35.2351,126.8242],[35.2112,126.8305],[35.1924,126.8563],[35.1805,126.8587],[35.1596,126.8529]]},{"from":"서울","from_en":"Seoul","to":"강릉","to_en":"Gangneung","km":216,"min":179,"path":[[37.5547,126.9698],[37.5461,126.9703],[37.5347,126.9755],[37.531,126.9905],[37.5064,127.0004],[37.4871,127.0099],[37.4819,127.0263],[37.4405,127.06],[37.4087,127.0938],[37.4096,127.0984],[37.4205,127.1021],[37.4214,127.1282],[37.4135,127.1635],[37.4017,127.2124],[37.3909,127.2585],[37.372,127.3151],[37.3747,127.3309],[37.3792,127.4316],[37.3784,127.5173],[37.3851,127.5787],[37.3935,127.6316],[37.3998,127.6796],[37.3961,127.7321],[37.4015,127.778],[37.3914,127.8291],[37.3946,127.8687],[37.3861,127.9017],[37.3861,127.9248],[37.3977,127.9359],[37.4041,127.962],[37.418,128.0006],[37.4474,128.0387],[37.4394,128.0892],[37.4517,128.1022],[37.4719,128.1076],[37.4638,128.1368],[37.4762,128.1568],[37.4871,128.1765],[37.4926,128.2056],[37.5011,128.2342],[37.5124,128.2458],[37.5217,128.2678],[37.5555,128.3243],[37.5618,128.3612],[37.5776,128.3991],[37.5948,128.4212],[37.6082,128.4378],[37.6133,128.466],[37.6298,128.4885],[37.6484,128.5543],[37.6586,128.5825],[37.6685,128.6066],[37.6705,128.6167],[37.672,128.6307],[37.6807,128.6544],[37.6809,128.6777],[37.6791,128.7092],[37.6707,128.7271],[37.6642,128.762],[37.6801,128.7746],[37.7027,128.7703],[37.7163,128.7737],[37.733,128.7811],[37.7466,128.7908],[37.7631,128.8111],[37.7679,128.8357],[37.7495,128.8383],[37.7375,128.8554],[37.746,128.8705],[37.7519,128.8763]]},{"from":"울산","from_en":"Ulsan","to":"서울","to_en":"Seoul","km":373,"min":280,"path":[[35.5383,129.3109],[35.5456,129.3026],[35.5499,129.2646],[35.571,129.2267],[35.559,129.1823],[35.5654,129.1328],[35.6165,129.1513],[35.6686,129.1757],[35.7095,129.1903],[35.7667,129.1969],[35.7928,129.1934],[35.8174,129.1643],[35.8294,129.1185],[35.8464,129.0836],[35.8759,129.0581],[35.8926,129.0235],[35.9175,129.0066],[35.9577,129.0166],[35.9892,128.9632],[36.0217,128.8986],[36.042,128.8229],[36.0625,128.7743],[36.0668,128.7308],[36.0867,128.6778],[36.1092,128.6429],[36.1341,128.6064],[36.1797,128.5401],[36.2258,128.5089],[36.2517,128.4701],[36.278,128.3981],[36.3027,128.3429],[36.3355,128.3044],[36.3752,128.2679],[36.3917,128.2409],[36.4346,128.2137],[36.5044,128.1854],[36.5468,128.1461],[36.5857,128.1544],[36.6203,128.1516],[36.6767,128.1237],[36.7121,128.1091],[36.7439,128.0738],[36.7511,128.0039],[36.7834,127.9853],[36.8329,127.9586],[36.8631,127.9356],[36.882,127.8955],[36.9399,127.8518],[36.9964,127.8484],[37.0336,127.8181],[37.0482,127.7315],[37.1178,127.6946],[37.1365,127.6554],[37.1676,127.6287],[37.1853,127.613],[37.2161,127.6015],[37.2387,127.5734],[37.2423,127.466],[37.242,127.3637],[37.2482,127.3208],[37.2398,127.2857],[37.2534,127.2182],[37.2888,127.1406],[37.3279,127.1036],[37.4377,127.0626],[37.4842,127.0272],[37.4919,127.0077],[37.5241,126.993],[37.535,126.9749],[37.5547,126.9698]]},{"from":"대구","from_en":"Daegu","to":"부산","to_en":"Busan","km":109,"min":83,"path":[[35.8712,128.6013],[35.8641,128.6029],[35.8622,128.6069],[35.8607,128.61],[35.8596,128.6163],[35.859,128.6258],[35.8587,128.6341],[35.8588,128.6452],[35.8564,128.6507],[35.8528,128.6611],[35.8459,128.6728],[35.8423,128.6809],[35.8383,128.6845],[35.8358,128.691],[35.8303,128.7014],[35.8159,128.7217],[35.8056,128.731],[35.7803,128.7355],[35.7676,128.7298],[35.7589,128.734],[35.7494,128.7369],[35.7337,128.7365],[35.7136,128.7431],[35.6896,128.7402],[35.6584,128.7455],[35.6483,128.75],[35.6397,128.7511],[35.6292,128.7609],[35.61,128.7687],[35.5932,128.7677],[35.5801,128.7698],[35.5546,128.7884],[35.5256,128.7948],[35.5109,128.7968],[35.5048,128.794],[35.4899,128.7803],[35.4788,128.7748],[35.4556,128.7729],[35.4403,128.7781],[35.4243,128.7861],[35.4089,128.8004],[35.3985,128.8246],[35.3922,128.834],[35.3693,128.8525],[35.358,128.8709],[35.3585,128.8965],[35.3591,128.9096],[35.3468,128.9257],[35.3368,128.9351],[35.3215,128.9397],[35.3169,128.9507],[35.3103,128.9674],[35.2976,128.9778],[35.2838,128.9848],[35.2741,128.9841],[35.2633,128.9823],[35.2471,128.9843],[35.2377,128.9817],[35.2216,128.9748],[35.2112,128.9742],[35.2006,128.9753],[35.1901,128.9869],[35.1857,128.9997],[35.1686,129.0273],[35.1543,129.032],[35.1327,129.052],[35.1304,129.0503],[35.1265,129.0465],[35.1212,129.0429],[35.1157,129.042]]},{"from":"수원","from_en":"Suwon","to":"대구","to_en":"Daegu","km":255,"min":196,"path":[[37.2635,127.0282],[37.2578,127.0226],[37.2461,127.0176],[37.2208,127.0278],[37.2049,127.0372],[37.1904,127.0465],[37.177,127.0588],[37.156,127.0726],[37.143,127.078],[37.1219,127.1039],[37.0788,127.1286],[37.0455,127.1368],[37.0071,127.1493],[36.9565,127.181],[36.8872,127.1891],[36.8386,127.1751],[36.8053,127.165],[36.7695,127.1812],[36.7626,127.2127],[36.7461,127.2243],[36.7335,127.2805],[36.718,127.3402],[36.7025,127.348],[36.6823,127.369],[36.6292,127.3821],[36.5975,127.4206],[36.5697,127.4289],[36.5637,127.4384],[36.5449,127.4807],[36.5256,127.5243],[36.5094,127.5762],[36.4766,127.6233],[36.4695,127.6822],[36.4564,127.7278],[36.4555,127.7841],[36.4553,127.8459],[36.4453,127.9194],[36.4425,127.9704],[36.4288,128.0247],[36.4074,128.0708],[36.3724,128.1243],[36.3692,128.1532],[36.3741,128.185],[36.3643,128.2378],[36.3362,128.2217],[36.2891,128.2313],[36.2657,128.2575],[36.2331,128.2635],[36.1915,128.2593],[36.1609,128.2645],[36.1552,128.2748],[36.1367,128.3151],[36.1269,128.3456],[36.1022,128.3621],[36.0713,128.362],[36.0697,128.3933],[36.051,128.4079],[36.0286,128.4143],[36.0225,128.4286],[36.001,128.4266],[35.9763,128.4333],[35.9633,128.4534],[35.9356,128.4661],[35.8981,128.4955],[35.8948,128.5084],[35.8869,128.5256],[35.8783,128.5349],[35.8792,128.5618],[35.8761,128.5895],[35.8712,128.6013]]},{"from":"천안","from_en":"Cheonan","to":"목포","to_en":"Mokpo","km":268,"min":194,"path":[[36.8154,127.114],[36.8232,127.1212],[36.8258,127.1377],[36.8248,127.1588],[36.8267,127.1651],[36.8102,127.1654],[36.7779,127.1762],[36.7662,127.1793],[36.7547,127.165],[36.7234,127.142],[36.6881,127.1184],[36.6373,127.1164],[36.6143,127.1194],[36.6023,127.115],[36.5703,127.1136],[36.5568,127.1121],[36.5351,127.1108],[36.5091,127.1095],[36.488,127.0927],[36.486,127.0867],[36.4862,127.0633],[36.4663,127.065],[36.4454,127.0323],[36.4075,127.0011],[36.3726,126.9472],[36.3418,126.8987],[36.3029,126.8592],[36.2803,126.8296],[36.2592,126.7993],[36.2295,126.7819],[36.1953,126.7751],[36.1561,126.7719],[36.1266,126.7663],[36.0752,126.7743],[36.0584,126.7708],[36.0491,126.7859],[36.0022,126.8047],[35.975,126.8348],[35.9427,126.8336],[35.9075,126.8425],[35.8773,126.8423],[35.84,126.8405],[35.798,126.8307],[35.745,126.7904],[35.7142,126.7595],[35.6642,126.7282],[35.6347,126.7044],[35.6001,126.6961],[35.5488,126.6914],[35.4998,126.6828],[35.4601,126.6708],[35.4211,126.6555],[35.3777,126.604],[35.3081,126.5633],[35.2593,126.5285],[35.2239,126.4928],[35.1915,126.4865],[35.1563,126.483],[35.1007,126.4815],[35.0431,126.4827],[35.0061,126.4923],[34.9582,126.5011],[34.9311,126.499],[34.8948,126.4994],[34.8627,126.4863],[34.8428,126.4619],[34.8404,126.428],[34.8318,126.3914],[34.8143,126.3824],[34.8116,126.3923]]},{"from":"인천","from_en":"Incheon","to":"전주","to_en":"Jeonju","km":224,"min":173,"path":[[37.4565,126.7052],[37.4555,126.7251],[37.4502,126.7453],[37.4329,126.7384],[37.3877,126.7526],[37.3644,126.7675],[37.3517,126.8005],[37.3482,126.8274],[37.3433,126.8638],[37.3228,126.8963],[37.3289,126.9327],[37.3201,126.9691],[37.3139,127.0008],[37.3081,127.035],[37.2932,127.0795],[37.2861,127.1035],[37.2384,127.1055],[37.2101,127.0954],[37.1747,127.0952],[37.1445,127.0838],[37.1151,127.112],[37.0772,127.1295],[37.0517,127.1362],[37.0122,127.1465],[36.9773,127.1641],[36.9343,127.1892],[36.8644,127.1861],[36.8337,127.174],[36.8043,127.1651],[36.7731,127.178],[36.7643,127.1765],[36.7469,127.1631],[36.7215,127.1378],[36.6819,127.1173],[36.6335,127.1194],[36.6098,127.1174],[36.5959,127.1149],[36.5651,127.1119],[36.5488,127.1152],[36.5242,127.11],[36.4988,127.0998],[36.4752,127.0874],[36.4555,127.0912],[36.4391,127.0804],[36.4189,127.0833],[36.4007,127.0757],[36.3661,127.0715],[36.3296,127.0721],[36.3,127.0677],[36.2588,127.0659],[36.2214,127.052],[36.1876,127.0508],[36.1347,127.0676],[36.101,127.0818],[36.0788,127.1016],[36.0503,127.1042],[36.0136,127.1037],[35.9929,127.1136],[35.9816,127.11],[35.9485,127.0953],[35.938,127.0945],[35.9122,127.1266],[35.8938,127.1536],[35.8791,127.1556],[35.867,127.1466],[35.8537,127.1549],[35.8461,127.1528],[35.8365,127.1529],[35.8325,127.1445],[35.8244,127.1478]]},{"from":"포항","from_en":"Pohang","to":"대전","to_en":"Daejeon","km":216,"min":172,"path":[[36.0193,129.344],[36.0164,129.3409],[36.009,129.3396],[36.0008,129.313],[35.9838,129.2689],[35.9914,129.2363],[35.9971,129.201],[35.9884,129.161],[35.9837,129.1249],[35.9864,129.0964],[36.0032,129.0451],[36.0112,128.9867],[35.991,128.9662],[36.0117,128.9358],[36.0214,128.8993],[36.0451,128.8605],[36.0418,128.8154],[36.0578,128.7834],[36.061,128.7626],[36.0659,128.7332],[36.0769,128.6989],[36.089,128.6727],[36.1061,128.6499],[36.1153,128.6354],[36.1296,128.6131],[36.159,128.5675],[36.181,128.5388],[36.209,128.5162],[36.2309,128.505],[36.2461,128.4805],[36.2572,128.4483],[36.2786,128.3968],[36.2926,128.3633],[36.3109,128.3247],[36.3301,128.3116],[36.3583,128.29],[36.3752,128.2697],[36.3663,128.2385],[36.3742,128.1791],[36.3684,128.1505],[36.3738,128.1219],[36.4088,128.0639],[36.4295,128.0212],[36.4415,127.956],[36.4473,127.8818],[36.4553,127.8169],[36.4548,127.7568],[36.4573,127.7184],[36.4474,127.7256],[36.4415,127.6941],[36.4207,127.6641],[36.4043,127.661],[36.3937,127.6634],[36.3831,127.6515],[36.3684,127.6403],[36.3749,127.6241],[36.362,127.6068],[36.3326,127.5792],[36.3197,127.5627],[36.3179,127.553],[36.3218,127.5441],[36.3337,127.5295],[36.3358,127.5169],[36.3415,127.5039],[36.3473,127.494],[36.3389,127.4896],[36.3265,127.4733],[36.3176,127.4604],[36.3241,127.446],[36.332,127.4345]]}];
+  // Real expressway rest areas along each route, in driving order.
+  const STOPS = [
+    ["안성휴게소", "금강휴게소", "추풍령휴게소", "칠곡휴게소"],
+    ["안성휴게소", "천안삼거리휴게소"],
+    ["서산휴게소", "홍성휴게소", "고창고인돌휴게소"],
+    ["용인휴게소", "문막휴게소", "평창휴게소"],
+    ["경주휴게소", "칠곡휴게소", "추풍령휴게소", "안성휴게소"],
+    ["청도새마을휴게소"],
+    ["안성휴게소", "추풍령휴게소", "칠곡휴게소"],
+    ["정안알밤휴게소", "함평천지휴게소"],
+    ["화성휴게소", "행담도휴게소", "군산휴게소"],
+    ["와촌휴게소", "칠곡휴게소", "추풍령휴게소"],
+  ];
+  const STOPS_EN = { "안성휴게소": "Anseong", "금강휴게소": "Geumgang", "추풍령휴게소": "Chupungnyeong", "칠곡휴게소": "Chilgok",
+    "천안삼거리휴게소": "Cheonan Samgeori", "서산휴게소": "Seosan", "홍성휴게소": "Hongseong", "고창고인돌휴게소": "Gochang Goindol",
+    "용인휴게소": "Yongin", "문막휴게소": "Munmak", "평창휴게소": "Pyeongchang", "경주휴게소": "Gyeongju", "청도새마을휴게소": "Cheongdo",
+    "정안알밤휴게소": "Jeongan", "함평천지휴게소": "Hampyeong", "화성휴게소": "Hwaseong", "행담도휴게소": "Haengdamdo",
+    "군산휴게소": "Gunsan", "와촌휴게소": "Wachon" };
+  const ko = () => (window.BN_LANG ? BN_LANG() : "en") === "ko";
+  const W = (k, e) => (ko() ? k : e);
+
+  const code = (new URLSearchParams(location.search).get("v") || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
+  let visit = null, state = code ? "loading" : "none";     // loading | ok | expired | none
+
+  // -- a seeded history ---------------------------------------------------- //
+  function rng(seed) {
+    let h = 2166136261;
+    for (const c of seed) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function trace(r, start, drive, eps) {
+    const out = [], n = 60;
+    for (let i = 0; i <= n; i++) {
+      const s = drive * i / n, hr = new Date((start + s) * 1000).getHours();
+      let v = 0.12 + (hr >= 2 && hr < 5 ? 0.18 : hr < 2 ? 0.1 : 0.03) + 0.06 * (s / drive) + (r() - 0.5) * 0.06;
+      for (const e of eps) { const d = Math.abs(start + s - e.at); if (d < 600) v = Math.max(v, 0.55 + 0.1 * e.max_stage - d / 1500); }
+      out.push([Math.round(s), Math.round(Math.min(0.98, Math.max(0.02, v)) * 1000) / 1000]);
+    }
+    return out;
+  }
+  let cache = null;
+  function history() {
+    const key = (code || "bamnun") + (ko() ? "k" : "e");
+    if (cache && cache.key === key) return cache.list;
+    const r = rng(code || "bamnun"), out = [];
+    let day = 61, id = 500;
+    while (true) {
+      day -= 1 + Math.floor(r() * 2.3);
+      if (day < 1) break;
+      const ri = Math.floor(r() * ROUTES.length), R = ROUTES[ri], back = r() < 0.5;
+      const d = new Date(); d.setDate(d.getDate() - day); d.setHours(20 + Math.floor(r() * 4), Math.floor(r() * 60), 0, 0);
+      const start = d.getTime() / 1000;
+      const drive = R.min * 60 * (1.05 + r() * 0.25);
+      const nb = R.min > 150 ? 1 + Math.floor(r() * 2) : Math.floor(r() * 2);
+      const break_s = nb * (900 + r() * 900), dur = drive + break_s;
+      const eps = [];
+      for (let t = start + 1800; t < start + dur - 600; t += 1200 + r() * 1200) {
+        const hr = new Date(t * 1000).getHours(), p = hr >= 2 && hr < 5 ? 0.22 : hr < 2 ? 0.12 : 0.05;
+        if (r() < p) eps.push({ at: Math.round(t), max_stage: r() < 0.55 ? 1 : r() < 0.6 ? 2 : r() < 0.7 ? 3 : 4 });
+      }
+      const alert_s = eps.length * (180 + r() * 240);
+      // Rest stops spread along the route, each where it really is (its
+      // place in the route's list), in driving order.
+      const all = STOPS[ri] || [], k = Math.min(all.length, Math.max(nb, 1));
+      let stops = [...Array(k)].map((_, j) => { const i = Math.floor((j + 0.5) * all.length / k); return { name: all[i], f: (i + 1) / (all.length + 1) }; });
+      if (back) stops = stops.reverse().map((x) => ({ name: x.name, f: 1 - x.f }));
+      const path = back ? R.path.slice().reverse() : R.path;
+      out.push({
+        id: id--, started_at: start, ended_at: start + dur, open: false, tz_min: -new Date().getTimezoneOffset(),
+        summary: { duration_s: Math.round(dur), drive_s: Math.round(drive), calm_s: Math.round(drive - alert_s),
+          alert_free: Math.round((drive - alert_s) / drive * 1e4) / 1e4, alerts: eps.length,
+          max_stage: Math.max(0, ...eps.map((e) => e.max_stage)), microsleeps: eps.some((e) => e.max_stage === 4) ? 1 : 0,
+          breaks: nb, break_s: Math.round(break_s), longest_calm_s: Math.round(Math.min(drive - alert_s, 3000 + r() * 6000)), episodes: eps },
+        route: { from: back ? W(R.to, R.to_en) : W(R.from, R.from_en), to: back ? W(R.from, R.from_en) : W(R.to, R.to_en),
+          distance_km: R.km, path, stops: stops.map((x) => ({ name: W(x.name, STOPS_EN[x.name] + " rest area"), f: x.f })) },
+        trace: trace(r, start, drive, eps),
+      });
+    }
+    out.sort((a, b) => b.started_at - a.started_at);
+    cache = { key, list: out };
+    return out;
+  }
+  function boothTrip() {
+    if (!visit || !visit.trip) return null;
+    const t = visit.trip;
+    return Object.assign({}, t, { id: 9999, open: false, tz_min: -new Date().getTimezoneOffset(), caught: visit.caught || null,
+      route: { from: W("밤눈 체험 부스", "Bamnun booth"), to: W("창보고 전시회", "Exhibition"), booth: true } });
+  }
+  function trips() { const b = boothTrip(); return b ? [b].concat(history()) : history(); }
+
+  // -- pictures ------------------------------------------------------------ //
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function mapSvg(t) {
+    const p = t.route && t.route.path;
+    if (!p || p.length < 2) return "";
+    const lat0 = p.reduce((a, q) => a + q[0], 0) / p.length, k = Math.cos(lat0 * Math.PI / 180);
+    const xs = p.map((q) => q[1] * k), ys = p.map((q) => -q[0]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const Wd = 300, Hd = 170, pad = 22, s = Math.min((Wd - 2 * pad) / Math.max(1e-6, x1 - x0), (Hd - 2 * pad) / Math.max(1e-6, y1 - y0));
+    const ox = (Wd - (x1 - x0) * s) / 2, oy = (Hd - (y1 - y0) * s) / 2;
+    const P = (i) => [(ox + (xs[i] - x0) * s).toFixed(1), (oy + (ys[i] - y0) * s).toFixed(1)];
+    const d = p.map((_, i) => (i ? "L" : "M") + P(i).join(",")).join("");
+    const stops = t.route.stops || [];
+    const dots = stops.map((x) => { const [cx, cy] = P(Math.round(x.f * (p.length - 1))); return `<circle cx="${cx}" cy="${cy}" r="4" fill="#F8C4A4"/>`; }).join("");
+    const [ax, ay] = P(0), [bx, by] = P(p.length - 1);
+    return `<div style="margin-top:12px"><svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;border-radius:14px;background:rgba(255,255,255,.05)">
+      <path d="${d}" fill="none" stroke="rgba(196,181,253,.35)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="${d}" fill="none" stroke="#C4B5FD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}
+      <circle cx="${ax}" cy="${ay}" r="6" fill="#F4EFE6"/><circle cx="${bx}" cy="${by}" r="6" fill="#F48FB1"/>
+      <text x="${ax}" y="${+ay - 10}" fill="#F4EFE6" font-size="12" font-weight="700" text-anchor="middle">${esc(t.route.from)}</text>
+      <text x="${bx}" y="${+by - 10}" fill="#F48FB1" font-size="12" font-weight="700" text-anchor="middle">${esc(t.route.to)}</text></svg>
+      ${stops.length ? `<p style="margin:8px 0 0;font-size:12.5px;color:#B3A6B4">${esc(W("쉬어 간 곳: ", "Stops: "))}${esc(stops.map((x) => x.name).join(" · "))}</p>` : ""}</div>`;
+  }
+  function curveSvg(t) {
+    const tr = t.trace;
+    if (!tr || tr.length < 2) return "";
+    const Wd = 300, Hd = 110, end = tr[tr.length - 1][0] || 1;
+    const X = (s) => (8 + (Wd - 16) * s / end).toFixed(1), Y = (v) => (Hd - 14 - (Hd - 26) * v).toFixed(1);
+    const line = tr.map((q, i) => (i ? "L" : "M") + X(q[0]) + "," + Y(q[1])).join("");
+    const marks = ((t.summary || {}).episodes || []).map((e) => { const s = e.at - t.started_at; return s >= 0 && s <= end ? `<line x1="${X(s)}" x2="${X(s)}" y1="10" y2="${Hd - 14}" stroke="#F48FB1" stroke-dasharray="3 3"/><circle cx="${X(s)}" cy="10" r="4" fill="#F48FB1"/>` : ""; }).join("");
+    return `<div style="margin-top:12px"><span style="font-size:12px;color:#B3A6B4">${esc(W("졸음 정도", "How sleepy"))}</span>
+      <svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;margin-top:4px;border-radius:14px;background:rgba(255,255,255,.05)">
+      <line x1="8" x2="${Wd - 8}" y1="${Y(0.5)}" y2="${Y(0.5)}" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 4"/>${marks}
+      <path d="${line} L${X(end)},${Hd - 14} L8,${Hd - 14} Z" fill="rgba(196,181,253,.18)"/>
+      <path d="${line}" fill="none" stroke="#C4B5FD" stroke-width="2.5" stroke-linejoin="round"/></svg></div>`;
+  }
+  function caughtHtml(t) {
+    if (!t.caught) return "";
+    return `<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><img src="${t.caught}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:14px;flex-shrink:0">
+      <div><b style="font-size:15px">${esc(W("여기서 졸았어요 😴", "Caught you dozing 😴"))}</b><p style="margin:4px 0 0;font-size:13px;color:#B3A6B4;line-height:1.4">${esc(W("밤눈이 이 순간 처음으로 깨웠어요.", "The moment Bamnun first woke you."))}</p></div></div>`;
+  }
+
+  // -- the guided tour (once per visit) ------------------------------------- //
+  const STEPS = [
+    { go: "Home", sel: "#hAvatar", ko: ["이건 당신이에요", "방금 부스에서 찍은 사진이 프로필이 됐어요."], en: ["This is you", "Your photo from the booth is your profile."] },
+    { go: "Home", sel: "#hTrip", ko: ["방금 운전한 기록", "부스에서 운전한 기록이 맨 위에 있어요."], en: ["Your drive, just now", "Your booth drive is at the top."] },
+    { go: "Trips", open: true, sel: "[data-trip='9999']", ko: ["운전 자세히 보기", "졸음 그래프와 밤눈이 깨운 순간이에요."], en: ["Your drive in detail", "How sleepy you got, and when Bamnun woke you."] },
+    { go: "Trips", sel: "#tList", ko: ["두 달 동안의 기록", "실제 고속도로 경로로 달린 밤 운전 기록이에요."], en: ["Two months of drives", "Night drives on real Korean expressways."] },
+    { go: "Insights", sel: "#iBody > section", ko: ["올리가 찾은 패턴", "언제 졸리는지, 무엇이 깨웠는지 알려줘요."], en: ["Patterns Ollie found", "When you get sleepy, and what wakes you."] },
+    { go: "Home", sel: "a[href='#Stages']", alt: () => [...document.querySelectorAll("section")].find((x) => x.isConnected && x.offsetParent && /Wake-up steps|깨우기 단계/.test((x.querySelector("b") || {}).textContent || "")), ko: ["깨우기 단계 미리 듣기", "네 단계를 휴대폰에서 들어 보세요. 이제 자유롭게 둘러보세요!"], en: ["Try the wake-up stages", "Hear the four stages here. Now look around!"] },
+  ];
+  function tour() {
+    let i = 0, box = null;
+    const end = () => { if (box) box.remove(); box = null; try { localStorage.setItem("bn-tour-" + code, "1"); } catch (e) {} };
+    function show() {
+      if (i >= STEPS.length) return end();
+      const st = STEPS[i];
+      if (window.BN_GO) BN_GO(st.go, { instant: true });
+      setTimeout(() => {
+        if (st.open) { const c = document.querySelector("[data-trip='9999']"); if (c && c.getAttribute("aria-expanded") !== "true") c.click(); }
+        setTimeout(() => {
+          const el = document.querySelector(st.sel) || (st.alt && st.alt());
+          if (!el) { i++; return show(); }
+          el.scrollIntoView({ block: "center" });
+          setTimeout(() => place(el, st), 250);
+        }, 250);
+      }, 350);
+    }
+    function place(el, st) {
+      if (!box) {
+        box = document.createElement("div");
+        box.style.cssText = "position:fixed;inset:0;z-index:9999;";
+        box.addEventListener("click", (e) => { if (e.target.dataset.skip) return end(); i++; show(); });
+        document.body.appendChild(box);
+      }
+      const r = el.getBoundingClientRect(), pad = 8, [h, p] = st[ko() ? "ko" : "en"];
+      const below = r.bottom + 190 < innerHeight;
+      box.innerHTML = `<div style="position:fixed;left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px;border-radius:18px;box-shadow:0 0 0 9999px rgba(10,6,12,.72);outline:3px solid #F4EFE6;transition:all .25s"></div>
+        <div style="position:fixed;left:16px;right:16px;${below ? `top:${r.bottom + pad + 14}px` : `bottom:${innerHeight - r.top + pad + 14}px`};background:#F4EFE6;color:#241A26;border-radius:20px;padding:16px 18px;font-family:Figtree,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">
+          <span style="font-size:12px;color:#8a7d8c">${i + 1} / ${STEPS.length}</span>
+          <h3 style="margin:4px 0 0;font-size:20px;font-weight:800">${esc(h)}</h3>
+          <p style="margin:6px 0 12px;font-size:14.5px;line-height:1.45">${esc(p)}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center"><button data-skip="1" style="background:none;border:0;color:#8a7d8c;font-size:14px;padding:6px 0">${esc(W("건너뛰기", "Skip"))}</button>
+          <span style="background:#241A26;color:#F4EFE6;font-weight:700;font-size:14px;padding:9px 16px;border-radius:99px">${esc(i === STEPS.length - 1 ? W("시작하기", "Done") : W("다음", "Next"))} ›</span></div></div>`;
+    }
+    show();
+  }
+
+  // -- loading ------------------------------------------------------------- //
+  function toast(text) {
+    const d = document.createElement("div");
+    d.textContent = text;
+    d.style.cssText = "position:fixed;left:16px;right:16px;top:16px;z-index:9998;background:#F4EFE6;color:#241A26;border-radius:16px;padding:14px 16px;font:600 14.5px Figtree,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 5000);
+  }
+  async function load() {
+    const cfg = window.BN_SUPABASE;
+    if (!code || !cfg) { state = "none"; return; }
+    try {
+      const r = await fetch(cfg.url + "/rest/v1/rpc/get_visit", { method: "POST",
+        headers: { apikey: cfg.key, Authorization: "Bearer " + cfg.key, "Content-Type": "application/json" },
+        body: JSON.stringify({ c: code }) });
+      const v = r.ok ? await r.json() : null;
+      if (v && v.trip) { visit = v; state = "ok"; } else state = "expired";
+    } catch (e) { state = "expired"; }
+    cache = null;
+    window.dispatchEvent(new Event("bn-visit"));
+    if (state === "expired") toast(W("이 체험 기록은 만료됐어요. 기본 데모를 보여 드릴게요.", "This booth drive has expired. Here's the demo instead."));
+    if (state === "ok") {
+      let done = false; try { done = localStorage.getItem("bn-tour-" + code) === "1"; } catch (e) {}
+      if (!done) setTimeout(tour, 1600);
+    }
+  }
+
+  window.BN_VISIT = {
+    trips, state: () => state, visit: () => visit, mapSvg, curveSvg, caughtHtml, tour,
+    name: () => (visit ? W("체험 운전자 #" + visit.number, "Test driver #" + visit.number) : null),
+    photo: () => (visit && visit.photo) || null,
+  };
+  if (/\.github\.io$/i.test(location.hostname) || new URLSearchParams(location.search).has("demo")) setTimeout(load, 0);
+})();
+
 /* The device API (docs/SPEC.md, section 1), for the screens.
 
    BN_API.profile() / settings()     the cached copy, instantly (the Pi is the
@@ -3510,6 +3758,7 @@ document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||
   }
   const SAMPLE_PLACES = [["Incheon", "Daejeon"], ["Pyeongtaek", "Busan"], ["Incheon", "Gwangju"], ["Seoul", "Ulsan"], ["Suwon", "Daegu"]];
   function sampleTrips() {
+    if (window.BN_VISIT) return BN_VISIT.trips();       // the booth history (visit.js)
     const now = Date.now() / 1000, out = [];
     for (let i = 0; i < 9; i++) {
       const day = [1, 2, 4, 6, 8, 11, 15, 19, 26][i], dur = 5400 + (i * 2731) % 9000, alerts = [2, 1, 0, 1, 3, 0, 1, 0, 2][i];
@@ -3523,6 +3772,8 @@ document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||
     return out;
   }
   function sampleInsights(range) {
+    if (window.BN_VISIT && window.BN_SYNC)
+      return Object.assign(BN_SYNC.compute(BN_VISIT.trips(), range, -new Date().getTimezoneOffset(), Date.now() / 1000), { sample: true });
     const trips = sampleTrips().filter((t) => range === "all" || t.started_at > Date.now() / 1000 - (range === "month" ? 30 : 7) * 86400);
     const today = new Date(), per = [];
     for (let i = 6; i >= 0; i--) { const d = new Date(today - i * 86400000); per.push({ date: d.toISOString().slice(0, 10), weekday: (d.getDay() + 6) % 7, alerts: trips.filter((t) => new Date(t.started_at * 1000).toDateString() === d.toDateString()).reduce((a, t) => a + t.summary.alerts, 0), drove: trips.some((t) => new Date(t.started_at * 1000).toDateString() === d.toDateString()) }); }

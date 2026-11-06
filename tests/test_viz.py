@@ -341,3 +341,12 @@ def test_a_click_on_a_dashboard_button_is_found_through_the_window_scaling():
     oy = (win_h - DASH_H) // 2
     assert button_at(*window_to_canvas(cx, cy + oy, win_w, win_h)) == "calibrate"
     assert button_at(5, 5) is None and DASH_W == 1280
+
+
+def test_the_volume_buttons_are_clickable_and_do_not_overlap_the_others():
+    from bamnun.viz import BUTTONS, button_at
+
+    for name, (x, y, w, h) in BUTTONS.items():
+        assert button_at(x + w // 2, y + h // 2) == name
+    spans = sorted((x, x + w) for x, _y, w, _h in BUTTONS.values())
+    assert all(a_end < b_start for (_a, a_end), (b_start, _b) in zip(spans, spans[1:]))

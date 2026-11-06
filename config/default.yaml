@@ -156,15 +156,21 @@ calibration:
   min_tracking_fraction: 0.60      # the face must be tracked in at least this share of frames
   min_open_samples: 30             # absolute floor, for very slow streams
   max_relative_pose_deg: 12.0      # frames this far from the session's own median pose are dropped
-  max_wobble_deg: 4.0              # head movement (robust std) above this: "Hold still", redo
+  max_wobble_deg: 6.0              # head movement (robust std) above this: "Hold still", redo
+                                   # (4 failed visitors at the booth who were only fidgeting)
   min_separation: 0.30             # (open - closed) / open EAR below this: eyes not separable, redo
   estimated_closed_ratio: 0.33     # no eyes-closed step: closed EAR estimated as this x open
   closed_lead_s: 0.7               # eyes-closed step: frames before this are the eyes still closing
-  min_brightness: 45.0             # face darker than this (0-255): "Too dark"
+  min_brightness: 25.0             # face darker than this (0-255): "Too dark". 45 failed
+                                   # under the infrared light with the face still tracked well
   max_brightness: 235.0            # brighter: "Too bright"
   min_face_frac: 0.06              # eye distance / frame width below this: "Move closer"
   max_face_frac: 0.32              # above: "Move back"
-  max_facing_deg: 28.0             # head turned further from the camera than this: "Face the camera"
+  max_facing_deg: 50.0             # head turned further from the camera than this: "Face the camera".
+                                   # The device sits to the driver's left, looking up: a driver
+                                   # watching the road is 30-40 degrees off its axis, and that's fine
+  max_attempts: 3                  # with an earlier calibration to fall back on, stop after this
+                                   # many failed tries and keep it (no endless recalibrating)
   # Saved per driver: runs/drivers/<profile name>/calibration.json. This is
   # the fallback when there is no profile name.
   save_path: runs/calibration.json

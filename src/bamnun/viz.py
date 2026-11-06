@@ -345,9 +345,14 @@ _CHART_Y, _CHART_H = 482, 230
 _COL_X, _COL_W = 848, 424
 # Buttons drawn over the camera's bottom-right corner, for a mouse or a Pi
 # Connect session, where a key press doesn't always reach the window.
-BUTTONS = {"calibrate": (_CAM_RECT[0] + _CAM_RECT[2] - 312, _CAM_RECT[1] + _CAM_RECT[3] - 46, 150, 36),
-           "fullscreen": (_CAM_RECT[0] + _CAM_RECT[2] - 154, _CAM_RECT[1] + _CAM_RECT[3] - 46, 146, 36)}
-_BUTTON_WORDS = {"calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)"}
+_BTN_Y = _CAM_RECT[1] + _CAM_RECT[3] - 46
+_BTN_R = _CAM_RECT[0] + _CAM_RECT[2] - 8
+BUTTONS = {"vol_down": (_BTN_R - 458, _BTN_Y, 66, 36),
+           "vol_up": (_BTN_R - 386, _BTN_Y, 66, 36),
+           "calibrate": (_BTN_R - 304, _BTN_Y, 150, 36),
+           "fullscreen": (_BTN_R - 146, _BTN_Y, 146, 36)}
+_BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
+                 "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)
@@ -404,6 +409,8 @@ class DashboardData:
     components: dict[str, float] = field(default_factory=dict)
     calibration_hint: str = ""
     note: str = ""                            # small print for the presenter
+    notice: str = ""                          # e.g. why the last calibration didn't work
+    volume: Optional[int] = None              # the speaker, %; None: no mixer found
 
 
 def level_words(name: str) -> str:
@@ -435,13 +442,15 @@ def _status_line(ff, state, data: DashboardData) -> tuple[str, tuple[int, int, i
     if data.calibrating >= 0.0:
         if data.calibration_hint:
             return data.calibration_hint, _WARN
-        return "look ahead, blink normally", _WHITE
+        return "look at the road, blink normally", _WHITE
     if state.face_lost:
         return "DRIVER NOT VISIBLE", _BAD
     if state.microsleep_now:
         return f"EYES CLOSED {ff.ongoing_closure_s:0.1f}s", _BAD
     if state.distracted:
         return "EYES OFF ROAD", _colour_for_level(2)
+    if data.notice:
+        return data.notice, _WARN
     return "", _WHITE
 
 
@@ -527,8 +536,20 @@ def _state_card(img, x: int, y: int, w: int, h: int, ff, state,
         _bar(img, bar_x, y + 82, bar_w, 16, state.score, colour)
         _ticks(img, bar_x, y + 82, bar_w, 16, data.score_ticks)
     text, text_colour = _status_line(ff, state, data)
-    if text:
+    if text and _text_w(text, 0.66, 2) <= w - 24:
         _t(img, text, x + 12, y + 126, 0.66, text_colour, 2)
+    elif text:                           # a longer message: two smaller lines
+        lines, cur = [], ""
+        for word in text.split():
+            nxt = f"{cur} {word}".strip()
+            if cur and _text_w(nxt, 0.5) > w - 24:
+                lines.append(cur)
+                cur = word
+            else:
+                cur = nxt
+        lines.append(cur)
+        for i, line in enumerate(lines[:2]):
+            _t(img, _shorten(line, w - 24, 0.5), x + 12, y + 110 + 20 * i, 0.5, text_colour)
 
 
 def _air_card(img, x: int, y: int, w: int, h: int, data: DashboardData) -> None:
@@ -706,9 +727,14 @@ def button_at(x: int, y: int) -> Optional[str]:
     return None
 
 
-def _buttons(img) -> None:
+def _buttons(img, volume: Optional[int] = None) -> None:
     import cv2
 
+    x, y, w, h = BUTTONS["vol_down"]
+    label = "speaker" if volume is None else f"speaker {volume}%"
+    cv2.rectangle(img, (x - _text_w(label, 0.5) - 20, y + 4),
+                  (x - 6, y + h - 4), (40, 40, 44), -1)
+    _t(img, label, x - _text_w(label, 0.5) - 13, y + h // 2 + 6, 0.5, _WHITE)
     for name, (x, y, w, h) in BUTTONS.items():
         cv2.rectangle(img, (x, y), (x + w, y + h), (40, 40, 44), -1)
         cv2.rectangle(img, (x, y), (x + w, y + h), (200, 200, 200), 1)
@@ -748,12 +774,14 @@ class Dashboard:
         self.refresh_s = float(refresh_s)
         self._panels: Optional[np.ndarray] = None
         self._drawn_at: Optional[float] = None
+        self._volume: Optional[int] = None
 
     def due(self, now: float) -> bool:
         return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
 
     def refresh(self, ff, state, data: DashboardData) -> None:
         self._panels = render_panels(ff, state, data)
+        self._volume = data.volume
         self._drawn_at = data.now
 
     def compose(self, camera: np.ndarray) -> np.ndarray:
@@ -771,5 +799,5 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
-        _buttons(canvas)
+        _buttons(canvas, self._volume)
         return canvas

@@ -6,8 +6,8 @@
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
 Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
-camera-only layout, f full screen, q quit. The dashboard also has Calibrate and
-Full screen buttons to click.
+camera-only layout, f full screen, - and = speaker volume, q quit. The dashboard
+also has Calibrate, Full screen and volume buttons to click.
 """
 
 from __future__ import annotations
@@ -59,6 +59,62 @@ PUBLISH_PERIOD_S = 0.1
 # The dashboard's score chart: one sample every half second, the last 2 min.
 SCORE_SAMPLE_S = 0.5
 SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
+CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
+VOLUME_STEP = 10
+
+# The calibrator's live hints, as a person reads them.
+CAL_HINTS = {"no_face": "Can't see your face", "closer": "Move a little closer",
+             "farther": "Move back a little", "dark": "Too dark: more light, please",
+             "bright": "Too bright", "face_camera": "Turn a little towards the camera",
+             "still": "Hold still"}
+
+
+class SpeakerVolume:
+    """The device speaker's volume, through ALSA's mixer (amixer).
+
+    The card is the USB speaker the device plays through (ui.speaker_mixer).
+    Changes are saved with alsactl so they survive a restart, in the
+    background so the camera loop never waits on them.
+    """
+
+    def __init__(self, cfg: Optional[dict]) -> None:
+        cfg = cfg or {}
+        self.card = str(cfg.get("card", "UACDemoV10"))
+        self.control = str(cfg.get("control", "PCM"))
+        self.percent: Optional[int] = self._read()
+
+    def _read(self) -> Optional[int]:
+        import re
+        import subprocess
+
+        try:
+            out = subprocess.run(["amixer", "-c", self.card, "sget", self.control],
+                                 capture_output=True, text=True, timeout=2).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+        m = re.search(r"\[(\d+)%\]", out)
+        return int(m.group(1)) if m else None
+
+    def change(self, step: int) -> None:
+        import subprocess
+        import threading
+
+        if self.percent is None:
+            return
+        self.percent = max(0, min(100, self.percent + step))
+        pct = self.percent
+
+        def apply() -> None:
+            try:
+                subprocess.run(["amixer", "-q", "-c", self.card, "sset", self.control, f"{pct}%"],
+                               timeout=3)
+                subprocess.run(["sudo", "-n", "alsactl", "store", self.card],
+                               capture_output=True, timeout=5)
+            except (OSError, subprocess.SubprocessError) as exc:
+                log.warning("speaker volume: %s", exc)
+
+        threading.Thread(target=apply, name="bamnun-volume", daemon=True).start()
+        console.print(f"speaker volume {pct}%")
 HEALTH_PERIOD_S = 1.0
 log = logging.getLogger("bamnun")
 
@@ -166,6 +222,9 @@ class Monitor:
         self._co2_history: deque = deque(maxlen=120)     # 10 min at the sensor's 5 s
         self._co2_recorded_at: Optional[float] = None
         self._last_score_t = -1e9
+        self.volume = SpeakerVolume(ui.get("speaker_mixer"))
+        self._max_cal_attempts = int(self.cfg["calibration"].get("max_attempts", 3))
+        self._cal_notice: Optional[tuple[str, float]] = None
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -442,6 +501,38 @@ class Monitor:
         if name:
             self._clicks.append(name)
 
+    def _start_calibration(self, t: float) -> None:
+        """Calibrate now (c key, the button, or start-up with none on file).
+
+        The wake-up lights go off first: the blue light shines into the
+        camera's view and darkens its exposure, which failed every
+        calibration after the first as "too dark". Nobody calibrating is
+        drowsy anyway.
+        """
+        self._last_alert = self.policy.reset(t)
+        self.features.calibrator.reset()
+        self.features.start_calibration(t)
+        self._cal_run = True
+        self._cal_announced = False
+        self._cal_notice = None
+
+    def _give_up_calibration(self, t: float) -> None:
+        """Stop after a few failed tries if there is a calibration to keep.
+
+        A calibration restarts by itself when it fails, which left the
+        dashboard calibrating forever. With an earlier one on file, keep it
+        and say why the new one didn't work; the button tries again.
+        """
+        cal = self.features.calibrator
+        if (cal.attempts >= self._max_cal_attempts and self.features.calibration.complete
+                and self.features.calibrating):
+            self.features.cancel_calibration()
+            self._cal_run = False
+            why = cal.last_failure or "the measurement wasn't steady"
+            self._cal_notice = (f"Kept the last calibration. {why}", time.monotonic() + CAL_NOTICE_S)
+            console.print(f"[yellow]calibration stopped after {cal.attempts} tries[/]: {why}")
+            self.logger.log_event("calibration_gave_up", {"attempts": cal.attempts, "reason": why})
+
     def _record_history(self, t: float, state: DriverState, calibrating: bool) -> None:
         """Samples for the dashboard's charts."""
         if not calibrating and t - self._last_score_t >= SCORE_SAMPLE_S:
@@ -485,7 +576,11 @@ class Monitor:
             stage_name=str(stages[min(stage, len(stages) - 1)].get("name", "")),
             last_alert=last_words,
             plan=self._plan,
-            calibration_hint=(self.features.calibrator.hint or "") if progress >= 0.0 else "",
+            calibration_hint=(CAL_HINTS.get(self.features.calibrator.hint or "", "")
+                              if progress >= 0.0 else ""),
+            notice=(self._cal_notice[0] if self._cal_notice
+                    and time.monotonic() < self._cal_notice[1] else ""),
+            volume=self.volume.percent,
             note=("booth: nothing fires by itself; stages play from the app"
                   if self.args.booth else demo_mode.HELP if self.demo else ""),
         )
@@ -520,8 +615,7 @@ class Monitor:
         if not self.features.calibration.complete:
             first = self.source.read()
             if first is not None:
-                self.features.start_calibration(first.timestamp)
-                self._cal_run = True
+                self._start_calibration(first.timestamp)
                 self._voice("calibrate_voice", first.timestamp)
 
         t_start = None
@@ -614,6 +708,7 @@ class Monitor:
 
             self._guarded(self._control, frame.timestamp, ff)
             self._guarded(self._record_history, frame.timestamp, state, calibrating)
+            self._guarded(self._give_up_calibration, frame.timestamp)
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -673,7 +768,8 @@ class Monitor:
                 # Connect, a key press doesn't always reach this window.
                 while self._clicks:
                     btn = self._clicks.popleft()
-                    key = {"calibrate": ord("c"), "fullscreen": ord("f")}.get(btn, key)
+                    key = {"calibrate": ord("c"), "fullscreen": ord("f"),
+                           "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if key == ord("q"):
                     break
                 if key == ord("l"):
@@ -684,11 +780,13 @@ class Monitor:
                                           cv2.WINDOW_FULLSCREEN if fullscreen
                                           else cv2.WINDOW_NORMAL)
                 if key == ord("c"):
-                    self.features.start_calibration(frame.timestamp)
-                    self._cal_run = True
+                    self._start_calibration(frame.timestamp)
                     self._voice("calibrate_voice", frame.timestamp)
-                    self._cal_announced = False
                     console.print("[cyan]calibration restarted[/]")
+                if key in (ord("-"), ord("_")):
+                    self.volume.change(-VOLUME_STEP)
+                if key in (ord("="), ord("+")):
+                    self.volume.change(VOLUME_STEP)
                 if key == ord("s"):
                     out = self.logger.dir / f"snap_{int(time.time())}.png"
                     cv2.imwrite(str(out), canvas)

@@ -166,11 +166,12 @@ class Screens:
         dst = canvas[y0c:y1, x0c:x1]
         dst[:] = (src[:, :, :3] * a + dst * (1.0 - a)).astype(np.uint8)
 
-    def _draw_owl(self, canvas: np.ndarray, f: _Frame, name: str, t: float) -> None:
+    def _draw_owl(self, canvas: np.ndarray, f: _Frame, name: str, t: float,
+                  height: float = 300, cy: float = 330) -> None:
         """Ollie breathing: a slow bob and a slight sway."""
         import cv2
 
-        owl = self._owl(name, f.n(300))
+        owl = self._owl(name, f.n(height))
         if owl is None:
             return
         angle = 3.5 * math.sin(t * 1.6)
@@ -178,7 +179,7 @@ class Screens:
         m = cv2.getRotationMatrix2D((w / 2, h * 0.85), angle, 1.0 + 0.015 * math.sin(t * 3.2))
         moved = cv2.warpAffine(owl, m, (w, h), flags=cv2.INTER_LINEAR,
                                borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
-        self._paste(canvas, moved, f.x(_SPLIT / 2), f.y(330 + 10 * math.sin(t * 2.2)))
+        self._paste(canvas, moved, f.x(_SPLIT / 2), f.y(cy + 10 * math.sin(t * 2.2)))
 
     def _game(self, f: _Frame) -> Optional[np.ndarray]:
         """The game's screen, fitted to the left panel, Drive circled."""
@@ -309,10 +310,12 @@ class Screens:
                                             [("야간 운전자를 위한 졸음 지킴이, 밤눈",
                                               "Bamnun, a drowsiness co-pilot for night drivers")])
         canvas = self._cache[key].copy()
-        self._draw_owl(canvas, f, "hello", t)
-        self._prompt(canvas, f, t, "스페이스바를 누르거나 클릭하세요", "Press SPACE or click to start")
-        if camera is not None:
+        if camera is not None:            # Ollie up top, the camera big below him
+            self._draw_owl(canvas, f, "hello", t, height=210, cy=165)
             self._thumbnail(canvas, f, camera)
+        else:
+            self._draw_owl(canvas, f, "hello", t)
+        self._prompt(canvas, f, t, "스페이스바를 누르거나 클릭하세요", "Press SPACE or click to start")
         return canvas
 
     def briefing(self, step: int, t: float, size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
@@ -377,14 +380,18 @@ class Screens:
 
     @staticmethod
     def _thumbnail(canvas: np.ndarray, f: _Frame, camera: np.ndarray) -> None:
-        """The live camera, small, at the foot of the left panel."""
+        """The live camera across the grey panel: people see themselves, and
+        the face mesh the tracker draws on them."""
         import cv2
 
-        w = f.n(220)
+        w = f.n(_SPLIT - 60)
         h = int(camera.shape[0] * w / camera.shape[1])
+        if h > f.n(DASH_H - 330):                 # a tall camera: fit the height instead
+            h = f.n(DASH_H - 330)
+            w = int(camera.shape[1] * h / camera.shape[0])
         thumb = cv2.resize(camera, (w, h), interpolation=cv2.INTER_AREA)
         if thumb.ndim == 2:
             thumb = cv2.cvtColor(thumb, cv2.COLOR_GRAY2BGR)
-        x, y = f.x(_SPLIT / 2) - w // 2, f.y(DASH_H - 24) - h
+        x, y = f.x(_SPLIT / 2) - w // 2, f.y(310)
         canvas[y:y + h, x:x + w] = thumb
         cv2.rectangle(canvas, (x - 1, y - 1), (x + w, y + h), (120, 120, 120), 1)

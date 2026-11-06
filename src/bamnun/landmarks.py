@@ -45,6 +45,22 @@ LEFT_EYE_RING = (362, 382, 381, 380, 374, 373, 390, 249, 263,
 
 RIGHT_IRIS = (469, 470, 471, 472)
 LEFT_IRIS = (474, 475, 476, 477)
+# Outlines for the on-screen face mesh (MediaPipe face mesh indices).
+FACE_OVAL = (10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379,
+             378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127,
+             162, 21, 54, 103, 67, 109)
+LIPS_OUTER = (61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267,
+              0, 37, 39, 40, 185)
+LIPS_INNER = (78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312,
+              13, 82, 81, 80, 191)
+RIGHT_BROW = (46, 53, 52, 65, 55, 107, 66, 105, 63, 70)
+LEFT_BROW = (276, 283, 282, 295, 285, 336, 296, 334, 293, 300)
+NOSE_BRIDGE = (168, 6, 197, 195, 5, 4, 1)
+NOSE_BASE = (98, 97, 2, 326, 327)
+# (points, closed ring?)
+FACE_OUTLINES = ((FACE_OVAL, True), (LIPS_OUTER, True), (LIPS_INNER, True),
+                 (RIGHT_BROW, False), (LEFT_BROW, False), (NOSE_BRIDGE, False),
+                 (NOSE_BASE, False))
 RIGHT_IRIS_CENTER = 468
 LEFT_IRIS_CENTER = 473
 

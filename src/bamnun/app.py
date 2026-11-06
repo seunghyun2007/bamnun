@@ -42,8 +42,8 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
-from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, fit_to_window,
-                  window_to_canvas)
+from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, draw_face_mesh,
+                  fit_to_window, window_to_canvas)
 
 # Console output must never stop detection. A Windows console in a legacy
 # code page can't print Korean (Ollie's lines, a driver's name), and an
@@ -797,7 +797,11 @@ class Monitor:
                     _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
                     size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
                     if self.mode == "standby":
-                        canvas = self._screens.standby(now, frame.image, size)
+                        cam = frame.image
+                        cam = cv2.cvtColor(cam, cv2.COLOR_GRAY2BGR) if cam.ndim == 2 else cam.copy()
+                        if lms is not None and lms.ok:
+                            draw_face_mesh(cam, lms.points)
+                        canvas = self._screens.standby(now, cam, size)
                     elif self.mode == "briefing":
                         canvas = self._screens.briefing(self._brief_step, now, size)
                     else:      # calibrating: look at the game screen, to the right

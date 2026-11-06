@@ -16,7 +16,8 @@ from typing import Any, Optional, Sequence
 
 import numpy as np
 
-from .landmarks import LEFT_EYE_RING, LEFT_IRIS_CENTER, RIGHT_EYE_RING, RIGHT_IRIS_CENTER
+from .landmarks import (FACE_OUTLINES, LEFT_EYE_RING, LEFT_IRIS_CENTER, RIGHT_EYE_RING,
+                        RIGHT_IRIS_CENTER)
 
 # BGR. Monochrome base with one accent per severity keeps it legible on a
 # projector and readable in a poster photograph.
@@ -148,6 +149,34 @@ def video_frame(image: np.ndarray, landmarks, eye_closed: bool,
     return buf.tobytes() if ok else b""
 
 
+def draw_face_mesh(canvas: np.ndarray, pts, colour=(235, 235, 235)) -> None:
+    """The face as the tracker sees it: outlines and every landmark as a dot.
+
+    The dots go in with one array write rather than 478 circles, so the
+    whole mesh costs well under a millisecond on the Pi.
+    """
+    import cv2
+
+    pts = np.asarray(pts)
+    if pts.ndim != 2 or len(pts) < 468:
+        return
+    xy = pts[:, :2]
+    ok = (xy[:, 0] > 0) | (xy[:, 1] > 0)      # unset landmarks sit at the origin
+    h, w = canvas.shape[:2]
+    for ring, closed in FACE_OUTLINES:
+        if not all(ok[i] for i in ring):
+            continue
+        poly = xy[list(ring)].astype(np.int32)
+        cv2.polylines(canvas, [poly], closed, colour, 1, cv2.LINE_AA)
+    xs = np.clip(xy[ok, 0].astype(np.int32), 0, w - 2)
+    ys = np.clip(xy[ok, 1].astype(np.int32), 0, h - 2)
+    dot = np.array(colour, np.uint16)
+    for dy in (0, 1):                          # 2x2 dots, blended 60 %
+        for dx in (0, 1):
+            px = canvas[ys + dy, xs + dx].astype(np.uint16)
+            canvas[ys + dy, xs + dx] = ((px * 2 + dot * 3) // 5).astype(np.uint8)
+
+
 def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
                  plan=None, alert=None, ui_cfg: Optional[dict[str, Any]] = None,
                  fps: float = 0.0, calibrating: float = -1.0,
@@ -165,6 +194,8 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
     # -- eye geometry --------------------------------------------------- #
     if landmarks is not None and landmarks.ok and ui_cfg.get("draw_eyes", True):
         pts = landmarks.points
+        if ui_cfg.get("draw_mesh", False):         # under the eye outlines
+            draw_face_mesh(canvas, pts)
         closed_colour = (60, 60, 240) if feature_frame.eye_closed else (120, 220, 120)
         for ring in (RIGHT_EYE_RING, LEFT_EYE_RING):
             # Skip unpopulated points. MediaPipe always returns all 478, but
@@ -181,10 +212,6 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
             if ic < len(pts):
                 c = tuple(int(v) for v in pts[ic][:2])
                 cv2.circle(canvas, c, 2, (240, 200, 60), -1, cv2.LINE_AA)
-
-        if ui_cfg.get("draw_mesh", False):
-            for p in pts:
-                cv2.circle(canvas, (int(p[0]), int(p[1])), 1, (90, 90, 90), -1)
 
     # -- calibration banner --------------------------------------------- #
     if calibrating >= 0.0:

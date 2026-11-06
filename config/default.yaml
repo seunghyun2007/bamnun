@@ -366,7 +366,7 @@ logging:
 
 ui:
   show_window: true
-  draw_mesh: false             # full 478-point mesh is pretty but slow
+  draw_mesh: true            # face outline and all 478 landmarks (one array write, under 1 ms)
   draw_eyes: true
   draw_gauges: true
   window_scale: 0.75

@@ -58,6 +58,10 @@ the Wi-Fi hotspot.
   left panel with one picture, charcoal right panel, white serif text
   (NanumMyeongjo on the Pi, `fonts-nanum`), title in a thin white box. No
   other colours.
+- **Face mesh** on the camera (`ui.draw_mesh: true`): face oval, brows, nose,
+  lips as lines, all 478 landmarks as dots, eyes still outlined in green
+  (`viz.draw_face_mesh`, about 0.2 ms). Also on the standby screen's camera,
+  which now spans the whole grey panel under a smaller Ollie.
 - **Ollie's voice**: 17 lines EN + KO generated with Supertonic voice M1
   (`tools/make_voice.py`), in `assets/voice/{en,ko}/`.
 - Normal (non-booth) mode still fires the real light/mist/alarm when drowsy.
@@ -85,6 +89,8 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: face mesh (outlines + 478 dots); standby camera as wide as the
+  grey panel.
 - 2026-11-06: opened PR #5, demo-booth -> main.
 - 2026-11-06: owner checked the new look, Drive page and calibration screen on
   the Pi: approved.

@@ -212,6 +212,11 @@ class Conditions:
         self.min_iod_frac = _cfg(cfg, "min_iod_frac", 0.045)
         self.max_yaw = _cfg(cfg, "reliable_yaw_deg", 30.0)
         self.max_pitch = _cfg(cfg, "reliable_pitch_deg", 30.0)
+        # The angle to the camera itself, not to the calibrated neutral: with
+        # the device off to one side, a driver looking at the road is already
+        # 40 degrees round, and a small turn away hides the far eye behind the
+        # nose and flattens the near one, which reads as closed.
+        self.max_camera_yaw = _cfg(cfg, "reliable_camera_yaw_deg", 55.0)
         self._jaw: Deque[tuple[float, float]] = deque()
         self._yawn_since: Optional[float] = None
         self._expr_until = -1e9

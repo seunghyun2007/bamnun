@@ -326,3 +326,18 @@ def test_dashboard_draws_the_camera_beside_its_panels():
     out = dash.compose(np.zeros((864, 1536, 3), np.uint8))
     assert out.shape == (DASH_H, DASH_W, 3)
     assert fit_to_window(out, 1920, 1080).shape == (1080, 1920, 3)
+
+
+def test_a_click_on_a_dashboard_button_is_found_through_the_window_scaling():
+    from bamnun.viz import BUTTONS, DASH_H, DASH_W, button_at, window_to_canvas
+
+    x, y, w, h = BUTTONS["calibrate"]
+    cx, cy = x + w // 2, y + h // 2
+    assert button_at(cx, cy) == "calibrate"
+    # The same spot in a full-HD window (scaled 1.5x, no letterbox).
+    assert button_at(*window_to_canvas(int(cx * 1.5), int(cy * 1.5), 1920, 1080)) == "calibrate"
+    # In a taller window the canvas is letterboxed: offset first, then scaled.
+    win_w, win_h = 1280, 900
+    oy = (win_h - DASH_H) // 2
+    assert button_at(*window_to_canvas(cx, cy + oy, win_w, win_h)) == "calibrate"
+    assert button_at(5, 5) is None and DASH_W == 1280

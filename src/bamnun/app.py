@@ -6,7 +6,8 @@
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
 Keys in the window: c recalibrate, s snapshot, a toggle actuators, l dashboard or
-camera-only layout, f full screen, q quit.
+camera-only layout, f full screen, q quit. The dashboard also has Calibrate and
+Full screen buttons to click.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
-from .viz import Dashboard, DashboardData, fit_to_window
+from .viz import Dashboard, DashboardData, button_at, fit_to_window, window_to_canvas
 
 # Console output must never stop detection. A Windows console in a legacy
 # code page can't print Korean (Ollie's lines, a driver's name), and an
@@ -427,6 +428,20 @@ class Monitor:
         """Hand the frame to the encoder thread, only while someone watches."""
         self.video.offer(image, lms, ff.shut_now or ff.microsleep_now)
 
+    def _on_mouse(self, event: int, x: int, y: int, _flags: int, _param) -> None:
+        """A click on a dashboard button; acted on in the camera loop."""
+        import cv2
+
+        if event != cv2.EVENT_LBUTTONUP or self.dashboard is None:
+            return
+        try:
+            _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+        except Exception:  # noqa: BLE001
+            return
+        name = button_at(*window_to_canvas(x, y, win_w, win_h))
+        if name:
+            self._clicks.append(name)
+
     def _record_history(self, t: float, state: DriverState, calibrating: bool) -> None:
         """Samples for the dashboard's charts."""
         if not calibrating and t - self._last_score_t >= SCORE_SAMPLE_S:
@@ -470,6 +485,7 @@ class Monitor:
             stage_name=str(stages[min(stage, len(stages) - 1)].get("name", "")),
             last_alert=last_words,
             plan=self._plan,
+            calibration_hint=(self.features.calibrator.hint or "") if progress >= 0.0 else "",
             note=("booth: nothing fires by itself; stages play from the app"
                   if self.args.booth else demo_mode.HELP if self.demo else ""),
         )
@@ -482,6 +498,7 @@ class Monitor:
 
         cv2 = None
         fullscreen = bool(self.args.booth or self.cfg["ui"].get("fullscreen", False))
+        self._clicks: deque = deque(maxlen=4)
         if self.show_window:
             try:
                 import cv2 as _cv2
@@ -490,6 +507,7 @@ class Monitor:
                 # shape, so nothing is left for Qt to letterbox in grey.
                 cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL
                                 | cv2.WINDOW_FREERATIO)
+                cv2.setMouseCallback("bamnun", self._on_mouse)
                 if fullscreen:   # the booth's big screen shows only this
                     cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
                                           cv2.WINDOW_FULLSCREEN)
@@ -648,6 +666,14 @@ class Monitor:
                     canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
                 cv2.imshow("bamnun", canvas)
                 key = cv2.waitKey(1) & 0xFF
+                # Caps Lock or Shift sends the upper case; treat it the same.
+                if ord("A") <= key <= ord("Z"):
+                    key += 32
+                # A click on a dashboard button counts as its key: over Pi
+                # Connect, a key press doesn't always reach this window.
+                while self._clicks:
+                    btn = self._clicks.popleft()
+                    key = {"calibrate": ord("c"), "fullscreen": ord("f")}.get(btn, key)
                 if key == ord("q"):
                     break
                 if key == ord("l"):

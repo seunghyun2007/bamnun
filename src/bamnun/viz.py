@@ -343,6 +343,11 @@ DASH_W, DASH_H = 1280, 720
 _CAM_RECT = (8, 8, 832, 468)              # x, y, w, h
 _CHART_Y, _CHART_H = 482, 230
 _COL_X, _COL_W = 848, 424
+# Buttons drawn over the camera's bottom-right corner, for a mouse or a Pi
+# Connect session, where a key press doesn't always reach the window.
+BUTTONS = {"calibrate": (_CAM_RECT[0] + _CAM_RECT[2] - 312, _CAM_RECT[1] + _CAM_RECT[3] - 46, 150, 36),
+           "fullscreen": (_CAM_RECT[0] + _CAM_RECT[2] - 154, _CAM_RECT[1] + _CAM_RECT[3] - 46, 146, 36)}
+_BUTTON_WORDS = {"calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)
@@ -683,6 +688,34 @@ def render_panels(ff, state, data: DashboardData) -> np.ndarray:
     return img
 
 
+def window_to_canvas(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
+    """Where a click at (x, y) in a window of that size lands on the dashboard
+    canvas: the inverse of fit_to_window."""
+    if win_w <= 0 or win_h <= 0 or (win_w, win_h) == (DASH_W, DASH_H):
+        return x, y
+    scale = min(win_w / DASH_W, win_h / DASH_H)
+    ox, oy = (win_w - int(DASH_W * scale)) // 2, (win_h - int(DASH_H * scale)) // 2
+    return int((x - ox) / scale), int((y - oy) / scale)
+
+
+def button_at(x: int, y: int) -> Optional[str]:
+    """The dashboard button under canvas point (x, y), if any."""
+    for name, (bx, by, bw, bh) in BUTTONS.items():
+        if bx <= x <= bx + bw and by <= y <= by + bh:
+            return name
+    return None
+
+
+def _buttons(img) -> None:
+    import cv2
+
+    for name, (x, y, w, h) in BUTTONS.items():
+        cv2.rectangle(img, (x, y), (x + w, y + h), (40, 40, 44), -1)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (200, 200, 200), 1)
+        text = _BUTTON_WORDS[name]
+        _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5, _WHITE)
+
+
 def fit_to_window(canvas: np.ndarray, win_w: int, win_h: int) -> np.ndarray:
     """Scale ``canvas`` to the window ourselves, centred on black.
 
@@ -738,4 +771,5 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
+        _buttons(canvas)
         return canvas

@@ -76,8 +76,8 @@ class SpeakerVolume:
     """The device speaker's volume, through ALSA's mixer (amixer).
 
     The card is the USB speaker the device plays through (ui.speaker_mixer).
-    Changes are saved with alsactl so they survive a restart, in the
-    background so the camera loop never waits on them.
+    It's set to start_percent (80) at every start; changes are saved with
+    alsactl, in the background so the camera loop never waits on them.
     """
 
     def __init__(self, cfg: Optional[dict]) -> None:
@@ -85,6 +85,10 @@ class SpeakerVolume:
         self.card = str(cfg.get("card", "UACDemoV10"))
         self.control = str(cfg.get("control", "PCM"))
         self.percent: Optional[int] = self._read()
+        # Every start begins at the same level; the buttons change it from there.
+        start = cfg.get("start_percent", 80)
+        if self.percent is not None and start is not None:
+            self.change(int(start) - self.percent)
 
     def _read(self) -> Optional[int]:
         import re
@@ -508,7 +512,7 @@ class Monitor:
         if self.mode != "live":
             self._clicks.append("next")
             return
-        if self.dashboard is None:
+        if self.dashboard is None or self.features.calibrating:
             return
         try:
             _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
@@ -785,15 +789,20 @@ class Monitor:
                 self._last_window = now
                 from .viz import draw_overlay
                 dash = self.dashboard
-                if self.mode != "live":
+                if self.mode != "live" or (calibrating and dash is not None):
                     if self._screens is None:
                         from .attract import Screens
                         self._screens = Screens(self.root)
                     # Drawn at the window's own size: stretched, the text went soft.
                     _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
                     size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
-                    canvas = (self._screens.standby(now, frame.image, size) if self.mode == "standby"
-                              else self._screens.briefing(self._brief_step, now, size))
+                    if self.mode == "standby":
+                        canvas = self._screens.standby(now, frame.image, size)
+                    elif self.mode == "briefing":
+                        canvas = self._screens.briefing(self._brief_step, now, size)
+                    else:      # calibrating: look at the game screen, to the right
+                        canvas = self._screens.calibrating(now, progress,
+                                                           self.features.calibrator.hint or "", size)
                 else:
                     canvas = draw_overlay(
                         frame.image, lms, ff, state,

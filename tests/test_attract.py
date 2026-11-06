@@ -83,3 +83,10 @@ def test_screens_are_drawn_at_the_window_size_not_stretched():
     cam = np.zeros((480, 640, 3), np.uint8)
     assert s.standby(0.0, cam, (1920, 1080)).shape == (1080, 1920, 3)
     assert s.briefing(4, 0.0, (1366, 768)).shape == (768, 1366, 3)
+
+
+def test_the_calibration_screen_and_the_drive_page_draw():
+    s = Screens(ROOT)
+    assert s.calibrating(0.5, 0.4, "still", (1366, 768)).shape == (768, 1366, 3)
+    drive = [i for i, step in enumerate(STEPS) if step[0] == "game"]
+    assert drive and s.briefing(drive[0], 0.0).shape == (DASH_H, DASH_W, 3)

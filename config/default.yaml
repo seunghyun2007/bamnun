@@ -383,6 +383,9 @@ ui:
   # and the ladder rests (no "driver not visible" chimes). A face brings the
   # dashboard back; space or a click starts the visitor briefing. 0: never.
   standby_after_s: 30
+  # The device speaker (the USB one in ~/.asoundrc): set to start_percent at
+  # every start; the dashboard's VOL buttons and - / = change it from there.
+  speaker_mixer: {card: UACDemoV10, control: PCM, start_percent: 80}
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.

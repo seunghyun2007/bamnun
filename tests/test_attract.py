@@ -231,3 +231,38 @@ def test_the_learn_more_screen_lights_the_playing_card():
     from bamnun.attract import _card_rect
     x, y, w, h = _card_rect(2)
     assert lit[y + 5, x + 5].mean() > 200 and idle[y + 5, x + 5].mean() < 100
+
+
+def test_booth_screens_pause_the_ladder_and_coming_back_starts_fresh():
+    from bamnun.app import QUIET_AFTER_SCREEN_S
+    resets, cleared = [], []
+    m = SimpleNamespace(mode="live", _seen_mode="live", _last_alert=None, _quiet_until=0.0,
+                        policy=SimpleNamespace(reset=lambda t: resets.append(t) or "reset"),
+                        features=SimpleNamespace(_reset_live=lambda: cleared.append(1)))
+    Monitor._mode_changed(m, 1.0, 1.0)
+    assert resets == []
+    m.mode = "qr"
+    Monitor._mode_changed(m, 2.0, 2.0)                     # into the QR screen: lights off
+    assert resets == [2.0] and cleared == []
+    m.mode = "live"
+    Monitor._mode_changed(m, 30.0, 30.0)                   # back: fresh, and quiet a while
+    assert resets == [2.0, 30.0] and cleared == [1]
+    assert m._quiet_until == 30.0 + QUIET_AFTER_SCREEN_S
+
+
+def test_hover_lights_up_what_the_mouse_is_on():
+    from bamnun.attract import _card_rect
+    from bamnun.viz import BUTTONS, Dashboard
+    s = Screens(ROOT)
+    url = "https://example.org/"
+    x, y, w, h = _card_rect(1)
+    plain = s.learn_more(0.0, url, (1280, 720))
+    lit = s.learn_more(0.0, url, (1280, 720), hover="stage1")
+    assert lit[y + 10, x + 10].mean() > plain[y + 10, x + 10].mean() + 20
+    d = Dashboard()
+    cam = np.zeros((480, 640, 3), np.uint8)
+    bx, by, bw, bh = BUTTONS["calibrate"]
+    a = d.compose(cam)[by + 3, bx + 3].mean()
+    d.hover = "calibrate"
+    b = d.compose(cam)[by + 3, bx + 3].mean()
+    assert b > a + 100

@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (322 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (324 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -48,6 +48,14 @@ the Wi-Fi hotspot.
   relaxed for the side camera. While calibrating, a full-screen page says
   "게임 화면을 보세요 / Look at the game screen" with a big moving arrow to
   the right, a progress bar and the live hint.
+- **Booth screens are never interrupted** (`app._mode_changed`): on the QR,
+  briefing and standby screens no ladder alert, rest or CO2 voice prompt, or
+  "are you OK?" check; opening the QR screen turns the lights off; coming
+  back to the dashboard resets the live eye windows and keeps alerts off for
+  8 s (`QUIET_AFTER_SCREEN_S`).
+- **Hover**: whatever the mouse is over lights up: dashboard buttons turn
+  white, the pop-up's button lightens (grey disc behind ×), stage cards and
+  Back lighten with a thick white edge.
 - **Blocked camera is not a head drop** (`features.nod.head_drop_when_lost:
   false`): the driver's arm passes in front of the low left camera; the face
   vanished after a jump in the landmarks, which read as a head drop and fired
@@ -135,6 +143,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: nothing interrupts the booth screens; hover highlights on every button and card.
 - 2026-11-06: QR + STAGES button and m key open the learn-more screen directly.
 - 2026-11-06: learn-more screen gets four stage cards that play on the real device.
 - 2026-11-06: arm blocking the camera no longer fires stage 4; website opens straight on the demo.

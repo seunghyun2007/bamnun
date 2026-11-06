@@ -449,7 +449,7 @@ class Screens:
 # The Pi's health (thermal.PiHealth), as a bar across the top of any screen.
     # -- learn more: the pop-up and the QR code --------------------------------- #
 
-    def _popup_card(self, f: _Frame) -> tuple[np.ndarray, _Frame]:
+    def _popup_card(self, f: _Frame, hot: bool = False) -> tuple[np.ndarray, _Frame]:
         """The pop-up's still parts, drawn once per window size at that size
         (drawn small and scaled up, the text went soft): a white card like a
         website's, a question, a dark button and a close cross. Ollie and the
@@ -457,14 +457,16 @@ class Screens:
         import cv2
 
         x, y, w, h = POPUP
-        key = ("popup", f.w, f.h)
+        key = ("popup", f.w, f.h, hot)
         if key not in self._cache:
             card = np.empty((f.n(h), f.n(w), 3), np.uint8)
             card[:] = (250, 250, 250)
             cf = _Frame((card.shape[1], card.shape[0]))
             cf.s, cf.ox, cf.oy = f.s, 0.0, 0.0
             bx, by, bw, bh = (POPUP_BUTTON[0] - x, POPUP_BUTTON[1] - y, POPUP_BUTTON[2], POPUP_BUTTON[3])
-            cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)), _BOARD, -1, cv2.LINE_AA)
+            # Under the mouse the button lightens, like a link on a website.
+            cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)),
+                          (88, 88, 94) if hot else _BOARD, -1, cv2.LINE_AA)
             tx = _POPUP_TEXT_X + (w - _POPUP_TEXT_X - 46) / 2
             card, _ = self._text(card, cf, [
                 ("밤눈이 궁금하세요?", "bold", 36, _BOARD, 22),
@@ -479,14 +481,20 @@ class Screens:
             self._cache[key] = (card, cf)
         return self._cache[key]
 
-    def learn_popup(self, canvas: np.ndarray, age: float, t: float) -> None:
+    def learn_popup(self, canvas: np.ndarray, age: float, t: float, hover: Optional[str] = None) -> None:
         """Draw the pop-up on the window-sized dashboard (fit_to_window's
         layout): it springs down into place, Ollie waves, the button glows."""
         import cv2
 
         f = _Frame((canvas.shape[1], canvas.shape[0]))
-        card, cf = self._popup_card(f)
+        card, cf = self._popup_card(f, hover == "learn_more")
         card = card.copy()
+        if hover == "learn_close":                  # a grey disc behind the cross
+            cv2.circle(card, (cf.x(w - 24), cf.y(24)), cf.n(19), (222, 222, 222), -1, cv2.LINE_AA)
+            r = cf.n(9)
+            cx, cy = cf.x(w - 24), cf.y(24)
+            for p0, p1 in (((cx - r, cy - r), (cx + r, cy + r)), ((cx - r, cy + r), (cx + r, cy - r))):
+                cv2.line(card, p0, p1, (60, 60, 60), cf.n(2.5), cv2.LINE_AA)
         x, y, w, h = POPUP
         # Ollie, waving: a bigger swing than on the slides.
         owl = self._owl("hello", cf.n(132))
@@ -602,7 +610,7 @@ class Screens:
         return c
 
     def learn_more(self, t: float, url: str, size: tuple[int, int] = (DASH_W, DASH_H),
-                   playing: int = 0, progress: float = 0.0) -> np.ndarray:
+                   playing: int = 0, progress: float = 0.0, hover: Optional[str] = None) -> np.ndarray:
         """The QR code for the website on the left; on the right, the four
         wake-up stages to click, each played on the real device. ``playing``
         is the stage playing now (lit, with ``progress`` 0-1 along its foot)."""
@@ -610,6 +618,19 @@ class Screens:
 
         f = _Frame(size)
         canvas = self._learn_static(f, url, playing).copy()
+        # Under the mouse: the card (or Back) lightens and its edge thickens,
+        # so it reads as something to press.
+        rect = None
+        if hover and hover.startswith("stage") and int(hover[5:]) != playing and not playing:
+            rect = _card_rect(int(hover[5:]))
+        elif hover == "qr_back":
+            rect = QR_BACK
+        if rect is not None:
+            x, y, w, h = rect
+            x0, y0, x1, y1 = f.x(x), f.y(y), f.x(x + w), f.y(y + h)
+            region = canvas[y0:y1, x0:x1]
+            region[:] = cv2.addWeighted(region, 0.8, np.full_like(region, 255), 0.2, 0)
+            cv2.rectangle(canvas, (x0, y0), (x1, y1), _WHITE, max(2, f.n(3)), cv2.LINE_AA)
         if playing:
             x, y, w, h = _card_rect(playing)
             x1 = x + 10 + (w - 20) * min(1.0, max(0.0, progress))

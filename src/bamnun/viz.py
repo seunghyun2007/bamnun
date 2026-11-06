@@ -764,7 +764,7 @@ def button_at(x: int, y: int) -> Optional[str]:
     return None
 
 
-def _buttons(img, volume: Optional[int] = None) -> None:
+def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None) -> None:
     import cv2
 
     x, y, w, h = BUTTONS["vol_down"]
@@ -773,10 +773,12 @@ def _buttons(img, volume: Optional[int] = None) -> None:
                   (x - 6, y + h - 4), (40, 40, 44), -1)
     _t(img, label, x - _text_w(label, 0.5) - 13, y + h // 2 + 6, 0.5, _WHITE)
     for name, (x, y, w, h) in BUTTONS.items():
-        cv2.rectangle(img, (x, y), (x + w, y + h), (40, 40, 44), -1)
-        cv2.rectangle(img, (x, y), (x + w, y + h), (200, 200, 200), 1)
+        lit = name == hover                    # under the mouse: white, dark text
+        cv2.rectangle(img, (x, y), (x + w, y + h), (240, 240, 240) if lit else (40, 40, 44), -1)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255) if lit else (200, 200, 200), 2 if lit else 1)
         text = _BUTTON_WORDS[name]
-        _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5, _WHITE)
+        _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5,
+           (30, 30, 34) if lit else _WHITE)
 
 
 def fit_to_window(canvas: np.ndarray, win_w: int, win_h: int) -> np.ndarray:
@@ -812,6 +814,7 @@ class Dashboard:
         self._panels: Optional[np.ndarray] = None
         self._drawn_at: Optional[float] = None
         self._volume: Optional[int] = None
+        self.hover: Optional[str] = None      # the button under the mouse, drawn lit
 
     def due(self, now: float) -> bool:
         return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
@@ -836,5 +839,5 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
-        _buttons(canvas, self._volume)
+        _buttons(canvas, self._volume, self.hover)
         return canvas

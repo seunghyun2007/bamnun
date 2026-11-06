@@ -63,7 +63,8 @@ PUBLISH_PERIOD_S = 0.1
 SCORE_SAMPLE_S = 0.5
 SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
 CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
-BRIEFING_IDLE_S = 45.0   # an untouched briefing page closes after this
+BRIEFING_IDLE_S = 45.0
+QUIET_AFTER_SCREEN_S = 8.0  # no alerts this long after leaving a booth screen   # an untouched briefing page closes after this
 VOLUME_STEP = 10
 
 # The calibrator's live hints, as a person reads them.
@@ -253,6 +254,9 @@ class Monitor:
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
         self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
+        self._mouse: Optional[tuple[int, int]] = None
+        self._quiet_until = 0.0                   # no alerts until then (just back from a screen)
+        self._seen_mode = "live"
         self._mode_t: Optional[float] = None
         self._cal_notice: Optional[tuple[str, float]] = None
         # The Pi's temperature and power (thermal.py): shown on the dashboard,
@@ -382,7 +386,7 @@ class Monitor:
             self._air_seen_at = air.updated_at
             self.logger.log_event("co2", {"t": t, "ppm": air.ppm,
                                           "temp_c": air.temp_c, "rh": air.rh})
-        if air.should_prompt(level):
+        if self.mode == "live" and air.should_prompt(level):
             console.print(f"[bold yellow]CO2 {air.ppm:.0f} ppm[/]: open the window")
             a = self.policy.prompt(air.actuator, t, "co2")
             self.logger.log_event("co2_prompt", {"t": t, "ppm": air.ppm, "level": level,
@@ -511,10 +515,11 @@ class Monitor:
     def _control(self, t: float, ff: FeatureFrame) -> None:
         """Phone commands, guided calibration, trips, reminders, emergency."""
         face = bool(ff.face_found)
+        live = self.mode == "live"               # no "are you OK?" over the booth's screens
         self.controller.tick(
             t, face=face, calibrated=bool(self.features.calibration.complete),
-            eye_closed=bool(ff.eye_closed) if face and not self.features.calibrating else None,
-            microsleep=bool(ff.microsleep_now), ear_raw=ff.ear_raw if face else None,
+            eye_closed=bool(ff.eye_closed) if face and live and not self.features.calibrating else None,
+            microsleep=bool(ff.microsleep_now) and live, ear_raw=ff.ear_raw if face else None,
             co2_ppm=self.air.ppm)
 
     def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
@@ -525,6 +530,9 @@ class Monitor:
         """A click on a dashboard button; acted on in the camera loop."""
         import cv2
 
+        if event == cv2.EVENT_MOUSEMOVE:
+            self._mouse = (x, y)                  # for the hover highlight
+            return
         if event != cv2.EVENT_LBUTTONUP:
             return
         if self.mode == "qr":                     # the stage cards, or back
@@ -647,6 +655,20 @@ class Monitor:
         self.mode, self._brief_step, self._brief_at = "briefing", 0, now
         self.logger.log_event("next_visitor", {})
         console.print("[cyan]next visitor: briefing from the start[/]")
+
+    def _mode_changed(self, now: float, t: float) -> None:
+        """Into the QR screen: the ladder stops (lights off). Back from any
+        booth screen: a fresh start, so what the eyes did meanwhile (reading
+        the cards, looking at the screen) can't set off an alarm."""
+        if self.mode == self._seen_mode:
+            return
+        was, self._seen_mode = self._seen_mode, self.mode
+        if self.mode == "qr":
+            self._last_alert = self.policy.reset(now)
+        if self.mode == "live" and was in ("qr", "briefing", "standby"):
+            self._last_alert = self.policy.reset(now)
+            self.features._reset_live()
+            self._quiet_until = now + QUIET_AFTER_SCREEN_S
 
     def _play_stage(self, n: int, now: float, t: float) -> None:
         """A stage card on the learn-more screen: play it on the real device,
@@ -834,14 +856,17 @@ class Monitor:
                     self._plan = self.planner.plan(frame.timestamp)
                     self._last_plan_t = frame.timestamp
                     plan = self._plan
-                    if plan.valid and (plan.recommend_rest_now or (
+                    if self.mode == "live" and plan.valid and (plan.recommend_rest_now or (
                             plan.rest_at_s is not None and plan.rest_at_s < 600.0)):
                         self._voice("rest_voice", frame.timestamp)
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
                 hold = self.controller.holds_ladder(frame.timestamp)
+                # Nothing interrupts the booth's own screens (QR, briefing,
+                # standby), nor the first seconds back from one.
+                quiet = self.mode != "live" or time.monotonic() < self._quiet_until
                 decision = (self.policy.update(state)
-                            if alerts_on and not hold and self.mode == "live" else None)
+                            if alerts_on and not hold and not quiet else None)
                 if decision is not None:
                     self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
@@ -865,6 +890,7 @@ class Monitor:
             self._guarded(self._record_history, frame.timestamp, state, calibrating)
             self._guarded(self._give_up_calibration, frame.timestamp)
             self._guarded(self._update_mode, time.monotonic(), bool(ff.face_found))
+            self._guarded(self._mode_changed, time.monotonic(), frame.timestamp)
             self._guarded(self._check_health, time.monotonic())
 
             now = time.monotonic()
@@ -906,9 +932,14 @@ class Monitor:
                     elif self.mode == "qr":
                         n, start, until = self._stage_play
                         on = n if now < until else 0
+                        hover = None
+                        if self._mouse is not None:
+                            from .attract import learn_hit
+                            hover = learn_hit(*self._mouse, size)
                         canvas = self._screens.learn_more(
                             now, self._learn_url, size, playing=on,
-                            progress=(now - start) / max(0.1, until - start) if on else 0.0)
+                            progress=(now - start) / max(0.1, until - start) if on else 0.0,
+                            hover=hover)
                     else:      # calibrating: look at the game screen, to the right
                         canvas = self._screens.calibrating(now, progress,
                                                            self.features.calibrator.hint or "", size)
@@ -929,14 +960,22 @@ class Monitor:
                             dash.refresh(ff, state, self._dashboard_data(
                                 frame.timestamp, frame.timestamp - t_start, fps,
                                 progress if calibrating else -1.0, alerts_on))
-                        canvas = dash.compose(canvas)
                         _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                        hover = None
+                        if self._mouse is not None:
+                            mx, my = window_to_canvas(*self._mouse, win_w, win_h)
+                            if self._popup_at is not None:
+                                from .attract import popup_hit
+                                hover = popup_hit(mx, my)
+                            hover = hover or button_at(mx, my)
+                        dash.hover = hover
+                        canvas = dash.compose(canvas)
                         canvas = fit_to_window(canvas, win_w, win_h)
                         if self._popup_at is not None:     # at the window's size: sharp
                             if self._screens is None:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
-                            self._screens.learn_popup(canvas, now - self._popup_at, now)
+                            self._screens.learn_popup(canvas, now - self._popup_at, now, hover)
                     if self.demo and dash is None:
                         h = canvas.shape[0]
                         label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")

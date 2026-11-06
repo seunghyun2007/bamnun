@@ -83,6 +83,8 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: owner checked the new look, Drive page and calibration screen on
+  the Pi: approved.
 - 2026-11-06: new calm look (grey/charcoal, serif), animated Ollie, "click
   Drive" briefing page, calibration screen with arrow, speaker 80% at start,
   this handoff file.

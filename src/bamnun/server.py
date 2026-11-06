@@ -95,12 +95,8 @@ OUTCOMES = ("ok", "contacted", "called", "dismissed")
 # Product control (the booth demo): one wake-up stage played on the real
 # device, as (commands, seconds the device stays taken). One phone at a time:
 # while a stage plays, every other request gets 409 and how long to wait.
-SHOWCASE_STAGES: dict[int, tuple[tuple[dict[str, Any], ...], float]] = {
-    1: (({"cmd": "test", "part": "blue_light"},), 4.0),
-    2: (({"cmd": "test", "part": "mist"},), 4.0),
-    3: (({"cmd": "test", "part": "chime"}, {"cmd": "say", "line": "stage3"}), 6.0),
-    4: (({"cmd": "test", "part": "alarm"}, {"cmd": "say", "line": "stage4"}), 6.0),
-}
+# The booth's four wake-up stages, as device commands (control.py).
+from .control import SHOWCASE_STAGES  # noqa: E402
 
 
 # -- booth mode: phones stay on the booth's Wi-Fi ---------------------------- #

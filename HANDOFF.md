@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (319 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (322 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -76,8 +76,13 @@ the Wi-Fi hotspot.
   little bounce over the camera's top-right corner, Ollie waving and the
   button glowing: Ollie, "밤눈이 궁금하세요? /
   Want to learn more about Bamnun?" and a "QR 코드 보기 · Learn more" button.
-  A click opens a full-screen QR code (calm slide style) for the website; a
-  click, Esc or 60 s goes back. The × or 40 s untouched hides it. Once per
+  A click opens the **learn-more screen**: QR code for the website on the
+  left ("휴대폰으로 더 알아보기"), and on the right "깨우기 단계 체험" with four
+  stage cards (파란 불빛, 민트 미스트, 차임과 음성, 알람). A click on a card
+  (or keys 1-4) plays that stage on the real device (`control.SHOWCASE_STAGES`,
+  the same commands a phone used to send), one at a time; the card lights up
+  with a progress bar. "‹ 돌아가기 / Back", Esc, space or 60 s untouched
+  goes back. The × or 40 s untouched hides it. Once per
   visitor (reset at standby). QR made by OpenCV (`cv2.QRCodeEncoder`), no new
   package.
 - **Mac simulator**: `tools/sim_server.py` (port 8000) plays a fake sleepy
@@ -129,6 +134,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-06: learn-more screen gets four stage cards that play on the real device.
 - 2026-11-06: arm blocking the camera no longer fires stage 4; website opens straight on the demo.
 - 2026-11-06: NEXT PERSON button (n); pop-up bigger, sharp, animated.
 - 2026-11-06: website runs the built-in demo drive (Product demo was stuck on "connecting").

@@ -252,6 +252,7 @@ class Monitor:
         self._learn_shown = False
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
+        self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
         self._mode_t: Optional[float] = None
         self._cal_notice: Optional[tuple[str, float]] = None
         # The Pi's temperature and power (thermal.py): shown on the dashboard,
@@ -526,6 +527,16 @@ class Monitor:
 
         if event != cv2.EVENT_LBUTTONUP:
             return
+        if self.mode == "qr":                     # the stage cards, or back
+            try:
+                _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+            except Exception:  # noqa: BLE001
+                return
+            from .attract import learn_hit
+            hit = learn_hit(x, y, (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H))
+            if hit:
+                self._clicks.append(hit)
+            return
         if self.mode != "live":
             self._clicks.append("next")
             return
@@ -636,6 +647,21 @@ class Monitor:
         self.mode, self._brief_step, self._brief_at = "briefing", 0, now
         self.logger.log_event("next_visitor", {})
         console.print("[cyan]next visitor: briefing from the start[/]")
+
+    def _play_stage(self, n: int, now: float, t: float) -> None:
+        """A stage card on the learn-more screen: play it on the real device,
+        one at a time, the same as a phone's Product control."""
+        from .control import SHOWCASE_STAGES
+
+        if n not in SHOWCASE_STAGES or now < self._stage_play[2]:
+            return
+        cmds, hold_s = SHOWCASE_STAGES[n]
+        for cmd in cmds:
+            self.controller.handle(cmd, t, True)
+        self._stage_play = (n, now, now + hold_s)
+        self._qr_at = now                          # someone's here: stay open
+        self.logger.log_event("qr_stage", {"stage": n})
+        console.print(f"[magenta]stage {n} played from the learn-more screen[/]")
 
     def _open_qr(self, now: float) -> None:
         self.mode, self._qr_at, self._popup_at = "qr", now, None
@@ -878,7 +904,11 @@ class Monitor:
                     elif self.mode == "briefing":
                         canvas = self._screens.briefing(self._brief_step, now, size)
                     elif self.mode == "qr":
-                        canvas = self._screens.learn_more(now, self._learn_url, size)
+                        n, start, until = self._stage_play
+                        on = n if now < until else 0
+                        canvas = self._screens.learn_more(
+                            now, self._learn_url, size, playing=on,
+                            progress=(now - start) / max(0.1, until - start) if on else 0.0)
                     else:      # calibrating: look at the game screen, to the right
                         canvas = self._screens.calibrating(now, progress,
                                                            self.features.calibrator.hint or "", size)
@@ -941,10 +971,16 @@ class Monitor:
                         self._popup_at = None
                     elif btn == "next_visitor":
                         key = ord("n")
+                    elif btn.startswith("stage") and self.mode == "qr":
+                        self._play_stage(int(btn[5:]), now, frame.timestamp)
+                    elif btn == "qr_back":
+                        self.mode = "live"
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if go_next:
                     self._next(now, frame.timestamp)
+                if self.mode == "qr" and key in (ord("1"), ord("2"), ord("3"), ord("4")):
+                    self._play_stage(key - ord("0"), now, frame.timestamp)
                 if key == ord("n"):                       # next person: the briefing again
                     self._next_visitor(now)
                 if key == 27 and self.mode != "live":     # Esc: skip to the dashboard
@@ -973,7 +1009,7 @@ class Monitor:
                 if key == ord("a"):
                     alerts_on = not alerts_on
                     console.print(f"actuators {'on' if alerts_on else 'off'}")
-                if self.demo and key != 0xFF and chr(key) in "01234dw":
+                if self.demo and self.mode != "qr" and key != 0xFF and chr(key) in "01234dw":
                     self.tour.stop()
                     self._demo_action(chr(key), frame.timestamp)
                 if self.demo and key == ord("t"):

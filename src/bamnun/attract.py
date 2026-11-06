@@ -91,6 +91,36 @@ POPUP_BUTTON = (POPUP[0] + 168, POPUP[1] + 116, 318, 50)
 POPUP_CLOSE = (POPUP[0] + POPUP[2] - 48, POPUP[1], 48, 48)
 
 
+# The learn-more screen's stage cards (1280x720 units): 2 x 2 on the right.
+STAGE_CARDS = {
+    1: ("파란 불빛", "Blue light", "조금 졸릴 때: 은은한 파란 빛", "A little sleepy: a soft blue glow"),
+    2: ("민트 미스트", "Mint mist", "더 졸릴 때: 시원한 민트 향", "Sleepier: a cool puff of mint"),
+    3: ("차임과 음성", "Chime and voice", "많이 졸릴 때: 올리가 말해요", "Very sleepy: Ollie speaks up"),
+    4: ("알람", "Alarm", "눈을 감았을 때: 커지는 알람", "Eyes shut: a rising alarm"),
+}
+QR_BACK = (1060, 650, 180, 46)
+
+
+def _card_rect(n: int) -> tuple[int, int, int, int]:
+    w, h, gap = 310, 160, 20
+    x0, y0 = _SPLIT + 40, 168
+    col, row = (n - 1) % 2, (n - 1) // 2
+    return x0 + col * (w + gap), y0 + row * (h + gap), w, h
+
+
+def learn_hit(x: int, y: int, size: tuple[int, int]) -> Optional[str]:
+    """A click at window (x, y) on the learn-more screen: "stage1".."stage4",
+    "qr_back", or None."""
+    f = _Frame(size)
+    u, v = (x - f.ox) / f.s, (y - f.oy) / f.s
+    def inside(r) -> bool:
+        return r[0] <= u < r[0] + r[2] and r[1] <= v < r[1] + r[3]
+    for n in STAGE_CARDS:
+        if inside(_card_rect(n)):
+            return f"stage{n}"
+    return "qr_back" if inside(QR_BACK) else None
+
+
 def popup_hit(x: int, y: int) -> Optional[str]:
     """A click at dashboard (x, y) on the pop-up: "learn_close" on the cross,
     "learn_more" anywhere else on it, None off it."""
@@ -517,29 +547,78 @@ class Screens:
             self._images[key] = code
         return self._images[key]
 
-    def learn_more(self, t: float, url: str, size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
-        """The QR code for the website, big on the left; what to do on the right."""
+    def _learn_static(self, f: _Frame, url: str, lit: int) -> np.ndarray:
+        """The learn-more screen without what moves; ``lit`` is the stage
+        card drawn white (playing), 0 none."""
+        import cv2
+
+        key = ("learn", url, f.w, f.h, lit)
+        if key in self._cache:
+            return self._cache[key]
+        c = self._base(f)
+        # Left: the website's code, and what it's for.
+        code = self._qr(url, f.n(330))
+        if code is not None:
+            h, w = code.shape[:2]
+            x0, y0 = f.x(_SPLIT / 2) - w // 2, f.y(285) - h // 2
+            pad = f.n(8)
+            cv2.rectangle(c, (x0 - pad, y0 - pad), (x0 + w + pad, y0 + h + pad), (255, 255, 255), -1)
+            c[y0:y0 + h, x0:x0 + w] = code
+        short = url.split("://", 1)[-1].rstrip("/")
+        c, _ = self._text(c, f, [("휴대폰으로 더 알아보기", "bold", 30, _BOARD, 490),
+                                 ("Learn more on your phone", "regular", 21, (95, 95, 95), 534),
+                                 (short, "regular", 17, (115, 115, 115), 570)],
+                          cx=_SPLIT / 2, max_w=_SPLIT - 60)
+        # Right: the title, four stage cards, a way back.
+        c, spans = self._text(c, f, [("깨우기 단계 체험", "bold", 42, _WHITE, 44),
+                                     ("Try Bamnun's four wake-up stages", "regular", 23, _GREY, 100)])
+        pad = f.n(18)
+        cv2.rectangle(c, (f.x(_SPLIT + 40), spans[0][0] - pad), (f.x(DASH_W - 40), spans[1][1] + pad),
+                      _WHITE, max(1, f.n(1.5)), cv2.LINE_AA)
+        lines = []
+        for n, (ko, en, dko, den) in STAGE_CARDS.items():
+            x, y, w, h = _card_rect(n)
+            on = n == lit
+            if on:
+                cv2.rectangle(c, (f.x(x), f.y(y)), (f.x(x + w), f.y(y + h)), _WHITE, -1, cv2.LINE_AA)
+            else:
+                cv2.rectangle(c, (f.x(x), f.y(y)), (f.x(x + w), f.y(y + h)), _GREY, max(1, f.n(1.5)), cv2.LINE_AA)
+            fg, dim = (_BOARD, (90, 90, 90)) if on else (_WHITE, _GREY)
+            cx = x + w / 2
+            lines.append(((f"{n}  ·  {ko}", "bold", 29, fg, y + 20), cx, w))
+            lines.append(((en, "regular", 19, dim, y + 58), cx, w))
+            lines.append(((dko, "regular", 19, fg, y + 98), cx, w))
+            lines.append(((den, "regular", 15, dim, y + 127), cx, w))
+        for line, cx, w in lines:
+            c, _ = self._text(c, f, [line], cx=cx, max_w=w - 26)
+        bx, by, bw, bh = QR_BACK
+        cv2.rectangle(c, (f.x(bx), f.y(by)), (f.x(bx + bw), f.y(by + bh)), _GREY, max(1, f.n(1.5)), cv2.LINE_AA)
+        c, _ = self._text(c, f, [("‹ 돌아가기  ·  Back", "regular", 19, _WHITE, by + (bh - 20) / 2)],
+                          cx=bx + bw / 2, max_w=bw - 16)
+        if lit:
+            c, _ = self._text(c, f, [(f"밤눈에서 {lit}단계를 켜는 중…", "bold", 28, _WHITE, 540),
+                                     (f"Playing stage {lit} on Bamnun…", "regular", 20, _GREY, 582)])
+        self._cache[key] = c
+        return c
+
+    def learn_more(self, t: float, url: str, size: tuple[int, int] = (DASH_W, DASH_H),
+                   playing: int = 0, progress: float = 0.0) -> np.ndarray:
+        """The QR code for the website on the left; on the right, the four
+        wake-up stages to click, each played on the real device. ``playing``
+        is the stage playing now (lit, with ``progress`` 0-1 along its foot)."""
         import cv2
 
         f = _Frame(size)
-        key = ("learn", url, f.w, f.h)
-        if key not in self._cache:
-            c = self._titled(f, "더 알아보기", "Learn more about Bamnun",
-                             [("휴대폰 카메라로 QR 코드를 찍어 보세요", "Point your phone's camera at the code"),
-                              ("밤눈 앱을 바로 써 볼 수 있어요", "and try the Bamnun app in your browser")])
-            short = url.split("://", 1)[-1].rstrip("/")
-            c, _ = self._text(c, f, [(short, "regular", 22, _GREY, 525)])
-            code = self._qr(url, f.n(430))
-            if code is not None:
-                h, w = code.shape[:2]
-                x0, y0 = f.x(_SPLIT / 2) - w // 2, f.y(360) - h // 2
-                pad = f.n(10)
-                cv2.rectangle(c, (x0 - pad, y0 - pad), (x0 + w + pad, y0 + h + pad), (255, 255, 255), -1)
-                c[y0:y0 + h, x0:x0 + w] = code
-            self._cache[key] = c
-        canvas = self._cache[key].copy()
-        self._prompt(canvas, f, t, "클릭하면 돌아가요", "Click to go back", y=610)
+        canvas = self._learn_static(f, url, playing).copy()
+        if playing:
+            x, y, w, h = _card_rect(playing)
+            x1 = x + 10 + (w - 20) * min(1.0, max(0.0, progress))
+            cv2.rectangle(canvas, (f.x(x + 10), f.y(y + h - 12)), (f.x(x1), f.y(y + h - 7)), _BOARD, -1)
+        else:
+            self._prompt(canvas, f, t, "카드를 누르면 밤눈이 실제로 켜져요", "Click a card: Bamnun plays it for real",
+                         y=540)
         return canvas
+
 
 HEALTH_WORDS = {
     "warm": ("Pi가 뜨거워지고 있어요", "The Pi is getting warm", (0, 130, 230)),

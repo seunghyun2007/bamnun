@@ -354,6 +354,16 @@ class GuidedCalibration:
 # --------------------------------------------------------------------------- #
 
 
+# The booth's four wake-up stages, each as device commands and how long it
+# plays: from a phone (server.py) or the "learn more" screen (app.py).
+SHOWCASE_STAGES: dict[int, tuple[tuple[dict[str, Any], ...], float]] = {
+    1: (({"cmd": "test", "part": "blue_light"},), 4.0),
+    2: (({"cmd": "test", "part": "mist"},), 4.0),
+    3: (({"cmd": "test", "part": "chime"}, {"cmd": "say", "line": "stage3"}), 6.0),
+    4: (({"cmd": "test", "part": "alarm"}, {"cmd": "say", "line": "stage4"}), 6.0),
+}
+
+
 class Controller:
     def __init__(self, hub: Hub, store: Optional[Store], policy: EscalationPolicy,
                  estimator=None, calibration=None, speaker: Optional[Speaker] = None,

@@ -395,8 +395,9 @@ ui:
   # every start; the dashboard's VOL buttons and - / = change it from there.
   speaker_mixer: {card: UACDemoV10, control: PCM, start_percent: 80}
   # After a visitor has driven after_s seconds (face seen, on the dashboard),
-  # a pop-up offers "learn more"; a click opens a full-screen QR code for url,
-  # which closes on a click, Esc or after qr_close_s. Once per visitor. url "": off.
+  # a pop-up offers "learn more"; a click opens a screen with the QR code for
+  # url and four wake-up stage cards that play on the real device (click or
+  # keys 1-4). Back, Esc or qr_close_s untouched closes it. Once per visitor. url "": off.
   learn_more:
     url: https://seunghyun2007.github.io/bamnun/
     after_s: 45

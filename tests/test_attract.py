@@ -127,7 +127,7 @@ def test_learn_more_pops_up_after_45_s_of_driving_once_per_visitor():
     assert m._popup_at is not None               # the next visitor gets one
 
 
-def test_the_qr_screen_closes_on_a_click_or_by_itself():
+def test_the_qr_screen_closes_on_space_or_by_itself():
     m, events = stub()
     Monitor._open_qr(m, 5.0)
     assert m.mode == "qr" and "learn_more_qr" in events
@@ -193,3 +193,40 @@ def test_a_blocked_camera_is_not_a_head_drop_at_the_booth():
             t += 0.07
             n.update(t, float(p), 0.9)
         assert n.lost(t + 0.07) is expected      # ... then the face is gone
+
+
+def test_stage_cards_play_on_the_device_one_at_a_time():
+    from bamnun.control import SHOWCASE_STAGES
+    m, events = stub()
+    sent = []
+    m.controller = SimpleNamespace(handle=lambda cmd, t, face: sent.append(cmd))
+    m._stage_play = (0, 0.0, 0.0)
+    m.mode, m._qr_at = "qr", 0.0
+    Monitor._play_stage(m, 3, 10.0, 10.0)
+    assert sent == list(SHOWCASE_STAGES[3][0]) and m._stage_play[0] == 3
+    assert m._qr_at == 10.0 and "qr_stage" in events          # stays open while used
+    Monitor._play_stage(m, 4, 11.0, 11.0)                     # still playing 3: ignored
+    assert len(sent) == len(SHOWCASE_STAGES[3][0])
+    Monitor._play_stage(m, 4, 10.0 + SHOWCASE_STAGES[3][1] + 0.1, 20.0)
+    assert sent[-1] == SHOWCASE_STAGES[4][0][-1]
+
+
+def test_clicks_on_the_learn_more_screen_find_the_cards_and_back():
+    from bamnun.attract import QR_BACK, _card_rect, learn_hit
+    for size, k in (((1280, 720), 1.0), ((1920, 1080), 1.5)):
+        for n in (1, 2, 3, 4):
+            x, y, w, h = _card_rect(n)
+            assert learn_hit(int((x + w / 2) * k), int((y + h / 2) * k), size) == f"stage{n}"
+        x, y, w, h = QR_BACK
+        assert learn_hit(int((x + w / 2) * k), int((y + h / 2) * k), size) == "qr_back"
+        assert learn_hit(int(100 * k), int(100 * k), size) is None
+
+
+def test_the_learn_more_screen_lights_the_playing_card():
+    s = Screens(ROOT)
+    url = "https://seunghyun2007.github.io/bamnun/"
+    idle = s.learn_more(0.0, url, (1280, 720))
+    lit = s.learn_more(0.0, url, (1280, 720), playing=2, progress=0.5)
+    from bamnun.attract import _card_rect
+    x, y, w, h = _card_rect(2)
+    assert lit[y + 5, x + 5].mean() > 200 and idle[y + 5, x + 5].mean() < 100

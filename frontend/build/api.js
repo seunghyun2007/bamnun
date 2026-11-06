@@ -163,6 +163,7 @@
   }
   const SAMPLE_PLACES = [["Incheon", "Daejeon"], ["Pyeongtaek", "Busan"], ["Incheon", "Gwangju"], ["Seoul", "Ulsan"], ["Suwon", "Daegu"]];
   function sampleTrips() {
+    if (window.BN_VISIT) return BN_VISIT.trips();       // the booth history (visit.js)
     const now = Date.now() / 1000, out = [];
     for (let i = 0; i < 9; i++) {
       const day = [1, 2, 4, 6, 8, 11, 15, 19, 26][i], dur = 5400 + (i * 2731) % 9000, alerts = [2, 1, 0, 1, 3, 0, 1, 0, 2][i];
@@ -176,6 +177,8 @@
     return out;
   }
   function sampleInsights(range) {
+    if (window.BN_VISIT && window.BN_SYNC)
+      return Object.assign(BN_SYNC.compute(BN_VISIT.trips(), range, -new Date().getTimezoneOffset(), Date.now() / 1000), { sample: true });
     const trips = sampleTrips().filter((t) => range === "all" || t.started_at > Date.now() / 1000 - (range === "month" ? 30 : 7) * 86400);
     const today = new Date(), per = [];
     for (let i = 6; i >= 0; i--) { const d = new Date(today - i * 86400000); per.push({ date: d.toISOString().slice(0, 10), weekday: (d.getDay() + 6) % 7, alerts: trips.filter((t) => new Date(t.started_at * 1000).toDateString() === d.toDateString()).reduce((a, t) => a + t.summary.alerts, 0), drove: trips.some((t) => new Date(t.started_at * 1000).toDateString() === d.toDateString()) }); }

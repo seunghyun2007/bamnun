@@ -308,6 +308,23 @@ const DYN = {
     const p = API().profile(), h = new Date().getHours();
     const hello = h >= 5 && h < 12 ? 'Good morning,' : h >= 12 && h < 17 ? 'Good afternoon,' : h >= 17 && h < 22 ? 'Good evening,' : 'Good night,';
     root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+    // A booth visitor (visit.js): their photo from the booth as the profile.
+    const paintVisit = () => {
+      if (!root.isConnected) return;
+      root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+      const ph = window.BN_VISIT && BN_VISIT.photo();
+      let av = root.querySelector('#hAvatar');
+      if (ph && !av) {
+        av = document.createElement('img');
+        av.id = 'hAvatar'; av.alt = '';
+        av.style.cssText = 'display:block;width:58px;height:58px;border-radius:50%;object-fit:cover;border:2px solid #F4EFE6;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,.35)';
+        root.querySelector('#hHello').before(av);
+      }
+      if (av && ph) av.src = ph;
+      load();
+    };
+    window.addEventListener('bn-visit', paintVisit);
+    if (window.BN_VISIT && BN_VISIT.photo()) setTimeout(paintVisit, 0);
     root.querySelector('#hShift').textContent = T(SHIFT_NAMES[shiftOf(p.work)]);
     // Came from Product demo on the Welcome screen: offer the way back.
     let showcase = false; try { showcase = localStorage.getItem('bn-showcase') === '1'; } catch (e) {}
@@ -359,7 +376,7 @@ const DYN = {
       $('#tList').innerHTML = list.map((t) => {
         const s = t.summary || {}, open = openId === String(t.id), n = s.alerts || 0;
         const detail = open ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.08)">
-            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>` : '';
+            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>${window.BN_VISIT ? `<div style="padding:0 16px 16px">${BN_VISIT.caughtHtml(t)}${BN_VISIT.curveSvg(t)}${BN_VISIT.mapSvg(t)}</div>` : ''}` : '';
         return `<section data-trip="${esc(t.id)}" role="button" aria-expanded="${open}" style="${GLASS};border-radius:22px;overflow:hidden;cursor:pointer">
           <div style="padding:14px 16px">
             <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;color:#B3A6B4">${esc(when(t.started_at))}</span>${t.open ? `<span style="font-size:11px;font-weight:700;color:#241A26;background:#F48FB1;padding:3px 8px;border-radius:99px">${esc(T('Now'))}</span>` : ''}</div>
@@ -375,6 +392,7 @@ const DYN = {
     async function load() { try { all = await SYNC_TRIPS(500); } catch (e) {} if (root.isConnected) draw(); }
     API().on('trip', load, root);
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(); load();
   },
 
@@ -433,6 +451,7 @@ const DYN = {
     }
     root.addEventListener('click', (e) => { const r = e.target.closest('[data-r]'); if (r) { range = r.dataset.r; load(); } });
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(null); load();
   },
 

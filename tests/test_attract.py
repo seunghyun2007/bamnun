@@ -44,6 +44,7 @@ def stub():
         _qr_close_s=60.0, _driven_s=0.0, _learn_shown=False, _popup_at=None, _qr_at=0.0,
         _mode_t=None,
     )
+    m.visit = SimpleNamespace(reset=lambda: events.append("visit_reset"))
     m._update_learn_more = lambda now, face: Monitor._update_learn_more(m, now, face)
     m._open_qr = lambda now: Monitor._open_qr(m, now)
     m._start_calibration = lambda t: m.calibrations.append(t)

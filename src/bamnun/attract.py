@@ -105,6 +105,8 @@ STAGE_CARDS = {
     4: ("알람", "Alarm", "눈을 감았을 때: 커지는 알람", "Eyes shut: a rising alarm"),
 }
 QR_BACK = (1060, 650, 180, 46)
+# The visitor's yes / no under their photo (left panel).
+VISIT_BUTTONS = {"visit_yes": (60, 450, 210, 70), "visit_no": (290, 450, 210, 70)}
 
 
 def _card_rect(n: int) -> tuple[int, int, int, int]:
@@ -114,9 +116,9 @@ def _card_rect(n: int) -> tuple[int, int, int, int]:
     return x0 + col * (w + gap), y0 + row * (h + gap), w, h
 
 
-def learn_hit(x: int, y: int, size: tuple[int, int]) -> Optional[str]:
+def learn_hit(x: int, y: int, size: tuple[int, int], asking: bool = False) -> Optional[str]:
     """A click at window (x, y) on the learn-more screen: "stage1".."stage4",
-    "qr_back", or None."""
+    "qr_back", "visit_yes" / "visit_no" (while ``asking``), or None."""
     f = _Frame(size)
     u, v = (x - f.ox) / f.s, (y - f.oy) / f.s
     def inside(r) -> bool:
@@ -124,7 +126,18 @@ def learn_hit(x: int, y: int, size: tuple[int, int]) -> Optional[str]:
     for n in STAGE_CARDS:
         if inside(_card_rect(n)):
             return f"stage{n}"
+    if asking:
+        for name, r in VISIT_BUTTONS.items():
+            if inside(r):
+                return name
     return "qr_back" if inside(QR_BACK) else None
+
+
+def face_box(points: np.ndarray, shape: tuple[int, ...]) -> tuple[float, float, float]:
+    """(centre x, centre y, width) of the face, as fractions of the image."""
+    h, w = shape[:2]
+    xs, ys = points[:, 0], points[:, 1]
+    return ((xs.min() + xs.max()) / 2 / w, (ys.min() + ys.max()) / 2 / h, (xs.max() - xs.min()) / w)
 
 
 # The centring page: the oval (a fraction of the camera's width and height)
@@ -690,28 +703,87 @@ class Screens:
             self._images[key] = code
         return self._images[key]
 
-    def _learn_static(self, f: _Frame, url: str, lit: int) -> np.ndarray:
+    def _learn_left(self, c: np.ndarray, f: _Frame, url: str, visit: Optional[dict]) -> np.ndarray:
+        """The left panel: the website's QR code; or, for a visitor with a
+        drive to take home, their photo and the question, the upload, and
+        their own QR code."""
+        import cv2
+
+        state = (visit or {}).get("state", "none")
+        photo = (visit or {}).get("photo")
+        dim = (95, 95, 95)
+
+        def put_qr(link: str, px: float, cy: float) -> None:
+            code = self._qr(link, f.n(px))
+            if code is not None:
+                h, w = code.shape[:2]
+                x0, y0 = f.x(_SPLIT / 2) - w // 2, f.y(cy) - h // 2
+                pad = f.n(8)
+                cv2.rectangle(c, (x0 - pad, y0 - pad), (x0 + w + pad, y0 + h + pad), (255, 255, 255), -1)
+                c[y0:y0 + h, x0:x0 + w] = code
+
+        def put_photo(px: float, cy: float) -> None:
+            if photo is None:
+                return
+            side = f.n(px)
+            img = cv2.resize(photo, (side, side), interpolation=cv2.INTER_AREA)
+            x0, y0 = f.x(_SPLIT / 2) - side // 2, f.y(cy) - side // 2
+            c[y0:y0 + side, x0:x0 + side] = img
+            cv2.rectangle(c, (x0 - 1, y0 - 1), (x0 + side, y0 + side), _BOARD, max(1, f.n(2)))
+
+        if state == "ask" and photo is not None:
+            put_photo(220, 175)
+            c, _ = self._text(c, f, [("내 운전 기록을 휴대폰으로 받을까요?", "bold", 26, _BOARD, 305),
+                                     ("Take this drive home on your phone?", "regular", 18, dim, 344),
+                                     ("사진과 기록은 11월 24일 전시가 끝나면 삭제돼요", "regular", 16, _BOARD, 382),
+                                     ("Photos and data are deleted when the exhibition ends, 24 Nov",
+                                      "regular", 13, dim, 408)],
+                              cx=_SPLIT / 2, max_w=_SPLIT - 50)
+            for name, (x, y, w, h) in VISIT_BUTTONS.items():
+                yes = name == "visit_yes"
+                cv2.rectangle(c, (f.x(x), f.y(y)), (f.x(x + w), f.y(y + h)), _BOARD,
+                              -1 if yes else max(1, f.n(2)), cv2.LINE_AA)
+                ko, en = ("예, 받을게요", "Yes, please") if yes else ("아니요", "No, thanks")
+                c, _ = self._text(c, f, [(ko, "bold", 22, _WHITE if yes else _BOARD, y + 9),
+                                         (en, "regular", 15, (200, 200, 200) if yes else dim, y + 38)],
+                                  cx=x + w / 2, max_w=w - 16)
+            c, _ = self._text(c, f, [("아니요를 누르면 사진은 바로 지워져요  ·  No deletes the photos now",
+                                      "regular", 13, dim, 548)], cx=_SPLIT / 2, max_w=_SPLIT - 50)
+        elif state == "uploading":
+            put_photo(220, 210)
+            c, _ = self._text(c, f, [("기록을 올리는 중…", "bold", 28, _BOARD, 350),
+                                     ("Saving your drive…", "regular", 20, dim, 392)],
+                              cx=_SPLIT / 2, max_w=_SPLIT - 60)
+        elif state == "done" and visit.get("link"):
+            put_qr(visit["link"], 330, 265)
+            c, _ = self._text(c, f, [("내 운전 기록 QR", "bold", 30, _BOARD, 470),
+                                     ("Your drive, on your phone", "regular", 21, dim, 514),
+                                     ("11월 24일까지 볼 수 있어요  ·  Until 24 Nov", "regular", 17, (115, 115, 115), 552)],
+                              cx=_SPLIT / 2, max_w=_SPLIT - 60)
+        else:
+            put_qr(url, 330, 285)
+            short = url.split("://", 1)[-1].rstrip("/")
+            lines = [("휴대폰으로 더 알아보기", "bold", 30, _BOARD, 490),
+                     ("Learn more on your phone", "regular", 21, dim, 534),
+                     (short, "regular", 17, (115, 115, 115), 570)]
+            if state == "failed":
+                lines.append(("인터넷 연결이 안 돼서 기본 QR이에요  ·  Offline: the general code",
+                              "regular", 13, dim, 604))
+            c, _ = self._text(c, f, lines, cx=_SPLIT / 2, max_w=_SPLIT - 50)
+        return c
+
+    def _learn_static(self, f: _Frame, url: str, lit: int, visit: Optional[dict] = None) -> np.ndarray:
         """The learn-more screen without what moves; ``lit`` is the stage
         card drawn white (playing), 0 none."""
         import cv2
 
-        key = ("learn", url, f.w, f.h, lit)
+        vkey = ((visit or {}).get("state", "none"), (visit or {}).get("key"))
+        key = ("learn", url, f.w, f.h, lit, vkey)
         if key in self._cache:
             return self._cache[key]
-        c = self._base(f)
-        # Left: the website's code, and what it's for.
-        code = self._qr(url, f.n(330))
-        if code is not None:
-            h, w = code.shape[:2]
-            x0, y0 = f.x(_SPLIT / 2) - w // 2, f.y(285) - h // 2
-            pad = f.n(8)
-            cv2.rectangle(c, (x0 - pad, y0 - pad), (x0 + w + pad, y0 + h + pad), (255, 255, 255), -1)
-            c[y0:y0 + h, x0:x0 + w] = code
-        short = url.split("://", 1)[-1].rstrip("/")
-        c, _ = self._text(c, f, [("휴대폰으로 더 알아보기", "bold", 30, _BOARD, 490),
-                                 ("Learn more on your phone", "regular", 21, (95, 95, 95), 534),
-                                 (short, "regular", 17, (115, 115, 115), 570)],
-                          cx=_SPLIT / 2, max_w=_SPLIT - 60)
+        for k in [k for k in self._cache if k[0] == "learn" and k[5] != vkey]:
+            del self._cache[k]                       # an earlier visitor's screens
+        c = self._learn_left(self._base(f), f, url, visit)
         # Right: the title, four stage cards, a way back.
         c, spans = self._text(c, f, [("깨우기 단계 체험", "bold", 42, _WHITE, 44),
                                      ("Try Bamnun's four wake-up stages", "regular", 23, _GREY, 100)])
@@ -745,14 +817,15 @@ class Screens:
         return c
 
     def learn_more(self, t: float, url: str, size: tuple[int, int] = (DASH_W, DASH_H),
-                   playing: int = 0, progress: float = 0.0, hover: Optional[str] = None) -> np.ndarray:
+                   playing: int = 0, progress: float = 0.0, hover: Optional[str] = None,
+                   visit: Optional[dict] = None) -> np.ndarray:
         """The QR code for the website on the left; on the right, the four
         wake-up stages to click, each played on the real device. ``playing``
         is the stage playing now (lit, with ``progress`` 0-1 along its foot)."""
         import cv2
 
         f = _Frame(size)
-        canvas = self._learn_static(f, url, playing).copy()
+        canvas = self._learn_static(f, url, playing, visit).copy()
         # Under the mouse: the card (or Back) lightens and its edge thickens,
         # so it reads as something to press.
         rect = None
@@ -760,6 +833,8 @@ class Screens:
             rect = _card_rect(int(hover[5:]))
         elif hover == "qr_back":
             rect = QR_BACK
+        elif hover in VISIT_BUTTONS and (visit or {}).get("state") == "ask":
+            rect = VISIT_BUTTONS[hover]
         if rect is not None:
             x, y, w, h = rect
             x0, y0, x1, y1 = f.x(x), f.y(y), f.x(x + w), f.y(y + h)
@@ -784,17 +859,10 @@ TOUR = [
      "얼굴 위의 점과 선이 밤눈이 따라가는 곳이에요", "The dots and lines are what Bamnun tracks"),
     ((848, 8, 424, 136), 410, 30, "지금 상태", "Right now",
      "졸음 점수: 깨어 있음부터 위험까지", "How sleepy you are, from alert to danger"),
-    ((848, 260, 424, 152), 410, 240, "눈", "Your eyes",
-     "눈이 감긴 정도, 깜빡임, 미세수면", "How closed they are, blinks, microsleeps"),
-    ((848, 418, 424, 54), 410, 330, "머리", "Your head",
-     "고개와 시선이 도로를 향하는지", "Whether your head and eyes face the road"),
     ((848, 478, 424, 134), 410, 450, "깨우기 단계", "Wake-up stages",
      "졸리면 불빛, 미스트, 소리, 알람이 여기 켜져요", "Light, mist, sound and alarm light up here"),
-    ((8, 482, 832, 230), 260, 250, "기록", "History",
-     "최근 2분의 졸음, 공기, 점수의 이유", "The last 2 minutes, the air, and why"),
-    ((12, 290, 824, 182), 260, 60, "버튼", "Buttons",
-     "가이드, 목소리, QR과 단계 체험, 다음 사람, 소리, 다시 보정",
-     "Guide, voice, QR + stages, next person, volume, recalibrate"),
+    ((12, 290, 824, 182), 260, 60, "운전이 끝나면", "After your drive",
+     "QR + STAGES를 누르면 기록을 휴대폰으로 받아요", "Press QR + STAGES to take it home on your phone"),
 ]
 TOUR_CARD = (400, 172)                        # w, h
 

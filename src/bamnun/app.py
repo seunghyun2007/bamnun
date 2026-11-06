@@ -257,6 +257,10 @@ class Monitor:
         self._learn_hide_s = float(lm.get("hide_after_s", 40.0))
         self._qr_close_s = float(lm.get("qr_close_s", 60.0))
         self._driven_s = 0.0
+        # The visitor's own drive and photos, for their phone (visit.py):
+        # recorded from the end of calibration, sent only on their yes.
+        from .visit import Visit
+        self.visit = Visit(self.root, self._learn_url or "https://seunghyun2007.github.io/bamnun/")
         self._learn_shown = False
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
@@ -556,7 +560,8 @@ class Monitor:
             except Exception:  # noqa: BLE001
                 return
             from .attract import learn_hit
-            hit = learn_hit(x, y, (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H))
+            hit = learn_hit(x, y, (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H),
+                            asking=self.visit.state == "ask")
             if hit:
                 self._clicks.append(hit)
             return
@@ -643,6 +648,7 @@ class Monitor:
             # The next visitor gets their own "learn more" pop-up.
             self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
             self._tip_shown, self._tip_at = False, None
+            self.visit.reset()
             self.logger.log_event("standby", {"after_s": self._standby_after_s})
             console.print("[dim]standby: nobody at the wheel[/]")
         elif self.mode == "briefing" and now - self._brief_at >= BRIEFING_IDLE_S:
@@ -682,6 +688,7 @@ class Monitor:
         self._last_alert = self.policy.reset(now)
         self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
         self._tip_shown, self._tip_at = False, None
+        self.visit.reset()
         self.mode, self._brief_step, self._brief_at = "briefing", 0, now
         self.logger.log_event("next_visitor", {})
         console.print("[cyan]next visitor: briefing from the start[/]")
@@ -693,6 +700,11 @@ class Monitor:
         if self.dashboard is not None:
             self.dashboard.voice = lang
         console.print(f"[cyan]Ollie's voice: {'Korean' if lang == 'ko' else 'English'}[/]")
+
+    def _visit_view(self) -> dict:
+        v = self.visit
+        return {"state": v.state, "photo": v.photo_img, "key": v.code or id(v.photo_img),
+                "link": v.link() if v.code else None}
 
     def _mode_changed(self, now: float, t: float) -> None:
         """Into the QR screen: the ladder stops (lights off). Back from any
@@ -722,6 +734,15 @@ class Monitor:
         self._qr_at = now                          # someone's here: stay open
         self.logger.log_event("qr_stage", {"stage": n})
         console.print(f"[magenta]stage {n} played from the learn-more screen[/]")
+
+    def _record_visit(self, now: float, image, lms, ff: FeatureFrame, state: DriverState) -> None:
+        from .attract import face_box, face_fit
+        ok = lms is not None and lms.ok
+        pts = lms.points if ok else None
+        self.visit.frame(now, image, pts,
+                         fit_good=ok and face_fit(face_box(pts, image.shape)) == "good",
+                         eyes_open=ok and not ff.eye_closed, score=state.score,
+                         stage=self.policy.stage, microsleeps=ff.microsleep_count, face=ok)
 
     def _start_tour(self, now: float) -> None:
         self.mode, self._tour_step, self._tour_at = "tour", 0, now
@@ -898,6 +919,7 @@ class Monitor:
                     if self._cal_run:
                         self._cal_run = False
                         self._voice("calibrated_voice", frame.timestamp)
+                        self.visit.start(time.monotonic())
                         if self._tour_after_cal and self.mode == "live" and self.dashboard is not None:
                             self._start_tour(time.monotonic())
                 state = self.estimator.update(
@@ -933,6 +955,8 @@ class Monitor:
                                                       "t": ff.t,
                                                       "duration_s": ff.ongoing_closure_s})
                 self.logger.log_frame(ff, state)
+                if self.visit.active and self.mode == "live":
+                    self._guarded(self._record_visit, time.monotonic(), frame.image, lms, ff, state)
 
             if calibrating or self.mode != "live" or time.monotonic() < self._quiet_until \
                     or not alerts_on:
@@ -1001,11 +1025,11 @@ class Monitor:
                         hover = None
                         if self._mouse is not None:
                             from .attract import learn_hit
-                            hover = learn_hit(*self._mouse, size)
+                            hover = learn_hit(*self._mouse, size, asking=self.visit.state == "ask")
                         canvas = self._screens.learn_more(
                             now, self._learn_url, size, playing=on,
                             progress=(now - start) / max(0.1, until - start) if on else 0.0,
-                            hover=hover)
+                            hover=hover, visit=self._visit_view())
                     else:      # calibrating: look at the game screen, to the right
                         canvas = self._screens.calibrating(now, progress,
                                                            self.features.calibrator.hint or "", size)
@@ -1099,6 +1123,14 @@ class Monitor:
                         self._play_stage(int(btn[5:]), now, frame.timestamp)
                     elif btn == "qr_back":
                         self.mode = "live"
+                    elif btn == "visit_yes":
+                        self.visit.upload()
+                        self._qr_at = now
+                        self.logger.log_event("visit", {"answer": "yes"})
+                    elif btn == "visit_no":
+                        self.visit.decline()
+                        self._qr_at = now
+                        self.logger.log_event("visit", {"answer": "no"})
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
                            "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
                 if go_next:

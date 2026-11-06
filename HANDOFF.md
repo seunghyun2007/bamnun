@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (328 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (334 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -50,6 +50,25 @@ the Wi-Fi hotspot.
   relaxed for the side camera. While calibrating, a full-screen page says
   "게임 화면을 보세요 / Look at the game screen" with a big moving arrow to
   the right, a progress bar and the live hint.
+- **Visitor's drive to their phone** (`visit.py`, until **24 Nov 2026**):
+  from the end of calibration the Pi keeps the drive (sleepiness every 2 s,
+  alerts, highest step, microsleeps) and two small face photos (profile:
+  centred, eyes open; "caught": first alert). On the learn-more screen the
+  left panel asks "내 운전 기록을 휴대폰으로 받을까요?" with the photo and
+  예 / 아니요 (no = photos deleted at once). Yes uploads one row to Supabase
+  `visits` (`supabase/booth_visits.sql`, already run: insert-only for the
+  public key, read one by code via `get_visit`, everything stops/deletes
+  after 24 Nov) and shows the visitor's own QR: website `?v=<code>`.
+  NEXT PERSON / standby wipe it. The Pi needs `frontend/.env` with
+  SUPABASE_URL and SUPABASE_ANON_KEY (public; installed on the Pi, not in git).
+- **Website for a visitor** (`frontend/build/visit.js`): with `?v=code` it
+  loads their visit: name "체험 운전자 #N", their photo on Home, their booth
+  drive as the newest trip (curve, alert markers, caught photo), on top of
+  ~35 generated night drives over 2 months on 10 real expressway routes
+  (`routes_kr.json`, paths from OSRM, real 휴게소 names), the same history
+  per code. Trip details show the route map and sleepiness curve. A 6-step
+  phone tour (photo, latest drive, detail, history, insights, wake-up
+  stages) runs once per code. Expired code: a note and the plain demo.
 - **Lights end on time on any screen** (`policy.tick`): a stage card's blue
   light stayed on, because lights only switched off inside the ladder's
   update, which the booth screens skip.
@@ -80,8 +99,8 @@ the Wi-Fi hotspot.
   (`try_sleepy`) suggest closing the eyes for 2 s; it hides after 15 s or when
   an alert answers it. The learn-more pop-up now comes at 60 s, after it.
 - **Guided tour** (`attract.TOUR`, mode "tour"): right after a calibration,
-  like a new app's first run, 7 steps each light one part of the dashboard
-  (camera, state, eyes, head, wake-up stages, history, buttons) with a card;
+  4 steps each light one part of the dashboard (camera, state, wake-up
+  stages, then "after your drive: QR + STAGES takes it home") with a card;
   click = next, Esc = skip, 12 s untouched = next. No alerts during it.
 - **Look**: like the owner's lecture slides (Mandel Cabrera's deck): light grey
   left panel with one picture, charcoal right panel, white serif text
@@ -157,6 +176,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: visitor drive + photos to their phone (consent, Supabase, own QR), history on real Korean routes, phone tour; Pi tour 4 steps.
 - 2026-11-07: face-centring page, sleepy tip while driving, guided tour, Korean voice + toggle, blue light off on time.
 - 2026-11-06: nothing interrupts the booth screens; hover highlights on every button and card.
 - 2026-11-06: QR + STAGES button and m key open the learn-more screen directly.

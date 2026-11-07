@@ -370,26 +370,35 @@ DASH_W, DASH_H = 1280, 720
 _CAM_RECT = (8, 8, 832, 468)              # x, y, w, h
 _CHART_Y, _CHART_H = 482, 230
 _COL_X, _COL_W = 848, 424
-# Buttons drawn over the camera's bottom-right corner, for a mouse or a Pi
-# Connect session, where a key press doesn't always reach the window.
+# One SETTINGS button over the camera's bottom-right corner, for a mouse or a
+# Pi Connect session (a key press doesn't always reach the window). A click
+# opens a menu of the rest above it; visitors only ever see the one button.
 _BTN_Y = _CAM_RECT[1] + _CAM_RECT[3] - 46
 _BTN_R = _CAM_RECT[0] + _CAM_RECT[2] - 8
-BUTTONS = {"vol_down": (_BTN_R - 458, _BTN_Y, 66, 36),
-           "vol_up": (_BTN_R - 386, _BTN_Y, 66, 36),
-           "calibrate": (_BTN_R - 304, _BTN_Y, 150, 36),
-           "fullscreen": (_BTN_R - 146, _BTN_Y, 146, 36),
-           # Bottom-left: start over for the next visitor (the briefing again).
-           "next_visitor": (_CAM_RECT[0] + 8, _BTN_Y, 196, 36),
-           # Above it: straight to the learn-more screen (QR code, stage cards).
-           "learn_more": (_CAM_RECT[0] + 8, _BTN_Y - 44, 196, 36),
-           # Above that: Ollie's voice, Korean or English.
-           "voice": (_CAM_RECT[0] + 8, _BTN_Y - 88, 196, 36),
-           # Top of the stack: the guided tour of this screen again.
-           "guide": (_CAM_RECT[0] + 8, _BTN_Y - 132, 196, 36)}
+SETTINGS = (_BTN_R - 160, _BTN_Y, 160, 36)
+_MENU_W = 250
+_MENU_X = _BTN_R - _MENU_W
+
+
+def _menu_row(k: int) -> int:
+    """The y of menu row k, counted up from just above SETTINGS."""
+    return _BTN_Y - 50 - 44 * k
+
+
+BUTTONS = {"settings": SETTINGS,
+           # The menu, bottom to top.
+           "vol_down": (_MENU_X, _menu_row(0), 70, 36),
+           "vol_up": (_MENU_X + _MENU_W - 70, _menu_row(0), 70, 36),
+           "fullscreen": (_MENU_X, _menu_row(1), _MENU_W, 36),
+           "calibrate": (_MENU_X, _menu_row(2), _MENU_W, 36),
+           "next_visitor": (_MENU_X, _menu_row(3), _MENU_W, 36),
+           "learn_more": (_MENU_X, _menu_row(4), _MENU_W, 36),
+           "voice": (_MENU_X, _menu_row(5), _MENU_W, 36),
+           "guide": (_MENU_X, _menu_row(6), _MENU_W, 36)}
 _BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
                  "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
                  "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)",
-                 "voice": "VOICE: KOREAN (v)", "guide": "GUIDE (g)"}
+                 "voice": "VOICE: KOREAN (v)", "guide": "GUIDE (g)", "settings": "SETTINGS"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)
@@ -761,32 +770,42 @@ def window_to_canvas(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
     return int((x - ox) / scale), int((y - oy) / scale)
 
 
-def button_at(x: int, y: int) -> Optional[str]:
-    """The dashboard button under canvas point (x, y), if any."""
+def button_at(x: int, y: int, menu_open: bool = True) -> Optional[str]:
+    """The dashboard button under canvas point (x, y), if any. With the menu
+    closed only SETTINGS is there."""
     for name, (bx, by, bw, bh) in BUTTONS.items():
-        if bx <= x <= bx + bw and by <= y <= by + bh:
+        if (menu_open or name == "settings") and bx <= x <= bx + bw and by <= y <= by + bh:
             return name
     return None
 
 
 def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None,
-             voice: Optional[str] = None) -> None:
+             voice: Optional[str] = None, menu_open: bool = False) -> None:
     import cv2
 
-    x, y, w, h = BUTTONS["vol_down"]
-    label = "speaker" if volume is None else f"speaker {volume}%"
-    cv2.rectangle(img, (x - _text_w(label, 0.5) - 20, y + 4),
-                  (x - 6, y + h - 4), (40, 40, 44), -1)
-    _t(img, label, x - _text_w(label, 0.5) - 13, y + h // 2 + 6, 0.5, _WHITE)
-    for name, (x, y, w, h) in BUTTONS.items():
-        lit = name == hover                    # under the mouse: white, dark text
+    def draw(name: str, x: int, y: int, w: int, h: int) -> None:
+        lit = name == hover or (name == "settings" and menu_open)
         cv2.rectangle(img, (x, y), (x + w, y + h), (240, 240, 240) if lit else (40, 40, 44), -1)
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255) if lit else (200, 200, 200), 2 if lit else 1)
         text = _BUTTON_WORDS[name]
         if name == "voice" and voice == "en":
             text = "VOICE: ENGLISH (v)"
+        if name == "settings":
+            text = "CLOSE" if menu_open else "SETTINGS"
         _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5,
            (30, 30, 34) if lit else _WHITE)
+
+    if menu_open:
+        top = _menu_row(6) - 10
+        bottom = _menu_row(0) + 36 + 10
+        cv2.rectangle(img, (_MENU_X - 10, top), (_MENU_X + _MENU_W + 10, bottom), (22, 22, 26), -1)
+        cv2.rectangle(img, (_MENU_X - 10, top), (_MENU_X + _MENU_W + 10, bottom), (120, 120, 126), 1)
+        for name, (x, y, w, h) in BUTTONS.items():
+            if name != "settings":
+                draw(name, x, y, w, h)
+        label = "speaker" if volume is None else f"speaker {volume}%"
+        _t(img, label, _MENU_X + (_MENU_W - _text_w(label, 0.5)) // 2, _menu_row(0) + 24, 0.5, _WHITE)
+    draw("settings", *SETTINGS)
 
 
 def fit_to_window(canvas: np.ndarray, win_w: int, win_h: int) -> np.ndarray:
@@ -824,6 +843,7 @@ class Dashboard:
         self._volume: Optional[int] = None
         self.hover: Optional[str] = None      # the button under the mouse, drawn lit
         self.voice: Optional[str] = None      # Ollie's language, on the VOICE button
+        self.menu_open = False                # the SETTINGS menu
 
     def due(self, now: float) -> bool:
         return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
@@ -848,5 +868,5 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
-        _buttons(canvas, self._volume, self.hover, self.voice)
+        _buttons(canvas, self._volume, self.hover, self.voice, self.menu_open)
         return canvas

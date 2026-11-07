@@ -861,8 +861,8 @@ TOUR = [
      "졸음 점수: 깨어 있음부터 위험까지", "How sleepy you are, from alert to danger"),
     ((848, 478, 424, 134), 410, 450, "깨우기 단계", "Wake-up stages",
      "졸리면 불빛, 미스트, 소리, 알람이 여기 켜져요", "Light, mist, sound and alarm light up here"),
-    ((12, 290, 824, 182), 260, 60, "운전이 끝나면", "After your drive",
-     "QR + STAGES를 누르면 기록을 휴대폰으로 받아요", "Press QR + STAGES to take it home on your phone"),
+    ((666, 422, 172, 48), 420, 230, "설정", "Settings",
+     "운전이 끝나면 여기서 QR + STAGES로 기록을 받아요", "After your drive: QR + STAGES here takes it home"),
 ]
 TOUR_CARD = (400, 172)                        # w, h
 

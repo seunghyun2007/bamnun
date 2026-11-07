@@ -146,23 +146,36 @@
   }
 
   // -- the guided tour (once per visit) ------------------------------------- //
-  const STEPS = [
+  const byText = (re) => () => [...document.querySelectorAll("section")].find((x) => x.isConnected && x.offsetParent && re.test(x.textContent.slice(0, 80)));
+  // Everyone else who opens the website (the general QR, or a visitor who
+  // said no): the same walk-through without the personal steps.
+  const STEPS_SITE = [
+    { go: "Home", sel: "#hNow", alt: byText(/Right now|지금/), ko: ["지금 상태", "밤눈이 보는 졸음 정도가 실시간으로 바뀌어요. 지금은 데모 운전이에요."], en: ["Right now", "How sleepy the driver is, live. This is a demo drive."] },
+    { go: "Home", sel: "#hTrip", ko: ["최근 운전", "운전이 끝나면 기록이 여기 쌓여요."], en: ["Your last drive", "Every drive ends up here."] },
+    { go: "Trips", open: "[data-trip]", sel: "[data-trip][aria-expanded='true']", ko: ["운전 자세히 보기", "경로, 졸음 그래프, 쉬어 간 곳을 보여 줘요."], en: ["A drive in detail", "The route, how sleepy, and where you stopped."] },
+    { go: "Trips", sel: "#tList", ko: ["두 달 동안의 기록", "실제 고속도로 경로로 달린 밤 운전 기록이에요."], en: ["Two months of drives", "Night drives on real Korean expressways."] },
+    { go: "Insights", sel: "#iBody > section", ko: ["올리가 찾은 패턴", "언제 졸리는지, 무엇이 깨웠는지 알려줘요."], en: ["Patterns Ollie found", "When you get sleepy, and what wakes you."] },
+    { go: "Home", sel: "a[href='#Stages']", alt: byText(/Wake-up steps|깨우기 단계/), ko: ["깨우기 단계 미리 듣기", "네 단계를 휴대폰에서 들어 보세요. 이제 자유롭게 둘러보세요!"], en: ["Try the wake-up stages", "Hear the four stages here. Now look around!"] },
+  ];
+  const STEPS_VISIT = [
     { go: "Home", sel: "#hAvatar", ko: ["이건 당신이에요", "방금 부스에서 찍은 사진이 프로필이 됐어요."], en: ["This is you", "Your photo from the booth is your profile."] },
     { go: "Home", sel: "#hTrip", ko: ["방금 운전한 기록", "부스에서 운전한 기록이 맨 위에 있어요."], en: ["Your drive, just now", "Your booth drive is at the top."] },
-    { go: "Trips", open: true, sel: "[data-trip='9999']", ko: ["운전 자세히 보기", "졸음 그래프와 밤눈이 깨운 순간이에요."], en: ["Your drive in detail", "How sleepy you got, and when Bamnun woke you."] },
+    { go: "Trips", open: "[data-trip='9999']", sel: "[data-trip='9999']", ko: ["운전 자세히 보기", "졸음 그래프와 밤눈이 깨운 순간이에요."], en: ["Your drive in detail", "How sleepy you got, and when Bamnun woke you."] },
     { go: "Trips", sel: "#tList", ko: ["두 달 동안의 기록", "실제 고속도로 경로로 달린 밤 운전 기록이에요."], en: ["Two months of drives", "Night drives on real Korean expressways."] },
     { go: "Insights", sel: "#iBody > section", ko: ["올리가 찾은 패턴", "언제 졸리는지, 무엇이 깨웠는지 알려줘요."], en: ["Patterns Ollie found", "When you get sleepy, and what wakes you."] },
     { go: "Home", sel: "a[href='#Stages']", alt: () => [...document.querySelectorAll("section")].find((x) => x.isConnected && x.offsetParent && /Wake-up steps|깨우기 단계/.test((x.querySelector("b") || {}).textContent || "")), ko: ["깨우기 단계 미리 듣기", "네 단계를 휴대폰에서 들어 보세요. 이제 자유롭게 둘러보세요!"], en: ["Try the wake-up stages", "Hear the four stages here. Now look around!"] },
   ];
+  const tourKey = () => "bn-tour-" + (state === "ok" ? code : "site");
   function tour() {
     let i = 0, box = null;
-    const end = () => { if (box) box.remove(); box = null; try { localStorage.setItem("bn-tour-" + code, "1"); } catch (e) {} };
+    const STEPS = state === "ok" ? STEPS_VISIT : STEPS_SITE;
+    const end = () => { if (box) box.remove(); box = null; try { localStorage.setItem(tourKey(), "1"); } catch (e) {} };
     function show() {
       if (i >= STEPS.length) return end();
       const st = STEPS[i];
       if (window.BN_GO) BN_GO(st.go, { instant: true });
       setTimeout(() => {
-        if (st.open) { const c = document.querySelector("[data-trip='9999']"); if (c && c.getAttribute("aria-expanded") !== "true") c.click(); }
+        if (st.open) { const c = document.querySelector(st.open); if (c && c.getAttribute("aria-expanded") !== "true") c.click(); }
         setTimeout(() => {
           const el = document.querySelector(st.sel) || (st.alt && st.alt());
           if (!el) { i++; return show(); }
@@ -199,9 +212,13 @@
     document.body.appendChild(d);
     setTimeout(() => d.remove(), 5000);
   }
+  function maybeTour() {
+    let done = false; try { done = localStorage.getItem(tourKey()) === "1"; } catch (e) {}
+    if (!done) setTimeout(tour, 1600);
+  }
   async function load() {
     const cfg = window.BN_SUPABASE;
-    if (!code || !cfg) { state = "none"; return; }
+    if (!code || !cfg) { state = "none"; maybeTour(); return; }
     try {
       const r = await fetch(cfg.url + "/rest/v1/rpc/get_visit", { method: "POST",
         headers: { apikey: cfg.key, Authorization: "Bearer " + cfg.key, "Content-Type": "application/json" },
@@ -212,10 +229,7 @@
     cache = null;
     window.dispatchEvent(new Event("bn-visit"));
     if (state === "expired") toast(W("이 체험 기록은 만료됐어요. 기본 데모를 보여 드릴게요.", "This booth drive has expired. Here's the demo instead."));
-    if (state === "ok") {
-      let done = false; try { done = localStorage.getItem("bn-tour-" + code) === "1"; } catch (e) {}
-      if (!done) setTimeout(tour, 1600);
-    }
+    maybeTour();
   }
 
   window.BN_VISIT = {

@@ -25,7 +25,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (334 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (335 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -42,6 +42,11 @@ the Wi-Fi hotspot.
   from page 1, a fresh pop-up), VOL -, VOL +, CALIBRATE, FULL SCREEN (clicks
   work over Pi Connect; keys don't always). Keys: g guided tour, v voice language, m learn-more screen, n next person, c calibrate, f full screen, l layout,
   - / = volume, space briefing, Esc skip standby/briefing, q quit.
+- **SETTINGS menu** (replaces the row/stack of buttons): one SETTINGS button
+  at the camera's bottom-right; a click opens a menu above it: GUIDE, VOICE,
+  QR + STAGES, NEXT PERSON, CALIBRATE, FULL SCREEN, VOL - / speaker % / VOL +.
+  An item closes the menu (volume keeps it open); a click beside it closes it.
+  Keys still work (g v m n c f - =). The Pi tour's last step points at it.
 - **Speaker** (USB, ALSA card `UACDemoV10`, control `PCM`) set to **80% at
   every start**; VOL buttons change it in 10% steps.
 - **Camera rotated 180°** (`capture.picamera.rotate_180: true`).
@@ -68,7 +73,8 @@ the Wi-Fi hotspot.
   (`routes_kr.json`, paths from OSRM, real 휴게소 names), the same history
   per code. Trip details show the route map and sleepiness curve. A 6-step
   phone tour (photo, latest drive, detail, history, insights, wake-up
-  stages) runs once per code. Expired code: a note and the plain demo.
+  stages) runs once per code. Without a code (the general QR, or a visitor
+  who said no) a 6-step general walkthrough runs once per phone. Expired code: a note and the plain demo.
 - **Lights end on time on any screen** (`policy.tick`): a stage card's blue
   light stayed on, because lights only switched off inside the ladder's
   update, which the booth screens skip.
@@ -196,6 +202,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: dashboard buttons folded into one SETTINGS menu (bottom-right of the camera); phone walkthrough for every website visitor (not only with a personal code; not published yet).
 - 2026-11-07: phone app redesign part 1 built (flat colours, Pretendard, flat Ollie, Home/Trips/Insights/Stages layouts); website not updated yet.
 - 2026-11-07: redesign plan + flat Ollie drafts (docs/REDESIGN_PLAN.md, assets/brand/); not built yet.
 - 2026-11-07: visitor drive + photos to their phone (consent, Supabase, own QR), history on real Korean routes, phone tour; Pi tour 4 steps.

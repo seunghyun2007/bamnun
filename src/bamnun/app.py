@@ -582,7 +582,10 @@ class Monitor:
         elif self._tip_at is not None:
             from .attract import popup_hit
             name = "tip_close" if popup_hit(cx, cy) == "learn_close" else None
-        name = name or button_at(cx, cy)
+        menu = bool(getattr(self.dashboard, "menu_open", False))
+        name = name or button_at(cx, cy, menu)
+        if menu and not name:
+            name = "menu_close"                   # a click beside the menu closes it
         if name:
             self._clicks.append(name)
 
@@ -1059,7 +1062,7 @@ class Monitor:
                                 hover = popup_hit(mx, my)
                                 if self._tip_at is not None and hover == "learn_more":
                                     hover = None          # the tip has no button
-                            hover = hover or button_at(mx, my)
+                            hover = hover or button_at(mx, my, dash.menu_open)
                         dash.hover = hover
                         dash.voice = AudioActuator.lang
                         canvas = dash.compose(canvas)
@@ -1105,6 +1108,11 @@ class Monitor:
                 go_next = key == ord(" ")
                 while self._clicks:
                     btn = self._clicks.popleft()
+                    if dash is not None and btn == "settings":
+                        dash.menu_open = not dash.menu_open
+                        continue
+                    if dash is not None and btn not in ("vol_down", "vol_up"):
+                        dash.menu_open = False        # an item done, or a click beside it
                     if btn == "next":
                         go_next = True
                     elif btn == "learn_more":

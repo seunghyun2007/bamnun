@@ -262,6 +262,7 @@ def test_hover_lights_up_what_the_mouse_is_on():
     lit = s.learn_more(0.0, url, (1280, 720), hover="stage1")
     assert lit[y + 10, x + 10].mean() > plain[y + 10, x + 10].mean() + 20
     d = Dashboard()
+    d.menu_open = True
     cam = np.zeros((480, 640, 3), np.uint8)
     bx, by, bw, bh = BUTTONS["calibrate"]
     a = d.compose(cam)[by + 3, bx + 3].mean()
@@ -321,3 +322,18 @@ def test_each_tour_step_draws_with_its_part_lit():
         inside = c[int((y + h / 2) * 1.5), int((x + w / 2) * 1.5)]
         assert inside.mean() >= 195 or i == 0          # the card may sit on a corner
         assert c[3, 1917].mean() < 120 or x + w > 1270  # elsewhere dimmed
+
+
+def test_only_settings_shows_until_it_is_opened():
+    from bamnun.viz import BUTTONS, SETTINGS, Dashboard, button_at
+    x, y, w, h = BUTTONS["calibrate"]
+    assert button_at(x + w // 2, y + h // 2, menu_open=False) is None
+    assert button_at(x + w // 2, y + h // 2, menu_open=True) == "calibrate"
+    sx, sy, sw, sh = SETTINGS
+    assert button_at(sx + sw // 2, sy + sh // 2, menu_open=False) == "settings"
+    d = Dashboard()
+    cam = np.zeros((480, 640, 3), np.uint8)
+    closed = d.compose(cam)
+    d.menu_open = True
+    opened = d.compose(cam)
+    assert not closed[y + 3, x + 3].any() and opened[y + 3, x + 3].any()

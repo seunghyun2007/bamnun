@@ -164,6 +164,13 @@ function fitScreen(sc){
   root.style.height=H+"px"; root.style.overflow="hidden";
 }
 addEventListener("resize",fit); fit();
+// The page, the stage and the phone frame never scroll; only a .screen does.
+// Something scrolling them anyway (scrollIntoView, a focused field, iOS)
+// pushed the whole app out of place: put it back.
+window.BN_UNSCROLL=()=>{for(const el of [document.scrollingElement,document.body,document.querySelector(".stage"),phone]){if(el&&(el.scrollTop||el.scrollLeft)){el.scrollTop=0;el.scrollLeft=0;}}};
+addEventListener("scroll",BN_UNSCROLL,{passive:true});
+for(const el of [document.querySelector(".stage"),phone]) if(el) el.addEventListener("scroll",BN_UNSCROLL,{passive:true});
+addEventListener("resize",()=>setTimeout(BN_UNSCROLL,50));
 function go(name,opts={}){
   if(!document.getElementById("t-"+name)) return;
   const back = opts.back || (cur && ORDER.indexOf(name) < ORDER.indexOf(cur));

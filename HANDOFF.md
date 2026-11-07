@@ -202,6 +202,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: website published with redesign part 1 + walkthrough for everyone; fixed the app frame sliding out of place on phones (the walkthrough's scrollIntoView scrolled the stage/phone frame; now only `.screen` scrolls, and `BN_UNSCROLL` in shell.html snaps the frame back).
 - 2026-11-07: dashboard buttons folded into one SETTINGS menu (bottom-right of the camera); phone walkthrough for every website visitor (not only with a personal code; not published yet).
 - 2026-11-07: phone app redesign part 1 built (flat colours, Pretendard, flat Ollie, Home/Trips/Insights/Stages layouts); website not updated yet.
 - 2026-11-07: redesign plan + flat Ollie drafts (docs/REDESIGN_PLAN.md, assets/brand/); not built yet.

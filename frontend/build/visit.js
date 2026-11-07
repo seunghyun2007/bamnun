@@ -165,6 +165,18 @@
     { go: "Insights", sel: "#iBody > section", ko: ["올리가 찾은 패턴", "언제 졸리는지, 무엇이 깨웠는지 알려줘요."], en: ["Patterns Ollie found", "When you get sleepy, and what wakes you."] },
     { go: "Home", sel: "a[href='#Stages']", alt: () => [...document.querySelectorAll("section")].find((x) => x.isConnected && x.offsetParent && /Wake-up steps|깨우기 단계/.test((x.querySelector("b") || {}).textContent || "")), ko: ["깨우기 단계 미리 듣기", "네 단계를 휴대폰에서 들어 보세요. 이제 자유롭게 둘러보세요!"], en: ["Try the wake-up stages", "Hear the four stages here. Now look around!"] },
   ];
+  // Bring a part into view by scrolling only the app's own screen. The
+  // browser's scrollIntoView also scrolled the scaled phone frame and the
+  // stage around it, and the whole app slid out of place on a phone.
+  function reveal(el) {
+    const sc = el.closest(".screen");
+    if (sc) {
+      const a = el.getBoundingClientRect(), b = sc.getBoundingClientRect();
+      const k = b.height / (sc.clientHeight || b.height);            // the frame's scale
+      sc.scrollTop += (a.top - b.top) / k - sc.clientHeight * 0.18;
+    }
+    if (window.BN_UNSCROLL) BN_UNSCROLL();
+  }
   const tourKey = () => "bn-tour-" + (state === "ok" ? code : "site");
   function tour() {
     let i = 0, box = null;
@@ -179,7 +191,7 @@
         setTimeout(() => {
           const el = document.querySelector(st.sel) || (st.alt && st.alt());
           if (!el) { i++; return show(); }
-          el.scrollIntoView({ block: "center" });
+          reveal(el);
           setTimeout(() => place(el, st), 250);
         }, 250);
       }, 350);
@@ -191,10 +203,14 @@
         box.addEventListener("click", (e) => { if (e.target.dataset.skip) return end(); i++; show(); });
         document.body.appendChild(box);
       }
-      const r = el.getBoundingClientRect(), pad = 8, [h, p] = st[ko() ? "ko" : "en"];
+      const raw = el.getBoundingClientRect(), pad = 8, [h, p] = st[ko() ? "ko" : "en"];
+      // A tall part (the trip list) is lit only where it's on screen.
+      const top = Math.max(raw.top, 12), bottom = Math.min(raw.bottom, innerHeight - 12);
+      const r = { left: raw.left, width: raw.width, top, bottom, height: Math.max(0, bottom - top) };
       const below = r.bottom + 190 < innerHeight;
+      const above = r.top - 190 > 0;
       box.innerHTML = `<div style="position:fixed;left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px;border-radius:18px;box-shadow:0 0 0 9999px rgba(10,6,12,.72);outline:3px solid #F2EEE8;transition:all .25s"></div>
-        <div style="position:fixed;left:16px;right:16px;${below ? `top:${r.bottom + pad + 14}px` : `bottom:${innerHeight - r.top + pad + 14}px`};background:#F2EEE8;color:#15131A;border-radius:20px;padding:16px 18px;font-family:Pretendard,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">
+        <div style="position:fixed;left:16px;right:16px;${below ? `top:${r.bottom + pad + 14}px` : above ? `bottom:${innerHeight - r.top + pad + 14}px` : "bottom:20px"};background:#F2EEE8;color:#15131A;border-radius:20px;padding:16px 18px;font-family:Pretendard,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">
           <span style="font-size:12px;color:#9A93A0">${i + 1} / ${STEPS.length}</span>
           <h3 style="margin:4px 0 0;font-size:20px;font-weight:700">${esc(h)}</h3>
           <p style="margin:6px 0 12px;font-size:14.5px;line-height:1.45">${esc(p)}</p>

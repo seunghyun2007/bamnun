@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="400" height="416">
+  <!-- Ollie, device version (option N): cream on black like the case. Draw on #1A181C. -->
+  <path d="M22 22 L17 9 L31 16 Z" fill="#E8D7AE"/><path d="M78 22 L83 9 L69 16 Z" fill="#E8D7AE"/>
+  <path d="M18 34 C18 16 32 11 50 11 C68 11 82 16 82 34 L84 66 C84 86 70 96 50 96 C30 96 16 86 16 66 Z" fill="#E8D7AE"/>
+  <path d="M20 58 Q16 70 22 78" fill="none" stroke="#1A181C" stroke-width="3" stroke-linecap="round"/>
+  <path d="M80 58 Q84 70 78 78" fill="none" stroke="#1A181C" stroke-width="3" stroke-linecap="round"/>
+  <ellipse cx="50" cy="72" rx="19" ry="16" fill="none" stroke="#1A181C" stroke-width="3"/>
+  <path d="M45 74 A7 7 0 1 0 56 69 A5.4 5.4 0 1 1 45 74 Z" fill="#1A181C"/>
+  <circle cx="36" cy="38" r="11" fill="none" stroke="#1A181C" stroke-width="4"/><circle cx="64" cy="38" r="11" fill="none" stroke="#1A181C" stroke-width="4"/>
+  <circle cx="36" cy="38" r="4.5" fill="#1A181C"/><circle cx="64" cy="38" r="4.5" fill="#1A181C"/>
+  <path d="M46 47 L54 47 L50 55 Z" fill="#1A181C"/>
+</svg>

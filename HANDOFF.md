@@ -167,6 +167,8 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Open items
 
+- **Next up: the phone app redesign**, see `docs/REDESIGN_PLAN.md` (agreed
+  direction, new flat Ollie in `assets/brand/`, part 1 before 10 Nov).
 - PR #5 (`demo-booth` -> `main`) is open: the friend should review it before
   it's merged. No CI on the repo.
 - Compare `local-wip` with the friend's detection code.
@@ -176,6 +178,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: redesign plan + flat Ollie drafts (docs/REDESIGN_PLAN.md, assets/brand/); not built yet.
 - 2026-11-07: visitor drive + photos to their phone (consent, Supabase, own QR), history on real Korean routes, phone tour; Pi tour 4 steps.
 - 2026-11-07: face-centring page, sleepy tip while driving, guided tour, Korean voice + toggle, blue light off on time.
 - 2026-11-06: nothing interrupts the booth screens; hover highlights on every button and card.

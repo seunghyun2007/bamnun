@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104" width="400" height="416">
+  <!-- Ollie, flat (option M): the app's Ollie without outlines, texture or blush. Rough draft: trace a clean final from the original Ollie art. -->
+  <path d="M22 22 L17 9 L31 16 Z" fill="#7A4E33"/><path d="M78 22 L83 9 L69 16 Z" fill="#7A4E33"/>
+  <path d="M18 34 C18 16 32 11 50 11 C68 11 82 16 82 34 L84 66 C84 86 70 96 50 96 C30 96 16 86 16 66 Z" fill="#8B5A3C"/>
+  <path d="M17 56 Q10 70 18 80 L22 62 Z" fill="#7A4E33"/><path d="M83 56 Q90 70 82 80 L78 62 Z" fill="#7A4E33"/>
+  <ellipse cx="50" cy="72" rx="20" ry="17" fill="#F4E6CC"/>
+  <path d="M45 74 A7 7 0 1 0 56 69 A5.4 5.4 0 1 1 45 74 Z" fill="#E7963B"/>
+  <circle cx="36" cy="38" r="12" fill="#F4E6CC"/><circle cx="64" cy="38" r="12" fill="#F4E6CC"/>
+  <circle cx="36" cy="38" r="7" fill="#241A16"/><circle cx="64" cy="38" r="7" fill="#241A16"/>
+  <circle cx="38.5" cy="35.5" r="2" fill="#FFFFFF"/><circle cx="66.5" cy="35.5" r="2" fill="#FFFFFF"/>
+  <path d="M46 47 L54 47 L50 55 Z" fill="#E7963B"/>
+  <path d="M36 95 l-4 5 h8 Z M64 95 l-4 5 h8 Z" fill="#E7963B"/>
+</svg>

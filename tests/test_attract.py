@@ -45,6 +45,9 @@ def stub():
         _mode_t=None,
     )
     m.visit = SimpleNamespace(reset=lambda: events.append("visit_reset"))
+    m._fit_since = None
+    m._next = lambda now, t: Monitor._next(m, now, t)
+    m._page_s = lambda: Monitor._page_s(m)
     m._update_learn_more = lambda now, face: Monitor._update_learn_more(m, now, face)
     m._open_qr = lambda now: Monitor._open_qr(m, now)
     m._start_calibration = lambda t: m.calibrations.append(t)
@@ -59,11 +62,11 @@ def test_nobody_for_30_s_is_standby_and_it_waits_for_the_visitor():
     assert m.mode == "live"
     Monitor._update_mode(m, 30.5, False)
     assert m.mode == "standby" and m._last_alert == "reset" and "standby" in events
-    Monitor._update_mode(m, 40.0, True)          # someone sits down and reads it:
-    Monitor._update_mode(m, 60.0, True)          # it stays until they press space
+    Monitor._update_mode(m, 40.0, True)          # someone sits down:
+    Monitor._update_mode(m, 42.0, True)
     assert m.mode == "standby"
-    Monitor._next(m, 61.0, 61.0)
-    assert m.mode == "briefing"
+    Monitor._update_mode(m, 43.5, True)          # after 3 s the briefing starts by itself
+    assert m.mode == "briefing" and m._brief_step == 0
 
 
 def test_space_runs_the_briefing_then_starts_calibrating():
@@ -78,11 +81,29 @@ def test_space_runs_the_briefing_then_starts_calibrating():
     assert m.mode == "live" and m.calibrations == [10.0]
 
 
-def test_an_untouched_briefing_closes():
+def test_the_briefing_turns_its_pages_and_starts_calibrating_by_itself():
+    from bamnun.app import BRIEF_CENTER_MAX_S, BRIEF_PAGE_S
     m, _ = stub()
-    m.mode, m._brief_at = "briefing", 0.0
-    Monitor._update_mode(m, 50.0, True)
-    assert m.mode == "live"
+    m.mode, m._brief_step, m._brief_at = "briefing", 0, 0.0
+    t = 0.0
+    for i in range(1, len(STEPS)):
+        t += (BRIEF_CENTER_MAX_S if STEPS[i - 1][0] == "center" else BRIEF_PAGE_S) + 0.1
+        Monitor._update_mode(m, t, True)
+        assert m._brief_step == i, (i, STEPS[i - 1][0])
+    t += BRIEF_PAGE_S + 0.1
+    Monitor._update_mode(m, t, True)             # the last page: calibration starts
+    assert m.mode == "live" and m.calibrations
+
+
+def test_the_centring_page_moves_on_once_the_face_fits():
+    m, _ = stub()
+    i = [k for k, st in enumerate(STEPS) if st[0] == "center"][0]
+    m.mode, m._brief_step, m._brief_at = "briefing", i, 0.0
+    m._fit_since = 1.5
+    Monitor._update_mode(m, 3.2, True)           # fitted 1.7 s: not yet
+    assert m._brief_step == i
+    Monitor._update_mode(m, 3.6, True)           # fitted 2 s, page up 3 s: next
+    assert m._brief_step == i + 1
 
 
 def test_screens_are_drawn_at_the_window_size_not_stretched():

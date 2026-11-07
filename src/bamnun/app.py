@@ -64,9 +64,12 @@ PUBLISH_PERIOD_S = 0.1
 SCORE_SAMPLE_S = 0.5
 SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
 CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
-BRIEFING_IDLE_S = 45.0
 QUIET_AFTER_SCREEN_S = 8.0
-TOUR_STEP_S = 12.0          # an untouched tour step moves on after this  # no alerts this long after leaving a booth screen   # an untouched briefing page closes after this
+TOUR_STEP_S = 6.0           # an untouched tour step moves on after this
+AUTO_BRIEF_S = 3.0          # someone at the wheel this long on standby: the briefing starts
+BRIEF_PAGE_S = 7.0          # each briefing page turns by itself after this ...
+BRIEF_CENTER_MAX_S = 14.0   # ... the centring page after this at most,
+BRIEF_FIT_S = 2.0           # or once the face has fit the oval this long  # no alerts this long after leaving a booth screen   # an untouched briefing page closes after this
 VOLUME_STEP = 10
 
 # The calibrator's live hints, as a person reads them.
@@ -271,6 +274,7 @@ class Monitor:
         # calibration from the briefing, and from the GUIDE button or g.
         self._tour_after_cal = bool(ui.get("tour_after_calibration", True))
         self._tour_step, self._tour_at = 0, 0.0
+        self._fit_since: Optional[float] = None   # the face fit the oval since (centring page)
         self._quiet_until = 0.0                   # no alerts until then (just back from a screen)
         self._seen_mode = "live"
         self._mode_t: Optional[float] = None
@@ -658,8 +662,16 @@ class Monitor:
             self.visit.reset()
             self.logger.log_event("standby", {"after_s": self._standby_after_s})
             console.print("[dim]standby: nobody at the wheel[/]")
-        elif self.mode == "briefing" and now - self._brief_at >= BRIEFING_IDLE_S:
-            self.mode = "live"
+        elif self.mode == "standby" and face and self._face_since is not None \
+                and now - self._face_since >= AUTO_BRIEF_S:
+            self._next(now, now)                  # someone sat down: the briefing starts
+        elif self.mode == "briefing":
+            from .attract import STEPS
+            pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
+            fitted = (pic == "center" and self._fit_since is not None
+                      and now - self._fit_since >= BRIEF_FIT_S and now - self._brief_at >= 3.0)
+            if fitted or now - self._brief_at >= self._page_s():
+                self._next(now, now)              # the page turns by itself
         elif self.mode == "qr" and now - self._qr_at >= self._qr_close_s:
             self.mode = "live"
         elif self.mode == "tour" and now - self._tour_at >= TOUR_STEP_S:
@@ -751,6 +763,32 @@ class Monitor:
                          fit_good=ok and face_fit(face_box(pts, image.shape)) == "good",
                          eyes_open=ok and not ff.eye_closed, score=state.score,
                          stage=self.policy.stage, microsleeps=ff.microsleep_count, face=ok)
+
+    def _camera_view(self, image, lms):
+        """The camera with the face mesh, and where the face is (for the oval)."""
+        import cv2
+        from .attract import face_box, face_fit
+
+        cam = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR) if image.ndim == 2 else image.copy()
+        face = None
+        if lms is not None and lms.ok:
+            draw_face_mesh(cam, lms.points)
+            face = face_box(lms.points, image.shape)
+        now = time.monotonic()
+        if face_fit(face) == "good":
+            if self._fit_since is None:
+                self._fit_since = now
+        else:
+            self._fit_since = None
+        return cam, face
+
+    def _page_s(self) -> float:
+        from .attract import STEPS
+        pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
+        return BRIEF_CENTER_MAX_S if pic == "center" else BRIEF_PAGE_S
+
+    def _page_progress(self, now: float) -> float:
+        return min(1.0, max(0.0, (now - self._brief_at) / self._page_s()))
 
     def _start_tour(self, now: float) -> None:
         self.mode, self._tour_step, self._tour_at = "tour", 0, now
@@ -1021,18 +1059,9 @@ class Monitor:
                             draw_face_mesh(cam, lms.points)
                         canvas = self._screens.standby(now, cam, size)
                     elif self.mode == "briefing":
-                        cam = face = None
-                        from .attract import STEPS
-                        if STEPS[min(self._brief_step, len(STEPS) - 1)][0] == "center":
-                            cam = frame.image
-                            cam = cv2.cvtColor(cam, cv2.COLOR_GRAY2BGR) if cam.ndim == 2 else cam.copy()
-                            if lms is not None and lms.ok:
-                                draw_face_mesh(cam, lms.points)
-                                h_, w_ = frame.image.shape[:2]
-                                xs, ys = lms.points[:, 0], lms.points[:, 1]
-                                face = ((xs.min() + xs.max()) / 2 / w_, (ys.min() + ys.max()) / 2 / h_,
-                                        (xs.max() - xs.min()) / w_)
-                        canvas = self._screens.briefing(self._brief_step, now, size, cam, face)
+                        cam, face = self._camera_view(frame.image, lms)
+                        canvas = self._screens.briefing(self._brief_step, now, size, cam, face,
+                                                        page=self._page_progress(now))
                     elif self.mode == "qr":
                         n, start, until = self._stage_play
                         on = n if now < until else 0
@@ -1046,8 +1075,10 @@ class Monitor:
                             progress=(now - start) / max(0.1, until - start) if on else 0.0,
                             hover=hover, visit=self._visit_view())
                     else:      # calibrating: look at the game screen
+                        cam, face = self._camera_view(frame.image, lms)
                         canvas = self._screens.calibrating(now, progress,
-                                                           self.features.calibrator.hint or "", size)
+                                                           self.features.calibrator.hint or "", size,
+                                                           cam, face)
                     if tall:
                         canvas = stack_tall(canvas, win_size)
                 else:

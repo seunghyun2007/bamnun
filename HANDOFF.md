@@ -29,7 +29,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (339 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (340 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -206,6 +206,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: fewer clicks: standby starts the briefing by itself 3 s after someone sits, pages turn by themselves (7 s; the centring page once the face fits the oval 2 s, at most 14 s), the last page starts calibration, the tour moves every 6 s; clicks still skip ahead. Standby is the big live camera + lines fading in and out (no owl); briefing pages and calibration show the live camera (calibration with the face oval). docs/LAPTOP_NAV_PROMPT.md: a prompt for the laptop's Claude Code to make switching between the game and Bamnun easy.
 - 2026-11-07: laptop dry run worked (RealVNC over the cable, game ⅔ / Bamnun ⅓). Fixes: one sound at a time (wake-up sounds cut in, tips/cues skip if busy); `alerts.face_lost_alerts: false` (an unseen face sets off nothing); the sleepy tip only with a face and no alert; the Pi's headless screen is 720x1200 at every start (`~/.config/labwc/autostart`, copy in tools/booth/labwc_autostart). Recalibrate after moving the camera for the laptop.
 - 2026-11-07: laptop setup: VNC on the Pi (wayvnc :5900), cable profile `bamnun-laptop` (Pi = 10.43.0.1, DHCP, no route/DNS), Bamnun auto-switches to a tall layout (stacked dashboard and slides, arrow left) when its window is taller than wide; docs/LAPTOP_SETUP.md.
 - 2026-11-07: website published with redesign part 1 + walkthrough for everyone; fixed the app frame sliding out of place on phones (the walkthrough's scrollIntoView scrolled the stage/phone frame; now only `.screen` scrolls, and `BN_UNSCROLL` in shell.html snaps the frame back).

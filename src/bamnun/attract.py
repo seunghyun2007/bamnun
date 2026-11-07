@@ -140,6 +140,15 @@ def face_box(points: np.ndarray, shape: tuple[int, ...]) -> tuple[float, float, 
     return ((xs.min() + xs.max()) / 2 / w, (ys.min() + ys.max()) / 2 / h, (xs.max() - xs.min()) / w)
 
 
+# Standby: these fade one into the next, STANDBY_S seconds each.
+STANDBY_S = 3.5
+STANDBY_LINES = [
+    ("여기 앉아서 체험해 보세요", "Sit here and try Bamnun"),
+    ("졸음운전, 밤눈이 지켜봐요", "Bamnun watches for drowsy driving"),
+    ("핸들을 잡고 게임 화면을 보세요", "Hold the wheel, look at the game"),
+    ("눈을 감으면 올리가 깨워요", "Close your eyes and Ollie wakes you"),
+]
+
 # The centring page: the oval (a fraction of the camera's width and height)
 # and how a face fits it. face = (centre x, centre y, width), all 0-1.
 FIT_RX, FIT_RY = 0.2, 0.36
@@ -397,25 +406,75 @@ class Screens:
 
     def standby(self, t: float, camera: Optional[np.ndarray] = None,
                 size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
-        """Nobody at the wheel: invite the next visitor."""
+        """Nobody at the wheel: the live camera big on the left, and on the
+        right a few lines that fade from one to the next."""
         f = _Frame(size)
         key = ("standby", f.w, f.h)
         if key not in self._cache:
-            self._cache[key] = self._titled(f, "여기 앉아서 체험해 보세요", "Sit here and try Bamnun",
-                                            [("야간 운전자를 위한 졸음 지킴이, 밤눈",
-                                              "Bamnun, a drowsiness co-pilot for night drivers")])
+            self._cache[key] = self._base(f)
         canvas = self._cache[key].copy()
-        if camera is not None:            # Ollie up top, the camera big below him
-            self._draw_owl(canvas, f, "hello", t, height=210, cy=165)
-            self._thumbnail(canvas, f, camera)
+        if camera is not None:
+            self._draw_camera(canvas, f, camera, top=None, max_h=560)
+        # The words: each line for STANDBY_S seconds, fading into the next.
+        n = len(STANDBY_LINES)
+        k = t / STANDBY_S
+        i, frac = int(k) % n, k - int(k)
+        x0, y0, y1 = f.x(_SPLIT), f.y(150), f.y(470)
+        # Fade out to the empty panel, then the next line fades in.
+        fade = max(0.0, (frac - 0.8) / 0.2)
+        if fade == 0:
+            band = self._standby_band(f, i)
         else:
-            self._draw_owl(canvas, f, "hello", t)
-        self._prompt(canvas, f, t, "스페이스바를 누르거나 클릭하세요", "Press SPACE or click to start")
+            line = self._standby_band(f, i if fade < 0.5 else (i + 1) % n)
+            a = 1 - fade * 2 if fade < 0.5 else fade * 2 - 1
+            empty = np.empty_like(line)
+            empty[:] = _BOARD
+            band = (line * a + empty * (1 - a)).astype(np.uint8)
+        canvas[y0:y1, x0:] = band
+        self._prompt(canvas, f, t, "핸들 앞에 앉으면 바로 시작돼요", "Sit at the wheel and it starts by itself",
+                     y=560)
         return canvas
+
+    def _standby_band(self, f: _Frame, i: int) -> np.ndarray:
+        key = ("standby_line", i, f.w, f.h)
+        if key not in self._cache:
+            ko, en = STANDBY_LINES[i]
+            c, _ = self._text(self._base(f), f, [(ko, "bold", 48, _WHITE, 250), (en, "regular", 26, _GREY, 322)])
+            self._cache[key] = c[f.y(150):f.y(470), f.x(_SPLIT):].copy()
+        return self._cache[key]
+
+    def _draw_camera(self, canvas: np.ndarray, f: _Frame, camera: np.ndarray,
+                     face: Optional[tuple[float, float, float]] = None, oval: bool = False,
+                     top: Optional[float] = 30, max_h: float = 380) -> None:
+        """The live camera in the left panel. With ``oval``, the face guide
+        (green when the face fits, as on the centring page)."""
+        import cv2
+
+        good = face_fit(face) == "good"
+        w = f.n(_SPLIT - 70)
+        h = int(camera.shape[0] * w / camera.shape[1])
+        if h > f.n(max_h):
+            h = f.n(max_h)
+            w = int(camera.shape[1] * h / camera.shape[0])
+        view = cv2.resize(camera, (w, h), interpolation=cv2.INTER_AREA)
+        if view.ndim == 2:
+            view = cv2.cvtColor(view, cv2.COLOR_GRAY2BGR)
+        if oval:
+            col = _GOOD if good else (255, 255, 255)
+            axes = (int(w * FIT_RX), int(h * FIT_RY))
+            cv2.ellipse(view, (w // 2, h // 2), axes, 0, 0, 360, (0, 0, 0), max(3, f.n(7)), cv2.LINE_AA)
+            cv2.ellipse(view, (w // 2, h // 2), axes, 0, 0, 360, col, max(2, f.n(4)), cv2.LINE_AA)
+        x = f.x(_SPLIT / 2) - w // 2
+        y = f.y(top) if top is not None else f.y(DASH_H / 2) - h // 2
+        canvas[y:y + h, x:x + w] = view
+        edge = f.n(6) if oval and good else 1
+        cv2.rectangle(canvas, (x - edge, y - edge), (x + w + edge - 1, y + h + edge - 1),
+                      _GOOD if oval and good else (120, 120, 120), edge)
 
     def briefing(self, step: int, t: float, size: tuple[int, int] = (DASH_W, DASH_H),
                  camera: Optional[np.ndarray] = None,
-                 face: Optional[tuple[float, float, float]] = None) -> np.ndarray:
+                 face: Optional[tuple[float, float, float]] = None,
+                 page: float = -1.0) -> np.ndarray:
         """One page of the briefing, with progress dots."""
         import cv2
 
@@ -436,16 +495,24 @@ class Screens:
             self._draw_game(canvas, f, t)
         elif pic == "center":
             self._draw_center(canvas, f, t, camera, face)
+        elif camera is not None:          # the visitor themself, not Ollie
+            self._draw_camera(canvas, f, camera, top=None, max_h=520)
         else:
             self._draw_owl(canvas, f, pic, t)
         if step == len(STEPS) - 1:
-            self._prompt(canvas, f, t, "스페이스바 또는 클릭: 보정 시작", "SPACE or click: start calibrating")
+            self._prompt(canvas, f, t, "곧 보정이 시작돼요  ·  클릭하면 바로", "Calibration starts in a moment, or click")
         else:
-            self._prompt(canvas, f, t, "스페이스바 또는 클릭: 다음", "SPACE or click: next")
+            self._prompt(canvas, f, t, "저절로 넘어가요  ·  클릭하면 바로 다음", "Turns by itself, or click for next")
+        if page >= 0:                     # how long until the page turns by itself
+            import cv2
+            bx0, bx1, by = f.x(_SPLIT + 160), f.x(DASH_W - 160), f.y(690)
+            cv2.rectangle(canvas, (bx0, by), (bx1, by + f.n(4)), (80, 80, 80), -1)
+            cv2.rectangle(canvas, (bx0, by), (int(bx0 + (bx1 - bx0) * min(1.0, page)), by + f.n(4)), _GREY, -1)
         return canvas
 
     def calibrating(self, t: float, progress: float, hint: str = "",
-                    size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
+                    size: tuple[int, int] = (DASH_W, DASH_H), camera: Optional[np.ndarray] = None,
+                    face: Optional[tuple[float, float, float]] = None) -> np.ndarray:
         """Calibration: look at the game screen, blink normally. The arrow
         points at the game: right of a booth monitor, left of a laptop's
         side panel (``game_left``)."""
@@ -457,7 +524,10 @@ class Screens:
             self._cache[key] = self._titled(f, "게임 화면을 보세요", "Look at the game screen",
                                             [("평소처럼 눈을 깜빡이세요", "Blink normally")], title_y=110)
         canvas = self._cache[key].copy()
-        self._draw_owl(canvas, f, "thinking", t)
+        if camera is not None:            # the face in its oval, the whole time
+            self._draw_camera(canvas, f, camera, face, oval=True, top=None, max_h=520)
+        else:
+            self._draw_owl(canvas, f, "thinking", t)
         # The big arrow, sliding towards the game.
         slide = (0.5 + 0.5 * math.sin(t * 3.0)) * 60
         y = f.y(430)
@@ -491,24 +561,7 @@ class Screens:
         state = face_fit(face)
         good = state == "good"
         if camera is not None:
-            w = f.n(_SPLIT - 70)
-            h = int(camera.shape[0] * w / camera.shape[1])
-            if h > f.n(380):
-                h = f.n(380)
-                w = int(camera.shape[1] * h / camera.shape[0])
-            view = cv2.resize(camera, (w, h), interpolation=cv2.INTER_AREA)
-            if view.ndim == 2:
-                view = cv2.cvtColor(view, cv2.COLOR_GRAY2BGR)
-            col = _GOOD if good else (255, 255, 255)
-            cv2.ellipse(view, (w // 2, h // 2), (int(w * FIT_RX), int(h * FIT_RY)), 0, 0, 360,
-                        (0, 0, 0), max(3, f.n(7)), cv2.LINE_AA)
-            cv2.ellipse(view, (w // 2, h // 2), (int(w * FIT_RX), int(h * FIT_RY)), 0, 0, 360,
-                        col, max(2, f.n(4)), cv2.LINE_AA)
-            x, y = f.x(_SPLIT / 2) - w // 2, f.y(30)
-            canvas[y:y + h, x:x + w] = view
-            edge = f.n(6) if good else 1
-            cv2.rectangle(canvas, (x - edge, y - edge), (x + w + edge - 1, y + h + edge - 1),
-                          _GOOD if good else (120, 120, 120), edge)
+            self._draw_camera(canvas, f, camera, face, oval=True)
         key = ("fit", state, f.w, f.h)
         if key not in self._cache:
             ko, en = FIT_WORDS[state]

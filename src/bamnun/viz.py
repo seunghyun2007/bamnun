@@ -394,11 +394,17 @@ BUTTONS = {"settings": SETTINGS,
            "next_visitor": (_MENU_X, _menu_row(3), _MENU_W, 36),
            "learn_more": (_MENU_X, _menu_row(4), _MENU_W, 36),
            "voice": (_MENU_X, _menu_row(5), _MENU_W, 36),
-           "guide": (_MENU_X, _menu_row(6), _MENU_W, 36)}
+           "photos": (_MENU_X, _menu_row(6), _MENU_W, 36)}
+
+# The visitor's QR code, always on screen (the middle bottom card): no clicks
+# needed to take a drive home. Drawn by attract.Screens.qr_card.
+_CHART_CW = (_CAM_RECT[2] - 12) // 3
+QR_SLOT = (8 + _CHART_CW + 6, _CHART_Y, _CHART_CW, _CHART_H)
+QR_STRIP = (832, 250)                     # the same, across a tall window
 _BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
                  "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
                  "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)",
-                 "voice": "VOICE: KOREAN (v)", "guide": "GUIDE (g)", "settings": "SETTINGS"}
+                 "voice": "VOICE: KOREAN (v)", "photos": "PHOTOS: ON (p)", "settings": "SETTINGS"}
 
 _BG = (12, 12, 14)
 _CARD = (28, 28, 32)
@@ -786,9 +792,10 @@ def is_tall(win_w: int, win_h: int) -> bool:
 def _column_layout() -> tuple[list[tuple[tuple[int, int, int, int], tuple[int, int, int, int]]], tuple[int, int]]:
     parts = [((0, 0, 848, 484), (0, 0, 848, 484))]
     y = 492
+    parts.append(((-1, -1, QR_STRIP[0], QR_STRIP[1]), (8, y, QR_STRIP[0], QR_STRIP[1])))   # the QR
+    y += QR_STRIP[1] + 8
     for src in ((_COL_X, 8, _COL_W, 136),       # driver state
                 (_COL_X, 260, _COL_W, 152),     # eyes
-                (_COL_X, 418, _COL_W, 54),      # head
                 (_COL_X, 478, _COL_W, 134)):    # system response
         h = round(src[3] * 832 / src[2])
         parts.append((src, (8, y, 832, h)))
@@ -799,12 +806,18 @@ def _column_layout() -> tuple[list[tuple[tuple[int, int, int, int], tuple[int, i
 COLUMN_PARTS, COLUMN_SIZE = _column_layout()
 
 
-def column_compose(canvas: np.ndarray) -> np.ndarray:
-    """The 1280x720 dashboard, cut and stacked for a tall window."""
+def column_compose(canvas: np.ndarray, qr_strip: Optional[np.ndarray] = None) -> np.ndarray:
+    """The 1280x720 dashboard, cut and stacked for a tall window, with the
+    visitor's QR (``qr_strip``, QR_STRIP size) under the camera."""
     import cv2
 
     out = np.full((COLUMN_SIZE[1], COLUMN_SIZE[0], 3), _BG, np.uint8)
     for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
+        if sx < 0:
+            if qr_strip is not None:
+                q = qr_strip[:dh, :dw]
+                out[dy:dy + q.shape[0], dx:dx + q.shape[1]] = q
+            continue
         part = canvas[sy:sy + sh, sx:sx + sw]
         if (dw, dh) != (sw, sh):
             part = cv2.resize(part, (dw, dh), interpolation=cv2.INTER_CUBIC)
@@ -815,7 +828,7 @@ def column_compose(canvas: np.ndarray) -> np.ndarray:
 def column_to_dash(x: int, y: int) -> tuple[int, int]:
     """A point on the stacked canvas, back on the 1280x720 dashboard."""
     for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
-        if dx <= x < dx + dw and dy <= y < dy + dh:
+        if sx >= 0 and dx <= x < dx + dw and dy <= y < dy + dh:
             return int(sx + (x - dx) * sw / dw), int(sy + (y - dy) * sh / dh)
     return -1, -1
 
@@ -837,7 +850,7 @@ def button_at(x: int, y: int, menu_open: bool = True) -> Optional[str]:
 
 
 def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None,
-             voice: Optional[str] = None, menu_open: bool = False) -> None:
+             voice: Optional[str] = None, menu_open: bool = False, photos: bool = True) -> None:
     import cv2
 
     def draw(name: str, x: int, y: int, w: int, h: int) -> None:
@@ -847,6 +860,8 @@ def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None,
         text = _BUTTON_WORDS[name]
         if name == "voice" and voice == "en":
             text = "VOICE: ENGLISH (v)"
+        if name == "photos" and not photos:
+            text = "PHOTOS: OFF (p)"
         if name == "settings":
             text = "CLOSE" if menu_open else "SETTINGS"
         _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5,
@@ -901,6 +916,8 @@ class Dashboard:
         self.hover: Optional[str] = None      # the button under the mouse, drawn lit
         self.voice: Optional[str] = None      # Ollie's language, on the VOICE button
         self.menu_open = False                # the SETTINGS menu
+        self.photos = True                    # the visitor's photos go with their drive
+        self.qr_card: Optional[np.ndarray] = None   # the visitor's QR, in QR_SLOT
 
     def due(self, now: float) -> bool:
         return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
@@ -925,5 +942,9 @@ class Dashboard:
         fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
         ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
         canvas[oy:oy + fh, ox:ox + fw] = fitted
-        _buttons(canvas, self._volume, self.hover, self.voice, self.menu_open)
+        if self.qr_card is not None:
+            x, y, w, h = QR_SLOT
+            card = self.qr_card[:h, :w]
+            canvas[y:y + card.shape[0], x:x + card.shape[1]] = card
+        _buttons(canvas, self._volume, self.hover, self.voice, self.menu_open, self.photos)
         return canvas

@@ -6,12 +6,15 @@ drive as the newest trip in their history: how sleepy they were over time
 and two small photos: a profile shot (face centred, eyes open, early in the
 drive) and the frame of their first alert ("caught dozing").
 
-Nothing leaves the Pi unless the visitor says yes on the learn-more screen.
-Then ``upload`` sends one row to the Supabase table ``visits``
-(supabase/booth_visits.sql) with the website's public key, and the visitor's
-own QR code opens the website with ``?v=<code>``. Everything is deleted
-after the last exhibition day, 24 Nov 2026. A new visitor (NEXT PERSON,
-standby) wipes it all from memory with ``reset``.
+Consent is asked in person by the team (the booth has no time for clicks).
+Each visitor gets a code when their guide starts (``begin``); the dashboard
+shows their own QR code (website ``?v=<code>``) the whole time. From the end
+of calibration the drive is sent every SYNC_S seconds, and once more when they
+leave, to Supabase (supabase/booth_consent.sql: the Pi records the yes, then
+put_visit), so a phone that scans early sees it arrive. ``photos_off`` (the
+team's NO PHOTOS, for someone who says no) sends the drive without photos.
+Everything is deleted after the last exhibition day, 24 Nov 2026. A new
+visitor wipes it all from memory with ``reset``.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import logging
 import secrets
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any, Optional
@@ -36,6 +40,7 @@ PROFILE_AFTER_S = 2.0           # the profile shot: a good frame after this ...
 PROFILE_BY_S = 20.0             # ... or the best seen by then
 PHOTO_PX = 320                  # photos are this square, as JPEG
 ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"
+SYNC_S = 15.0                   # the drive is sent this often while it lasts
 
 
 def read_env(path: Path) -> dict[str, str]:
@@ -113,13 +118,28 @@ class Visit:
         self.state = "none"
         self.code: Optional[str] = None
         self.number: Optional[int] = None
+        self.photos_off = False
+        self._synced_at: Optional[float] = None
+        self._consented = False
 
     @property
     def active(self) -> bool:
         return self.started is not None
 
-    def start(self, now: float) -> None:
+    def begin(self) -> None:
+        """A new visitor: forget the last one, give this one a code (their QR)."""
+        self.finish()
         self.reset()
+        self.code = "".join(secrets.choice(ALPHABET) for _ in range(10))
+        self.number = self._next_number()
+        self.state = "open"
+
+    def start(self, now: float) -> None:
+        """Calibration done: the drive starts now (same visitor, same code)."""
+        code, number = self.code, self.number
+        self.reset()
+        self.code, self.number = code, number
+        self.state = "open" if code else "none"
         self.started, self.wall0 = now, time.time()
 
     def frame(self, now: float, image, points, *, fit_good: bool, eyes_open: bool,
@@ -156,8 +176,9 @@ class Visit:
                 self._best = (q, (image.copy(), points.copy()))
             if self.photo is None and el >= PROFILE_BY_S and self._best[1] is not None:
                 self._take_profile(*self._best[1])
-        if self.photo is not None and self.state == "none" and el >= 10.0:
-            self.state = "ask"
+        if self.code and (self._synced_at is None or now - self._synced_at >= SYNC_S):
+            self._synced_at = now
+            self.send()
 
     def _take_profile(self, image, points) -> None:
         import cv2
@@ -203,41 +224,44 @@ class Visit:
             },
         }
 
-    def link(self) -> str:
-        return f"{self.website.split('?')[0].rstrip('/')}/?v={self.code}"
-
-    def upload(self) -> None:
-        """Yes on the screen: send it in the background; state goes to done
-        (``code`` set) or failed."""
-        if self.state != "ask":
+    def send(self) -> None:
+        """Send the drive so far (in the background). The team asked the
+        visitor in person; the Pi records that yes once, then put_visit."""
+        if not (self.url and self.key and self.code and self.started is not None):
             return
-        if not (self.url and self.key):
-            log.warning("no SUPABASE_URL / SUPABASE_ANON_KEY in frontend/.env; can't upload")
-            self.state = "failed"
-            return
-        self.state = "uploading"
-        self.number = self._next_number()
-        code = "".join(secrets.choice(ALPHABET) for _ in range(10))
-        body = json.dumps({"code": code, "payload": self.payload()}).encode()
+        code, payload, consented = self.code, self.payload(), self._consented
+        if self.photos_off:
+            payload["photo"] = payload["caught"] = None
+        hdr = {"apikey": self.key, "Authorization": "Bearer " + self.key,
+               "Content-Type": "application/json"}
 
-        def send() -> None:
-            req = urllib.request.Request(
-                self.url + "/rest/v1/visits", data=body, method="POST",
-                headers={"apikey": self.key, "Authorization": "Bearer " + self.key,
-                         "Content-Type": "application/json", "Prefer": "return=minimal"})
+        def post(path: str, body: dict, extra: Optional[dict] = None) -> tuple[int, bytes]:
+            req = urllib.request.Request(self.url + path, data=json.dumps(body).encode(), method="POST",
+                                         headers={**hdr, **(extra or {})})
             try:
                 with urllib.request.urlopen(req, timeout=12) as r:
-                    ok = 200 <= r.status < 300
+                    return r.status, r.read()
+            except urllib.error.HTTPError as e:
+                return e.code, b""
             except Exception as exc:  # noqa: BLE001
                 log.warning("visit upload failed: %s", exc)
-                ok = False
-            if self.state == "uploading":        # not reset meanwhile
-                self.code = code if ok else None
-                self.state = "done" if ok else "failed"
+                return 0, b""
 
-        threading.Thread(target=send, name="visit-upload", daemon=True).start()
+        def run() -> None:
+            if not consented:
+                st, _ = post("/rest/v1/visit_consents", {"code": code}, {"Prefer": "return=minimal"})
+                if st in (201, 409) and self.code == code:
+                    self._consented = True
+            st, body = post("/rest/v1/rpc/put_visit", {"c": code, "p": payload})
+            if self.code == code:
+                self.state = "sent" if st == 200 and body.strip() == b"true" else "failed"
 
-    def decline(self) -> None:
-        """No: the photos go at once."""
-        self.photo = self.photo_img = self.caught = None
-        self.state = "declined"
+        threading.Thread(target=run, name="visit-send", daemon=True).start()
+
+    def finish(self) -> None:
+        """The visitor leaves: send the whole drive one last time."""
+        if self.code and self.started is not None and self.trace:
+            self.send()
+
+    def link(self) -> str:
+        return f"{self.website.split('?')[0].rstrip('/')}/?v={self.code}"

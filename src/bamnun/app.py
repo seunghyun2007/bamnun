@@ -5,7 +5,7 @@
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
-Keys in the window: g guided tour, v voice Korean/English, n next person (the briefing again), m the QR code and stage cards, c recalibrate, s snapshot, a toggle actuators, l dashboard or
+Keys in the window: p photos on/off for this visitor, v voice Korean/English, n next person (the briefing again), m the QR code and stage cards, c recalibrate, s snapshot, a toggle actuators, l dashboard or
 camera-only layout, f full screen, - and = speaker volume, space the visitor
 briefing, Esc skip the standby or briefing screen, q quit. The dashboard also has Calibrate, Full screen and volume
 buttons to click; on the standby and briefing screens a click is space.
@@ -593,12 +593,7 @@ class Monitor:
             return
         cx, cy = window_to_dash(x, y, win_w, win_h)
         name = None
-        if self._popup_at is not None:
-            from .attract import popup_hit
-            name = popup_hit(cx, cy)
-        elif self._tip_at is not None:
-            from .attract import popup_hit
-            name = "tip_close" if popup_hit(cx, cy) == "learn_close" else None
+        # (No pop-ups to click any more.)
         menu = bool(getattr(self.dashboard, "menu_open", False))
         name = name or button_at(cx, cy, menu)
         if menu and not name:
@@ -669,6 +664,7 @@ class Monitor:
             self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
             self._tip_shown, self._tip_at = False, None
             self._guide_t0 = self._guide_done_at = None
+            self.visit.finish()                   # their drive, sent one last time
             self.visit.reset()
             self.logger.log_event("seat_empty", {"after_s": self._standby_after_s})
             console.print("[dim]nobody at the wheel: the next face starts the guide[/]")
@@ -721,7 +717,7 @@ class Monitor:
         self._last_alert = self.policy.reset(now)
         self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
         self._tip_shown, self._tip_at = False, None
-        self.visit.reset()
+        self.visit.begin()                        # their own code: the QR at the bottom
         self.mode, self._brief_step, self._brief_at = "briefing", 0, now
         self.logger.log_event("next_visitor", {})
         console.print("[cyan]next visitor: briefing from the start[/]")
@@ -736,7 +732,7 @@ class Monitor:
 
     def _visit_view(self) -> dict:
         v = self.visit
-        return {"state": v.state, "photo": v.photo_img, "key": v.code or id(v.photo_img),
+        return {"state": "done" if v.code else "none", "photo": v.photo_img, "key": v.code,
                 "link": v.link() if v.code else None}
 
     def _mode_changed(self, now: float, t: float) -> None:
@@ -1011,8 +1007,7 @@ class Monitor:
                         self._cal_run = False
                         self._voice("calibrated_voice", frame.timestamp)
                         self.visit.start(time.monotonic())
-                        if self._tour_after_cal and self.mode == "live" and self.dashboard is not None:
-                            self._start_guide(time.monotonic())
+                        # (No hints on screen: the team explains in person.)
                 state = self.estimator.update(
                     ff, calibrated=self.features.calibration.complete
                 )
@@ -1148,18 +1143,20 @@ class Monitor:
                         hover = None
                         if self._mouse is not None:
                             mx, my = window_to_dash(*self._mouse, win_w, win_h)
-                            if self._popup_at is not None or self._tip_at is not None:
-                                from .attract import popup_hit
-                                hover = popup_hit(mx, my)
-                                if self._tip_at is not None and hover == "learn_more":
-                                    hover = None          # the tip has no button
-                            hover = hover or button_at(mx, my, dash.menu_open)
+                            hover = button_at(mx, my, dash.menu_open)
                         dash.hover = hover
                         dash.voice = AudioActuator.lang
+                        dash.photos = not self.visit.photos_off
+                        from .attract import Screens
+                        from .viz import QR_SLOT, QR_STRIP
+                        if self._screens is None:
+                            self._screens = Screens(self.root)
+                        qr_url = self.visit.link() if self.visit.code else self._learn_url
+                        dash.qr_card = self._screens.qr_card(qr_url, bool(self.visit.code), QR_SLOT[2:])
                         canvas = dash.compose(canvas)
                         if not tall:
                             canvas = fit_to_window(canvas, win_w, win_h)
-                        guide = self._guide_now(now)
+                        guide = None              # no pop-ups over the camera
                         if self.mode == "tour":
                             if self._screens is None:
                                 from .attract import Screens
@@ -1174,18 +1171,19 @@ class Monitor:
                             if guide[1] is not None:
                                 outline(canvas, guide[1], now)
                             self._screens.learn_popup(canvas, 1.0, now, None, guide[0])
-                        elif self._popup_at is not None:     # at the window's size: sharp
+                        elif False and self._popup_at is not None:     # (pop-ups retired)
                             if self._screens is None:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
                             self._screens.learn_popup(canvas, now - self._popup_at, now, hover)
-                        elif self._tip_at is not None:
+                        elif False and self._tip_at is not None:
                             if self._screens is None:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
                             self._screens.learn_popup(canvas, now - self._tip_at, now, hover, "sleepy")
                         if tall:                       # cut and stacked for the side panel
-                            canvas = fit_to_window(column_compose(canvas), win_w, win_h)
+                            strip = self._screens.qr_card(qr_url, bool(self.visit.code), QR_STRIP)
+                            canvas = fit_to_window(column_compose(canvas, strip), win_w, win_h)
                     if self.demo and dash is None:
                         h = canvas.shape[0]
                         label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
@@ -1229,18 +1227,18 @@ class Monitor:
                         key = ord("n")
                     elif btn == "voice":
                         key = ord("v")
-                    elif btn == "guide":
-                        key = ord("g")
+                    elif btn == "photos":
+                        key = ord("p")
                     elif btn.startswith("stage") and self.mode == "qr":
                         self._play_stage(int(btn[5:]), now, frame.timestamp)
                     elif btn == "qr_back":
                         self.mode = "live"
                     elif btn == "visit_yes":
-                        self.visit.upload()
+                        self.visit.send()
                         self._qr_at = now
                         self.logger.log_event("visit", {"answer": "yes"})
                     elif btn == "visit_no":
-                        self.visit.decline()
+                        self.visit.photos_off = True
                         self._qr_at = now
                         self.logger.log_event("visit", {"answer": "no"})
                     key = {"calibrate": ord("c"), "fullscreen": ord("f"),
@@ -1249,8 +1247,9 @@ class Monitor:
                     self._next(now, frame.timestamp)
                 if self.mode == "qr" and key in (ord("1"), ord("2"), ord("3"), ord("4")):
                     self._play_stage(key - ord("0"), now, frame.timestamp)
-                if key == ord("g") and self.mode == "live" and dash is not None:
-                    self._start_guide(now)                 # the hints again
+                if key == ord("p"):                        # this visitor said no to photos
+                    self.visit.photos_off = not self.visit.photos_off
+                    console.print(f"[cyan]photos {'off' if self.visit.photos_off else 'on'} for this visitor[/]")
                 if key == ord("v"):                        # Ollie's voice: Korean <-> English
                     self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
                 if key == ord("m") and self.mode != "qr":  # straight to the learn-more screen

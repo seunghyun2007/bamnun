@@ -636,6 +636,43 @@ class Screens:
         left, top = max(0, min(W - cw, left)), max(0, min(H - ch, top))
         canvas[top:top + ch, left:left + cw] = card
 
+    def qr_card(self, url: str, personal: bool, size: tuple[int, int]) -> np.ndarray:
+        """The always-on QR card for the dashboard: the visitor's own drive
+        (``personal``) or the website. Wide sizes put the words beside it."""
+        import cv2
+
+        w, h = size
+        key = ("qrcard", url, personal, w, h)
+        if key in self._cache:
+            return self._cache[key]
+        card = np.empty((h, w, 3), np.uint8)
+        card[:] = (250, 250, 250)
+        f = _Frame((w, h))
+        f.s, f.ox, f.oy = 1.0, 0.0, 0.0
+        ko, en = ("내 운전 기록 받기", "Scan: your drive, on your phone") if personal \
+            else ("밤눈 앱 체험하기", "Scan: try the Bamnun app")
+        note = ("11월 24일까지 · until 24 Nov" if personal else "seunghyun2007.github.io/bamnun")
+        wide = w > h * 1.6
+        side = int(h - 20) if wide else int(min(w - 20, h - 64))
+        code = self._qr(url, side)
+        if code is not None:                      # whole modules: crisp to scan
+            cs = code.shape[0]
+            qx = 10 + (side - cs) // 2 if wide else (w - cs) // 2
+            qy = (h - cs) // 2 if wide else 8 + (side - cs) // 2
+            card[qy:qy + cs, qx:qx + cs] = code
+        if wide:
+            tx = side + 20 + (w - side - 20) / 2
+            card, _ = self._text(card, f, [(ko, "bold", 40, _BOARD, h / 2 - 62),
+                                           (en, "regular", 24, (90, 90, 90), h / 2 - 8),
+                                           (note, "regular", 20, (120, 120, 120), h / 2 + 30)],
+                                 cx=tx, max_w=w - side - 50)
+        else:
+            card, _ = self._text(card, f, [(ko, "bold", 20, _BOARD, h - 52),
+                                           (en, "regular", 13, (90, 90, 90), h - 26)],
+                                 cx=w / 2, max_w=w - 16)
+        self._cache[key] = card
+        return card
+
     # -- learn more: the pop-up and the QR code --------------------------------- #
 
     def _popup_card(self, f: _Frame, hot: bool = False, kind: str = "learn") -> tuple[np.ndarray, _Frame]:

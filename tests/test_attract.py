@@ -44,7 +44,9 @@ def stub():
         _qr_close_s=60.0, _driven_s=0.0, _learn_shown=False, _popup_at=None, _qr_at=0.0,
         _mode_t=None,
     )
-    m.visit = SimpleNamespace(reset=lambda: events.append("visit_reset"))
+    m.visit = SimpleNamespace(reset=lambda: events.append("visit_reset"),
+                              finish=lambda: events.append("visit_finish"),
+                              begin=lambda: events.append("visit_begin"))
     m._fit_since = None
     m._seat_empty = False
     m._guide_t0 = m._guide_done_at = None

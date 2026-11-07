@@ -37,9 +37,13 @@ def drive(v, seconds, stage_at=None):
 def test_a_drive_gets_a_profile_photo_a_caught_photo_and_the_numbers(tmp_path):
     v = Visit(tmp_path, "https://example.org/bamnun/")
     assert v.state == "none" and not v.active
-    v.start(0.0)
+    v.begin()
+    assert v.code and len(v.code) == 10 and v.state == "open"
+    code = v.code
+    v.start(0.0)                                     # calibration done: same visitor, same code
+    assert v.code == code
     drive(v, 30.0, stage_at=15.0)
-    assert v.photo is not None and v.caught is not None and v.state == "ask"
+    assert v.photo is not None and v.caught is not None
     p = v.payload()
     trip = p["trip"]
     assert trip["summary"]["alerts"] == 1 and trip["summary"]["max_stage"] == 2
@@ -50,22 +54,30 @@ def test_a_drive_gets_a_profile_photo_a_caught_photo_and_the_numbers(tmp_path):
     assert len(json.dumps(p)) < 300_000                       # the table's size limit
 
 
-def test_no_deletes_the_photos_and_a_new_visitor_starts_empty(tmp_path):
+def test_photos_off_sends_the_drive_without_faces_and_a_new_visitor_starts_empty(tmp_path, monkeypatch):
+    sent = []
     v = Visit(tmp_path, "https://example.org/")
+    v.url, v.key = "https://x.supabase.co", "k"
+    monkeypatch.setattr("threading.Thread.start", lambda self: sent.append(self))
+    v.begin()
+    first = v.code
     v.start(0.0)
+    v.photos_off = True
     drive(v, 12.0)
-    v.decline()
-    assert v.photo is None and v.caught is None and v.state == "declined"
-    v.reset()
-    assert v.state == "none" and v.started is None and not v.trace
+    assert sent                                       # sent while driving, no click
+    v.begin()                                         # the next visitor
+    assert v.code != first and v.started is None and not v.trace and not v.photos_off
 
 
-def test_without_the_keys_it_fails_gracefully(tmp_path):
+def test_without_the_keys_nothing_is_sent(tmp_path, monkeypatch):
+    sent = []
+    monkeypatch.setattr("threading.Thread.start", lambda self: sent.append(self))
     v = Visit(tmp_path, "https://example.org/")
+    v.url = v.key = ""
+    v.begin()
     v.start(0.0)
     drive(v, 12.0)
-    v.upload()
-    assert v.state == "failed"
+    assert sent == [] and v.state == "open"
 
 
 def test_the_link_is_the_website_with_the_code():

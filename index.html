@@ -3618,20 +3618,57 @@ document.addEventListener("bn-signed-in",()=>{if(cur==="Main"||cur==="Welcome"||
     let done = false; try { done = localStorage.getItem(tourKey()) === "1"; } catch (e) {}
     if (!done) setTimeout(tour, 1600);
   }
+  // The booth sends a drive every 15 s from the end of calibration, so a
+  // phone may scan before it exists: wait for it (a note at the top), then
+  // keep it fresh while the visitor is still driving.
+  const WAIT_MS = 10 * 60 * 1000, FRESH_MS = 20 * 60 * 1000;
+  let banner = null;
+  function note(text) {
+    if (!text) { if (banner) banner.remove(); banner = null; return; }
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.style.cssText = "position:fixed;left:16px;right:16px;top:16px;z-index:9998;background:#F2EEE8;color:#15131A;border-radius:16px;padding:14px 16px;font:600 14.5px Pretendard,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+      document.body.appendChild(banner);
+    }
+    banner.textContent = text;
+  }
+  async function fetchVisit(cfg) {
+    const r = await fetch(cfg.url + "/rest/v1/rpc/get_visit", { method: "POST",
+      headers: { apikey: cfg.key, Authorization: "Bearer " + cfg.key, "Content-Type": "application/json" },
+      body: JSON.stringify({ c: code }) });
+    const v = r.ok ? await r.json() : null;
+    return v && v.trip ? v : null;
+  }
   async function load() {
     const cfg = window.BN_SUPABASE;
     if (!code || !cfg) { state = "none"; maybeTour(); return; }
-    try {
-      const r = await fetch(cfg.url + "/rest/v1/rpc/get_visit", { method: "POST",
-        headers: { apikey: cfg.key, Authorization: "Bearer " + cfg.key, "Content-Type": "application/json" },
-        body: JSON.stringify({ c: code }) });
-      const v = r.ok ? await r.json() : null;
-      if (v && v.trip) { visit = v; state = "ok"; } else state = "expired";
-    } catch (e) { state = "expired"; }
+    const t0 = Date.now();
+    let v = null;
+    while (true) {
+      try { v = await fetchVisit(cfg); } catch (e) { v = null; }
+      if (v || Date.now() - t0 > WAIT_MS) break;
+      state = "waiting";
+      note(W("부스에서 운전 기록을 가져오는 중이에요… 보정이 끝나면 곧 나타나요.",
+             "Fetching your drive from the booth… it appears soon after calibration."));
+      await new Promise((r) => setTimeout(r, 4000));
+    }
+    note(null);
+    if (v) { visit = v; state = "ok"; } else state = "expired";
     cache = null;
     window.dispatchEvent(new Event("bn-visit"));
-    if (state === "expired") toast(W("이 체험 기록은 만료됐어요. 기본 데모를 보여 드릴게요.", "This booth drive has expired. Here's the demo instead."));
+    if (state === "expired") toast(W("이 체험 기록을 찾을 수 없어요. 기본 데모를 보여 드릴게요.", "Couldn't find this booth drive. Here's the demo instead."));
     maybeTour();
+    // Still driving at the booth: pick up the newer drive as it's sent.
+    while (state === "ok" && Date.now() - t0 < FRESH_MS) {
+      await new Promise((r) => setTimeout(r, 20000));
+      try {
+        const nv = await fetchVisit(cfg);
+        if (nv && JSON.stringify(nv.trip) !== JSON.stringify(visit.trip) || nv && nv.photo !== visit.photo) {
+          visit = nv; cache = null;
+          window.dispatchEvent(new Event("bn-visit"));
+        }
+      } catch (e) {}
+    }
   }
 
   window.BN_VISIT = {

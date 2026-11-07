@@ -674,7 +674,8 @@ class Monitor:
         if self.mode == "live" and face and not self.features.calibrating:
             self._driven_s += dt
         if (not self._tip_shown and self.mode == "live" and self._tip_after_s > 0
-                and self._driven_s >= self._tip_after_s and self._popup_at is None):
+                and self._driven_s >= self._tip_after_s and self._popup_at is None
+                and face and getattr(self.policy, "stage", 0) == 0):   # not over an alert
             self._tip_shown, self._tip_at = True, now
             self._voice("sleepy_voice", now)
             self.logger.log_event("sleepy_tip", {"driven_s": round(self._driven_s, 1)})

@@ -230,16 +230,40 @@ class AudioActuator(Actuator):
             cmd += ["-nodisp", "-autoexit", "-loglevel", "quiet"]
         return cmd + [str(path)]
 
+    # One sound at a time on the one speaker. The wake-up sounds (URGENT)
+    # cut off anything else; any other cue (a tip, a calibration line, the
+    # open-window prompt) is skipped while something is playing. Two clips
+    # used to talk over each other.
+    URGENT = ("chime", "warn", "alarm")
+    _play_lock = threading.Lock()
+    _playing: Optional[subprocess.Popen] = None
+    _playing_urgent = False
+
+    @classmethod
+    def busy(cls) -> bool:
+        return cls._playing is not None and cls._playing.poll() is None
+
     def _do_fire(self, t: float, **params: Any) -> str:
         files = self.present
         if self._player is None or not files:
             return "(simulated sound)"
+        urgent = self.name in self.URGENT
+        cls = AudioActuator
+        with cls._play_lock:
+            if cls.busy():
+                if not urgent:
+                    return "skipped: another sound is playing"
+                cls._playing.terminate()              # the newest wake-up sound wins
 
         def run():  # pragma: no cover - plays through hardware
             for p in files:
                 try:
-                    subprocess.run(self._cmd(p), stdout=subprocess.DEVNULL,
-                                   stderr=subprocess.DEVNULL, timeout=30)
+                    with cls._play_lock:
+                        proc = subprocess.Popen(self._cmd(p), stdout=subprocess.DEVNULL,
+                                                stderr=subprocess.DEVNULL)
+                        cls._playing, cls._playing_urgent = proc, urgent
+                    if proc.wait(timeout=30) != 0 and proc.returncode < 0:
+                        return                        # cut off by a wake-up sound
                 except Exception as exc:  # noqa: BLE001
                     log.warning("audio %s failed on %s: %s", self.name, p.name, exc)
                     return
@@ -528,6 +552,9 @@ class EscalationPolicy:
         # A lost face is not a glance: it is an empty seat as often as a
         # slumped driver, and chiming every 10 s at an empty seat is noise.
         self.face_lost_cooldown_s = float(dcfg.get("face_lost_cooldown_s", 45.0))
+        # Off at the booth: a face out of the camera's view is unseen, not
+        # sleepy (an arm on the wheel, a look at the laptop's game).
+        self.face_lost_alerts = bool(cfg.get("face_lost_alerts", True))
         self._distraction_ready_at = 0.0
         # Actuators the driver switched off in the app (SPEC.md, sections 1
         # and 4). Skipped, and reported as suppressed, but the stage itself
@@ -591,6 +618,8 @@ class EscalationPolicy:
             act.tick(t)
 
         distracted = state.distracted if distracted_override is None else distracted_override
+        if state.face_lost and not self.face_lost_alerts:
+            distracted = False
 
         nudged: list[Actuation] = []
         if distracted and self.distraction_actuators:
@@ -623,6 +652,8 @@ class EscalationPolicy:
         # escalation ladder upward; there is no ocular evidence.
         if state.face_lost and state.face_lost_s > 5.0:
             target = min(target, 1)
+        if state.face_lost and not self.face_lost_alerts:
+            target = 0                               # unseen: no alert, and stop repeating one
 
         decision = AlertDecision(t=t, stage=self._stage,
                                  stage_name=str(self.stages[self._stage].get("name", "")))

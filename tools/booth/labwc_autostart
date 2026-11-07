@@ -1,0 +1,7 @@
+/usr/bin/lwrespawn /usr/bin/pcmanfm-pi &
+/usr/bin/lwrespawn /usr/bin/wf-panel-pi &
+/usr/bin/kanshi &
+# bamnun: with no monitor plugged in (the laptop booth, the screen seen over
+# VNC), make the Pi screen tall to fit the side panel next to the game.
+sh -c "sleep 5; wlr-randr | grep -q ^NOOP-1 && wlr-randr --output NOOP-1 --custom-mode 720x1200" &
+/usr/bin/lxsession-xdg-autostart

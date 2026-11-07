@@ -53,6 +53,14 @@ screen.
 
 ## During the demo
 
+- **Mouse stuck in the game:** the game grabs the mouse while driving. Use
+  **Alt + Tab** (or Esc, or the Windows key) to reach the Bamnun window;
+  click the game to drive again. Turning off mouse steering in the game's
+  Controls may help.
+- **Recalibrate after moving the camera** (SETTINGS → CALIBRATE): the Pi's
+  camera must see the face while the driver looks at the laptop's game. Put it
+  low, just left of the laptop screen, pointing at the driver's face.
+
 - **Focus:** clicking in the Bamnun window takes the keyboard/wheel focus
   away from the game. After using Bamnun's SETTINGS, **click the game again**.
   Visitors don't need to click Bamnun except the consent buttons and stage

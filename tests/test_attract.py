@@ -46,6 +46,9 @@ def stub():
     )
     m.visit = SimpleNamespace(reset=lambda: events.append("visit_reset"))
     m._fit_since = None
+    m._seat_empty = False
+    m._guide_t0 = m._guide_done_at = None
+    m._next_visitor = lambda now: Monitor._next_visitor(m, now)
     m._next = lambda now, t: Monitor._next(m, now, t)
     m._page_s = lambda: Monitor._page_s(m)
     m._update_learn_more = lambda now, face: Monitor._update_learn_more(m, now, face)
@@ -55,19 +58,18 @@ def stub():
     return m, events
 
 
-def test_nobody_for_30_s_is_standby_and_it_waits_for_the_visitor():
+def test_an_empty_seat_then_a_face_starts_the_next_visitors_guide():
     m, events = stub()
     Monitor._update_mode(m, 0.0, False)
     Monitor._update_mode(m, 29.0, False)
-    assert m.mode == "live"
-    Monitor._update_mode(m, 30.5, False)
-    assert m.mode == "standby" and m._last_alert == "reset" and "standby" in events
-    Monitor._update_mode(m, 40.0, True)          # someone sits down:
+    assert not m._seat_empty
+    Monitor._update_mode(m, 30.5, False)          # nobody for 30 s: forgotten, dashboard stays
+    assert m.mode == "live" and m._seat_empty and "seat_empty" in events
+    Monitor._update_mode(m, 40.0, True)          # someone sits down ...
     Monitor._update_mode(m, 42.0, True)
-    assert m.mode == "standby"
-    Monitor._update_mode(m, 43.5, True)          # after 3 s the briefing starts by itself
-    assert m.mode == "briefing" and m._brief_step == 0
-
+    assert m.mode == "live"
+    Monitor._update_mode(m, 43.5, True)          # ... 3 s later their guide starts
+    assert m.mode == "briefing" and m._brief_step == 0 and not m._seat_empty
 
 def test_space_runs_the_briefing_then_starts_calibrating():
     m, _ = stub()
@@ -81,17 +83,11 @@ def test_space_runs_the_briefing_then_starts_calibrating():
     assert m.mode == "live" and m.calibrations == [10.0]
 
 
-def test_the_briefing_turns_its_pages_and_starts_calibrating_by_itself():
-    from bamnun.app import BRIEF_CENTER_MAX_S, BRIEF_PAGE_S
+def test_the_guide_starts_calibrating_by_itself():
+    from bamnun.app import BRIEF_CENTER_MAX_S
     m, _ = stub()
     m.mode, m._brief_step, m._brief_at = "briefing", 0, 0.0
-    t = 0.0
-    for i in range(1, len(STEPS)):
-        t += (BRIEF_CENTER_MAX_S if STEPS[i - 1][0] == "center" else BRIEF_PAGE_S) + 0.1
-        Monitor._update_mode(m, t, True)
-        assert m._brief_step == i, (i, STEPS[i - 1][0])
-    t += BRIEF_PAGE_S + 0.1
-    Monitor._update_mode(m, t, True)             # the last page: calibration starts
+    Monitor._update_mode(m, BRIEF_CENTER_MAX_S + 0.1, True)
     assert m.mode == "live" and m.calibrations
 
 
@@ -102,8 +98,8 @@ def test_the_centring_page_moves_on_once_the_face_fits():
     m._fit_since = 1.5
     Monitor._update_mode(m, 3.2, True)           # fitted 1.7 s: not yet
     assert m._brief_step == i
-    Monitor._update_mode(m, 3.6, True)           # fitted 2 s, page up 3 s: next
-    assert m._brief_step == i + 1
+    Monitor._update_mode(m, 3.6, True)           # fitted 2 s, page up 3 s: calibration
+    assert m.mode == "live" and m.calibrations
 
 
 def test_screens_are_drawn_at_the_window_size_not_stretched():
@@ -113,11 +109,10 @@ def test_screens_are_drawn_at_the_window_size_not_stretched():
     assert s.briefing(4, 0.0, (1366, 768)).shape == (768, 1366, 3)
 
 
-def test_the_calibration_screen_and_the_drive_page_draw():
+def test_the_calibration_screen_draws_and_the_guide_is_one_page():
     s = Screens(ROOT)
     assert s.calibrating(0.5, 0.4, "still", (1366, 768)).shape == (768, 1366, 3)
-    drive = [i for i, step in enumerate(STEPS) if step[0] == "game"]
-    assert drive and s.briefing(drive[0], 0.0).shape == (DASH_H, DASH_W, 3)
+    assert [st[0] for st in STEPS] == ["center"]      # no Drive page: the team helps
 
 
 def drive(m, start: float, seconds: float, face: bool = True) -> float:
@@ -142,10 +137,9 @@ def test_learn_more_pops_up_after_45_s_of_driving_once_per_visitor():
     assert m._popup_at is None
     t = drive(m, t, 120.0)
     assert m._popup_at is None                   # not again for the same visitor
-    t = drive(m, t, 31.0, face=False)            # they leave: standby
-    assert m.mode == "standby" and not m._learn_shown
-    Monitor._next(m, t, t)
-    m.mode = "live"
+    t = drive(m, t, 31.0, face=False)            # they leave: the visitor is forgotten
+    assert m._seat_empty and not m._learn_shown
+    m._seat_empty = False                        # (the next one's guide and calibration)
     drive(m, t, 46.0)
     assert m._popup_at is not None               # the next visitor gets one
 
@@ -391,3 +385,21 @@ def test_a_tall_window_stacks_the_slides_and_the_cards_still_click():
     assert {"stage1", "stage2", "stage3", "stage4", "qr_back"} <= hits
     s.game_left = True                             # the arrow points at the game, left
     assert s.calibrating(0.0, 0.5, "", size).shape[:2] == (size[1], size[0])
+
+
+def test_live_hints_explain_an_alert_when_it_happens_then_offer_the_qr():
+    from bamnun.app import GUIDE_ALERT_S, GUIDE_DONE_S
+    from bamnun.attract import RESPONSE_RECT
+    m, _ = stub()
+    m.mode = "live"
+    Monitor._start_guide(m, 0.0)
+    words, rect = Monitor._guide_now(m, 1.0)
+    assert words[0] == "운전해 보세요" and rect == (8, 8, 832, 468)
+    m.policy.stage = 1                              # the blue light comes on
+    words, rect = Monitor._guide_now(m, 25.0)
+    assert words[0].startswith("1단계") and rect == RESPONSE_RECT
+    m.policy.stage = 0                              # it worked
+    Monitor._guide_now(m, 25.0 + GUIDE_ALERT_S)
+    words, rect = Monitor._guide_now(m, 26.0 + GUIDE_ALERT_S)
+    assert words[0].startswith("잘했어요") and rect is None
+    assert Monitor._guide_now(m, 40.0 + GUIDE_ALERT_S + GUIDE_DONE_S) is None

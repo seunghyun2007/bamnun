@@ -51,24 +51,9 @@ _TEXT_W = DASH_W - _SPLIT - 70
 # (picture, Korean title, English title, Korean line, English line).
 # "game" is the game's own screen with an arrow at Drive.
 STEPS = [
-    ("hello", "안녕하세요, 저는 올리예요", "Hi, I'm Ollie",
-     "운전하는 동안 눈을 지켜보고, 졸면 깨워 줘요.",
-     "I watch your eyes while you drive, and wake you if you doze."),
-    ("driving", "핸들 앞에 앉으세요", "Sit at the wheel",
-     "카메라 말고 게임 화면을 보세요.",
-     "Look at the game screen, not the camera."),
     ("center", "카메라에 얼굴을 맞추세요", "Line your face up with the camera",
-     "타원이 초록색이 되게 얼굴을 맞추세요.",
-     "Move until the oval turns green."),
-    ("game", "게임에서 Drive를 누르세요", "Click Drive in the game",
-     "게임 화면 왼쪽 아래의 Drive 버튼을 누르면 출발해요.",
-     "The Drive button is at the bottom left of the game screen."),
-    ("thinking", "15초 동안 눈을 익혀요", "15 seconds to learn your eyes",
-     "게임 화면을 보며 평소처럼 눈을 깜빡이세요.",
-     "Look at the game screen and blink normally."),
-    ("wake", "네 단계로 깨워요", "Four steps to wake you",
-     "파란 불빛, 민트 미스트, 차임과 목소리, 점점 커지는 알람.",
-     "Blue light, mint mist, chime and voice, rising alarm."),
+     "타원이 초록색이 되면 바로 시작해요.",
+     "It starts as soon as the oval turns green."),
 ]
 
 # The calibrator's live hints (eyes.Calibrator), in both languages.
@@ -672,7 +657,7 @@ class Screens:
             cv2.rectangle(card, (cf.x(bx), cf.y(by)), (cf.x(bx + bw), cf.y(by + bh)),
                           (88, 88, 94) if hot else _BOARD, -1, cv2.LINE_AA)
             tx = _POPUP_TEXT_X + (w - _POPUP_TEXT_X - 46) / 2
-            title, sub, box = POPUP_WORDS[kind]
+            title, sub, box = POPUP_WORDS[kind] if isinstance(kind, str) else kind[:3]
             card, _ = self._text(card, cf, [
                 (title, "bold", 36, _BOARD, 22),
                 (sub, "regular", 21, (105, 105, 105), 72),
@@ -703,7 +688,9 @@ class Screens:
                 cv2.line(card, p0, p1, (60, 60, 60), cf.n(2.5), cv2.LINE_AA)
         x, y, w, h = POPUP
         # Ollie, waving: a bigger swing than on the slides.
-        owl = self._owl("hello" if kind == "learn" else "sleepy", cf.n(132))
+        pose = ("hello" if kind == "learn" else "sleepy" if kind == "sleepy"
+                else kind[3] if not isinstance(kind, str) and len(kind) > 3 else "hello")
+        owl = self._owl(pose, cf.n(132))
         if owl is not None:
             oh, ow = owl.shape[:2]
             m = cv2.getRotationMatrix2D((ow / 2, oh * 0.85), 7.0 * math.sin(t * 3.0), 1.0)
@@ -1028,3 +1015,46 @@ def tall_to_slide(x: int, y: int, size: tuple[int, int]) -> tuple[int, int]:
     if v < sh:                                   # the picture half
         return u - max(0, (cw - split) // 2), v
     return split + u, v - sh
+
+
+# -- the guide while driving --------------------------------------------------- #
+#
+# After calibration a visitor gets one hint at a time in the pop-up's place
+# (no clicks), with the part it's about outlined: what they see as it happens.
+
+GUIDE_INTRO = [   # (from s, (Korean, English, the box line, Ollie), the part, 1280x720)
+    (0.0, ("운전해 보세요", "Drive: Ollie is watching your eyes", "올리가 지켜봐요  ·  Ollie's on it", "driving"),
+     (8, 8, 832, 468)),
+    (7.0, ("지금 졸음 상태예요", "How sleepy you are, right now", "깨어 있음 → 위험  ·  Alert to danger", "idle"),
+     (848, 8, 424, 136)),
+    (14.0, ("눈을 보고 있어요", "Your eyes: closed time, blinks", "감긴 시간과 깜빡임  ·  Closure, blinks", "thinking"),
+     (848, 260, 424, 152)),
+]
+GUIDE_INTRO_END = 20.0
+STAGE_GUIDE = {
+    1: ("1단계: 파란 불빛", "Stage 1: a soft blue light"),
+    2: ("2단계: 민트 미스트", "Stage 2: a cool mint mist"),
+    3: ("3단계: 차임과 목소리", "Stage 3: chime and Ollie's voice"),
+    4: ("4단계: 알람", "Stage 4: a rising alarm"),
+}
+RESPONSE_RECT = (848, 478, 424, 134)
+
+
+def stage_words(stage: int) -> tuple[str, str, str, str]:
+    ko, en = STAGE_GUIDE.get(stage, STAGE_GUIDE[4])
+    return (ko, en, "더 졸리면 다음 단계로  ·  Sleepier: next step", "wake")
+
+
+DONE_WORDS = ("잘했어요! 이게 밤눈이에요", "That's Bamnun waking you up", "곧 QR 코드가 나와요  ·  QR next", "celebrate")
+
+
+def outline(canvas: np.ndarray, rect: tuple[int, int, int, int], t: float) -> None:
+    """A pulsing white outline round a dashboard part (1280x720 units), on a
+    canvas the dashboard was fitted into."""
+    import cv2
+
+    f = _Frame((canvas.shape[1], canvas.shape[0]))
+    x, y, w, h = rect
+    p = f.n(2 + 3 * (0.5 + 0.5 * math.sin(t * 4.0)))
+    cv2.rectangle(canvas, (f.x(x) - p, f.y(y) - p), (f.x(x + w) + p, f.y(y + h) + p), _WHITE,
+                  max(2, f.n(3)), cv2.LINE_AA)

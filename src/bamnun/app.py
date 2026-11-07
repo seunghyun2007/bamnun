@@ -66,6 +66,8 @@ SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after
 CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
 QUIET_AFTER_SCREEN_S = 8.0
 TOUR_STEP_S = 6.0           # an untouched tour step moves on after this
+GUIDE_ALERT_S = 7.0         # an alert's hint ("1단계: 파란 불빛") stays this long
+GUIDE_DONE_S = 6.0          # "잘했어요" after the first alert ends, then the QR offer
 AUTO_BRIEF_S = 3.0          # someone at the wheel this long on standby: the briefing starts
 BRIEF_PAGE_S = 7.0          # each briefing page turns by itself after this ...
 BRIEF_CENTER_MAX_S = 14.0   # ... the centring page after this at most,
@@ -275,6 +277,13 @@ class Monitor:
         self._tour_after_cal = bool(ui.get("tour_after_calibration", True))
         self._tour_step, self._tour_at = 0, 0.0
         self._fit_since: Optional[float] = None   # the face fit the oval since (centring page)
+        # No standby screen: the dashboard stays up. A seat empty for a while
+        # means the next face is a new visitor, and their guide starts.
+        self._seat_empty = True
+        self._guide_t0: Optional[float] = None    # the live hints after calibration
+        self._guide_stage = (0, 0.0)              # the alert being explained, since
+        self._guide_had_alert = False
+        self._guide_done_at: Optional[float] = None
         self._quiet_until = 0.0                   # no alerts until then (just back from a screen)
         self._seen_mode = "live"
         self._mode_t: Optional[float] = None
@@ -652,19 +661,22 @@ class Monitor:
             self._face_since = None
             if self._no_face_since is None:
                 self._no_face_since = now
-        if self.mode == "live" and self._standby_after_s > 0 and self._no_face_since is not None \
-                and now - self._no_face_since >= self._standby_after_s:
-            self.mode = "standby"
+        if self.mode == "live" and not self._seat_empty and self._standby_after_s > 0 \
+                and self._no_face_since is not None and now - self._no_face_since >= self._standby_after_s:
+            # Nobody at the wheel: the dashboard stays, the visitor is forgotten.
+            self._seat_empty = True
             self._last_alert = self.policy.reset(now)     # lights off; nobody to wake
-            # The next visitor gets their own "learn more" pop-up.
             self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
             self._tip_shown, self._tip_at = False, None
+            self._guide_t0 = self._guide_done_at = None
             self.visit.reset()
-            self.logger.log_event("standby", {"after_s": self._standby_after_s})
-            console.print("[dim]standby: nobody at the wheel[/]")
-        elif self.mode == "standby" and face and self._face_since is not None \
-                and now - self._face_since >= AUTO_BRIEF_S:
-            self._next(now, now)                  # someone sat down: the briefing starts
+            self.logger.log_event("seat_empty", {"after_s": self._standby_after_s})
+            console.print("[dim]nobody at the wheel: the next face starts the guide[/]")
+        elif self.mode in ("live", "standby") and self._seat_empty and face \
+                and self._face_since is not None and now - self._face_since >= AUTO_BRIEF_S \
+                and not self.features.calibrating:
+            self._seat_empty = False              # someone sat down: their guide starts
+            self._next_visitor(now)
         elif self.mode == "briefing":
             from .attract import STEPS
             pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
@@ -694,8 +706,9 @@ class Monitor:
         if self._tip_at is not None and (self.mode != "live" or now - self._tip_at >= self._tip_hide_s
                                          or getattr(self.policy, "stage", 0) > 0):
             self._tip_at = None                   # done, or they did it: an alert is up
+        done = (self._guide_done_at is not None and now - self._guide_done_at >= GUIDE_DONE_S)
         if (self._learn_url and not self._learn_shown and self.mode == "live"
-                and self._tip_at is None and self._driven_s >= self._learn_after_s):
+                and self._tip_at is None and (self._driven_s >= self._learn_after_s or done)):
             self._learn_shown, self._popup_at = True, now
             self.logger.log_event("learn_more_popup", {"driven_s": round(self._driven_s, 1)})
         if self._popup_at is not None and (self.mode != "live"
@@ -789,6 +802,38 @@ class Monitor:
 
     def _page_progress(self, now: float) -> float:
         return min(1.0, max(0.0, (now - self._brief_at) / self._page_s()))
+
+    def _start_guide(self, now: float) -> None:
+        self._guide_t0, self._guide_done_at = now, None
+        self._guide_had_alert, self._guide_stage = False, (0, 0.0)
+        self.logger.log_event("guide", {})
+
+    def _guide_now(self, now: float):
+        """The hint to show now: (words, outlined part) or None. An alert is
+        explained the moment it happens; before that, a short intro."""
+        from .attract import (DONE_WORDS, GUIDE_INTRO, GUIDE_INTRO_END, RESPONSE_RECT,
+                              stage_words)
+        if self._guide_t0 is None or self.mode != "live":
+            return None
+        stage = int(getattr(self.policy, "stage", 0))
+        shown, since = self._guide_stage
+        if stage > shown:
+            self._guide_stage = (stage, now)
+            self._guide_had_alert = True
+        elif stage == 0 and shown:
+            self._guide_stage = (0, now)
+            if self._guide_done_at is None:
+                self._guide_done_at = now
+        shown, since = self._guide_stage
+        if shown and now - since < GUIDE_ALERT_S:
+            return stage_words(shown), RESPONSE_RECT
+        if self._guide_done_at is not None and now - self._guide_done_at < GUIDE_DONE_S:
+            return DONE_WORDS, None
+        el = now - self._guide_t0
+        if el < GUIDE_INTRO_END and not self._guide_had_alert:
+            step = [g for g in GUIDE_INTRO if el >= g[0]][-1]
+            return step[1], step[2]
+        return None
 
     def _start_tour(self, now: float) -> None:
         self.mode, self._tour_step, self._tour_at = "tour", 0, now
@@ -967,7 +1012,7 @@ class Monitor:
                         self._voice("calibrated_voice", frame.timestamp)
                         self.visit.start(time.monotonic())
                         if self._tour_after_cal and self.mode == "live" and self.dashboard is not None:
-                            self._start_tour(time.monotonic())
+                            self._start_guide(time.monotonic())
                 state = self.estimator.update(
                     ff, calibrated=self.features.calibration.complete
                 )
@@ -1114,11 +1159,21 @@ class Monitor:
                         canvas = dash.compose(canvas)
                         if not tall:
                             canvas = fit_to_window(canvas, win_w, win_h)
+                        guide = self._guide_now(now)
                         if self.mode == "tour":
                             if self._screens is None:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
                             self._screens.tour_overlay(canvas, self._tour_step, now, now - self._tour_at)
+                        elif guide is not None and (guide[1] is not None and guide[1][0] == 848
+                                                    and guide[1][1] == 478 or self._tip_at is None):
+                            # a live hint: an alert's always, the intro unless the tip is up
+                            from .attract import Screens, outline
+                            if self._screens is None:
+                                self._screens = Screens(self.root)
+                            if guide[1] is not None:
+                                outline(canvas, guide[1], now)
+                            self._screens.learn_popup(canvas, 1.0, now, None, guide[0])
                         elif self._popup_at is not None:     # at the window's size: sharp
                             if self._screens is None:
                                 from .attract import Screens
@@ -1195,7 +1250,7 @@ class Monitor:
                 if self.mode == "qr" and key in (ord("1"), ord("2"), ord("3"), ord("4")):
                     self._play_stage(key - ord("0"), now, frame.timestamp)
                 if key == ord("g") and self.mode == "live" and dash is not None:
-                    self._start_tour(now)                  # the guided tour again
+                    self._start_guide(now)                 # the hints again
                 if key == ord("v"):                        # Ollie's voice: Korean <-> English
                     self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
                 if key == ord("m") and self.mode != "qr":  # straight to the learn-more screen

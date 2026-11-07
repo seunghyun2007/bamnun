@@ -121,7 +121,7 @@ def drive(hub: Hub, store: Store, minutes: float, calibrate_s: float, seed: int)
     policy = EscalationPolicy(cfg["alerts"])
     sim_cal = SimCalibration()
     control = Controller(hub, store, policy, estimator=estimator, calibration=sim_cal,
-                         trip_cfg=cfg.get("trips"))
+                         trip_cfg=cfg.get("trips"), quiet=args.booth)
     total = minutes * 60.0
     away = (0.12 * total, 0.12 * total + 5.0)     # driver out of view for 5 s
     stage = 0
@@ -184,6 +184,7 @@ def main() -> int:
     ap.add_argument("--calibrate-s", type=float, default=6.0)
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--booth", action="store_true", help="as at the booth (tools/booth/setup_booth.sh)")
     ap.add_argument("--once", action="store_true", help="stop after one drive")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--db", default=str(Path(__file__).resolve().parents[1] / "runs" / "sim.db"),
@@ -192,7 +193,7 @@ def main() -> int:
 
     hub = Hub()
     store = Store(args.db)
-    server = ServerThread(hub, args.host, args.port, store=store).start()
+    server = ServerThread(hub, args.host, args.port, store=store, booth=args.booth).start()
     print(f"open http://localhost:{args.port}  (Ctrl+C to stop)", flush=True)
     seed = args.seed
     try:

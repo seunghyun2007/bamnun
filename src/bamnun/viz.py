@@ -11,11 +11,13 @@ milliseconds per frame on a Pi 5 and adds nothing a judge can read.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from dataclasses import dataclass, field
+from typing import Any, Optional, Sequence
 
 import numpy as np
 
-from .landmarks import LEFT_EYE_RING, LEFT_IRIS_CENTER, RIGHT_EYE_RING, RIGHT_IRIS_CENTER
+from .landmarks import (FACE_OUTLINES, LEFT_EYE_RING, LEFT_IRIS_CENTER, RIGHT_EYE_RING,
+                        RIGHT_IRIS_CENTER)
 
 # BGR. Monochrome base with one accent per severity keeps it legible on a
 # projector and readable in a poster photograph.
@@ -147,6 +149,34 @@ def video_frame(image: np.ndarray, landmarks, eye_closed: bool,
     return buf.tobytes() if ok else b""
 
 
+def draw_face_mesh(canvas: np.ndarray, pts, colour=(235, 235, 235)) -> None:
+    """The face as the tracker sees it: outlines and every landmark as a dot.
+
+    The dots go in with one array write rather than 478 circles, so the
+    whole mesh costs well under a millisecond on the Pi.
+    """
+    import cv2
+
+    pts = np.asarray(pts)
+    if pts.ndim != 2 or len(pts) < 468:
+        return
+    xy = pts[:, :2]
+    ok = (xy[:, 0] > 0) | (xy[:, 1] > 0)      # unset landmarks sit at the origin
+    h, w = canvas.shape[:2]
+    for ring, closed in FACE_OUTLINES:
+        if not all(ok[i] for i in ring):
+            continue
+        poly = xy[list(ring)].astype(np.int32)
+        cv2.polylines(canvas, [poly], closed, colour, 1, cv2.LINE_AA)
+    xs = np.clip(xy[ok, 0].astype(np.int32), 0, w - 2)
+    ys = np.clip(xy[ok, 1].astype(np.int32), 0, h - 2)
+    dot = np.array(colour, np.uint16)
+    for dy in (0, 1):                          # 2x2 dots, blended 60 %
+        for dx in (0, 1):
+            px = canvas[ys + dy, xs + dx].astype(np.uint16)
+            canvas[ys + dy, xs + dx] = ((px * 2 + dot * 3) // 5).astype(np.uint8)
+
+
 def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
                  plan=None, alert=None, ui_cfg: Optional[dict[str, Any]] = None,
                  fps: float = 0.0, calibrating: float = -1.0,
@@ -164,6 +194,8 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
     # -- eye geometry --------------------------------------------------- #
     if landmarks is not None and landmarks.ok and ui_cfg.get("draw_eyes", True):
         pts = landmarks.points
+        if ui_cfg.get("draw_mesh", False):         # under the eye outlines
+            draw_face_mesh(canvas, pts)
         closed_colour = (60, 60, 240) if feature_frame.eye_closed else (120, 220, 120)
         for ring in (RIGHT_EYE_RING, LEFT_EYE_RING):
             # Skip unpopulated points. MediaPipe always returns all 478, but
@@ -180,10 +212,6 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
             if ic < len(pts):
                 c = tuple(int(v) for v in pts[ic][:2])
                 cv2.circle(canvas, c, 2, (240, 200, 60), -1, cv2.LINE_AA)
-
-        if ui_cfg.get("draw_mesh", False):
-            for p in pts:
-                cv2.circle(canvas, (int(p[0]), int(p[1])), 1, (90, 90, 90), -1)
 
     # -- calibration banner --------------------------------------------- #
     if calibrating >= 0.0:
@@ -330,3 +358,593 @@ def draw_overlay(image: np.ndarray, landmarks, feature_frame, state,
                     (240, 240, 240), 1, cv2.LINE_AA)
 
     return canvas
+
+
+# --------------------------------------------------------------------------- #
+# Presentation dashboard
+# --------------------------------------------------------------------------- #
+
+# The window is scaled to the screen, so every position below is in this fixed
+# canvas and the text keeps its size relative to the display.
+DASH_W, DASH_H = 1280, 720
+_CAM_RECT = (8, 8, 832, 468)              # x, y, w, h
+_CHART_Y, _CHART_H = 482, 230
+_COL_X, _COL_W = 848, 424
+# One SETTINGS button over the camera's bottom-right corner, for a mouse or a
+# Pi Connect session (a key press doesn't always reach the window). A click
+# opens a menu of the rest above it; visitors only ever see the one button.
+_BTN_Y = _CAM_RECT[1] + _CAM_RECT[3] - 46
+_BTN_R = _CAM_RECT[0] + _CAM_RECT[2] - 8
+SETTINGS = (_BTN_R - 160, _BTN_Y, 160, 36)
+_MENU_W = 250
+_MENU_X = _BTN_R - _MENU_W
+
+
+def _menu_row(k: int) -> int:
+    """The y of menu row k, counted up from just above SETTINGS."""
+    return _BTN_Y - 50 - 44 * k
+
+
+BUTTONS = {"settings": SETTINGS,
+           # The menu, bottom to top.
+           "vol_down": (_MENU_X, _menu_row(0), 70, 36),
+           "vol_up": (_MENU_X + _MENU_W - 70, _menu_row(0), 70, 36),
+           "fullscreen": (_MENU_X, _menu_row(1), _MENU_W, 36),
+           "calibrate": (_MENU_X, _menu_row(2), _MENU_W, 36),
+           "next_visitor": (_MENU_X, _menu_row(3), _MENU_W, 36),
+           "learn_more": (_MENU_X, _menu_row(4), _MENU_W, 36),
+           "voice": (_MENU_X, _menu_row(5), _MENU_W, 36),
+           "photos": (_MENU_X, _menu_row(6), _MENU_W, 36)}
+
+# The visitor's QR code, always on screen (the middle bottom card): no clicks
+# needed to take a drive home. Drawn by attract.Screens.qr_card.
+_CHART_CW = (_CAM_RECT[2] - 12) // 3
+QR_SLOT = (8 + _CHART_CW + 6, _CHART_Y, _CHART_CW, _CHART_H)
+QR_STRIP = (832, 250)                     # the same, across a tall window
+_BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
+                 "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
+                 "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)",
+                 "voice": "VOICE: KOREAN (v)", "photos": "PHOTOS: ON (p)", "settings": "SETTINGS"}
+
+_BG = (12, 12, 14)
+_CARD = (28, 28, 32)
+_EDGE = (58, 58, 64)
+_DIM = (110, 110, 110)
+_GOOD = (120, 200, 120)
+_WARN = (60, 200, 240)
+_BAD = (70, 70, 240)
+_BLUE_ON = (240, 150, 60)
+
+_LEVEL_WORDS = {"a_bit": "A BIT", "very": "VERY DROWSY"}
+_COMPONENT_WORDS = {"heavy_lids": "heavy lids", "perclos": "eye closure",
+                    "blink_duration": "blink length", "long_blinks": "long blinks",
+                    "nods": "head nods", "lid_speed": "slow lids", "microsleep": "microsleep",
+                    "yawn": "yawning", "blink_rate": "blink rate"}
+_CO2_AXIS_FLOOR = 400.0                   # outdoor air; the sensor cannot read less
+_CO2_STALE_S = 30.0                       # the sensor reports every 5 s
+_PERCLOS_BAR_MAX = 0.30
+_EYE_BAR_MAX = 1.5                        # a wide-open eye reads above its baseline
+_SCORE_WINDOW_S = 120.0
+_CO2_WINDOW_S = 600.0
+
+
+@dataclass
+class DashboardData:
+    """What the dashboard shows beyond the feature frame and driver state."""
+
+    now: float = 0.0
+    fps: float = 0.0
+    session_s: float = 0.0
+    calibrating: float = -1.0
+    score_history: Sequence[tuple[float, float]] = ()
+    co2_history: Sequence[tuple[float, float]] = ()
+    co2_connected: bool = False
+    co2_ppm: Optional[float] = None
+    co2_age_s: Optional[float] = None
+    temp_c: Optional[float] = None
+    rh: Optional[float] = None
+    co2_elevated_ppm: float = 1000.0
+    co2_high_ppm: float = 1500.0
+    score_ticks: Sequence[float] = ()
+    perclos_ticks: Sequence[float] = ()
+    eye_closed_fraction: float = 0.50
+    # Each is False, True, or for sound, None: no speaker to play through.
+    ir_on: bool = False
+    blue_on: bool = False
+    mist_on: bool = False
+    sound_on: Optional[bool] = False
+    alerts_on: bool = True
+    stage: int = 0
+    stage_name: str = "none"
+    last_alert: str = ""
+    plan: Any = None
+    components: dict[str, float] = field(default_factory=dict)
+    calibration_hint: str = ""
+    note: str = ""                            # small print for the presenter
+    notice: str = ""                          # e.g. why the last calibration didn't work
+    volume: Optional[int] = None              # the speaker, %; None: no mixer found
+    pi_celsius: Optional[float] = None        # the Pi's chip; None off a Pi
+    pi_warm: bool = False
+
+
+def level_words(name: str) -> str:
+    return _LEVEL_WORDS.get(name, name.replace("_", " ").upper())
+
+
+def co2_status(data: DashboardData) -> str:
+    """offline, waiting, stale or live: never show an old value as current."""
+    if data.co2_ppm is None:
+        return "waiting" if data.co2_connected else "offline"
+    if data.co2_age_s is not None and data.co2_age_s > _CO2_STALE_S:
+        return "stale"
+    return "live"
+
+
+def plan_words(plan) -> tuple[str, bool]:
+    """The rest plan as a judge should read it, and whether it is urgent."""
+    if plan is None:
+        return "collecting trend data", False
+    if not plan.valid:
+        reason = str(getattr(plan, "reason", ""))
+        if reason.startswith(("need", "insufficient")):
+            return "collecting trend data", False
+        return reason, False
+    return plan.summary(), bool(plan.recommend_rest_now)
+
+
+def _status_line(ff, state, data: DashboardData) -> tuple[str, tuple[int, int, int]]:
+    if data.calibrating >= 0.0:
+        if data.calibration_hint:
+            return data.calibration_hint, _WARN
+        return "look at the road, blink normally", _WHITE
+    if state.face_lost:
+        return "DRIVER NOT VISIBLE", _BAD
+    if state.microsleep_now:
+        return f"EYES CLOSED {ff.ongoing_closure_s:0.1f}s", _BAD
+    if state.distracted:
+        return "EYES OFF ROAD", _colour_for_level(2)
+    if data.notice:
+        return data.notice, _WARN
+    return "", _WHITE
+
+
+def _t(img, text: str, x: int, y: int, scale: float = 0.5, colour=_WHITE,
+       thickness: int = 1) -> None:
+    import cv2
+
+    cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, colour,
+                thickness, cv2.LINE_AA)
+
+
+def _card(img, x: int, y: int, w: int, h: int, title: str) -> None:
+    import cv2
+
+    cv2.rectangle(img, (x, y), (x + w, y + h), _CARD, -1)
+    cv2.rectangle(img, (x, y), (x + w, y + h), _EDGE, 1)
+    _t(img, title, x + 12, y + 20, 0.46, _GREY)
+
+
+def _ticks(img, x: int, y: int, w: int, h: int, fracs: Sequence[float]) -> None:
+    import cv2
+
+    for frac in fracs:
+        tx = x + int(w * max(0.0, min(1.0, frac)))
+        cv2.line(img, (tx, y - 2), (tx, y + h + 2), _WHITE, 1)
+
+
+def _chart(img, x: int, y: int, w: int, h: int, points, now: float,
+           window_s: float, lo: float, hi: float, colour,
+           limits: Sequence[float] = ()) -> None:
+    """A line over the last ``window_s``, newest at the right edge."""
+    import cv2
+
+    cv2.rectangle(img, (x, y), (x + w, y + h), (16, 16, 18), -1)
+
+    def py(v: float) -> int:
+        frac = (float(v) - lo) / max(hi - lo, 1e-6)
+        return y + h - int(h * max(0.0, min(1.0, frac)))
+
+    for limit in limits:
+        cv2.line(img, (x, py(limit)), (x + w, py(limit)), _EDGE, 1)
+    pts = [(x + w - int(w * (now - t) / window_s), py(v))
+           for t, v in points if 0.0 <= now - t <= window_s]
+    if len(pts) >= 2:
+        cv2.polylines(img, [np.array(pts, dtype=np.int32)], False, colour, 2,
+                      cv2.LINE_AA)
+    elif pts:
+        cv2.circle(img, pts[0], 3, colour, -1, cv2.LINE_AA)
+    else:
+        _t(img, "collecting data", x + 12, y + h // 2, 0.5, _DIM)
+
+
+def _light(img, x: int, y: int, w: int, h: int, label: str, on: bool,
+           colour, note: str = "") -> None:
+    import cv2
+
+    cv2.rectangle(img, (x, y), (x + w, y + h), colour if on else (20, 20, 22), -1)
+    cv2.rectangle(img, (x, y), (x + w, y + h), colour if on else _EDGE, 1)
+    text = _shorten(f"{label}: {note or ('ON' if on else 'off')}", w - 16, 0.52)
+    _t(img, text, x + 8, y + h // 2 + 6, 0.52, (15, 15, 15) if on else _GREY,
+       2 if on else 1)
+
+
+def _state_card(img, x: int, y: int, w: int, h: int, ff, state,
+                data: DashboardData) -> None:
+    _card(img, x, y, w, h, "DRIVER STATE")
+    calibrating = data.calibrating >= 0.0
+    colour = _WHITE if calibrating else _colour_for_level(state.level)
+    if state.face_lost and not calibrating:
+        colour = tuple(int(c * 0.45) for c in colour)
+    name = "CALIBRATING" if calibrating else level_words(state.level_name)
+    _t(img, name, x + 12, y + 54, 1.15, colour, 3)
+    bar_x, bar_w = x + 12, w - 24
+    if calibrating:
+        _bar(img, bar_x, y + 80, bar_w, 16, data.calibrating, _WHITE)
+    else:
+        _draw_right(img, f"KSS est. {state.kss:0.1f}", x + w - 12, y + 20, 0.52,
+                    _WHITE)
+        _t(img, f"drowsiness {state.score:0.2f}", x + 12, y + 76, 0.5,
+           _GREY if state.face_lost else _WHITE)
+        _draw_right(img, f"confidence {state.confidence:0.2f}", x + w - 12, y + 76,
+                    0.46, _GREY)
+        _bar(img, bar_x, y + 82, bar_w, 16, state.score, colour)
+        _ticks(img, bar_x, y + 82, bar_w, 16, data.score_ticks)
+    text, text_colour = _status_line(ff, state, data)
+    if text and _text_w(text, 0.66, 2) <= w - 24:
+        _t(img, text, x + 12, y + 126, 0.66, text_colour, 2)
+    elif text:                           # a longer message: two smaller lines
+        lines, cur = [], ""
+        for word in text.split():
+            nxt = f"{cur} {word}".strip()
+            if cur and _text_w(nxt, 0.5) > w - 24:
+                lines.append(cur)
+                cur = word
+            else:
+                cur = nxt
+        lines.append(cur)
+        for i, line in enumerate(lines[:2]):
+            _t(img, _shorten(line, w - 24, 0.5), x + 12, y + 110 + 20 * i, 0.5, text_colour)
+
+
+def _air_card(img, x: int, y: int, w: int, h: int, data: DashboardData) -> None:
+    _card(img, x, y, w, h, "CABIN AIR (CO2)")
+    status = co2_status(data)
+    if status == "offline":
+        _t(img, "--", x + 12, y + 62, 1.25, _DIM, 2)
+        _t(img, "sensor offline", x + 12, y + 92, 0.56, _DIM)
+        return
+    if status == "waiting":
+        _t(img, "--", x + 12, y + 62, 1.25, _DIM, 2)
+        _t(img, "waiting for first reading", x + 12, y + 92, 0.56, _GREY)
+        return
+
+    ppm = float(data.co2_ppm)
+    if status == "stale":
+        colour, note, note_colour = _DIM, f"no new reading for {data.co2_age_s:0.0f} s", _GREY
+    elif ppm >= data.co2_high_ppm:
+        colour, note, note_colour = _BAD, "HIGH: OPEN WINDOW", _BAD
+    elif ppm >= data.co2_elevated_ppm:
+        colour, note, note_colour = _WARN, "elevated", _WARN
+    else:
+        colour, note, note_colour = _GOOD, "normal", _GOOD
+    value = f"{ppm:0.0f}"
+    _t(img, value, x + 12, y + 62, 1.25, colour, 2)
+    _t(img, "ppm", x + 20 + _text_w(value, 1.25, 2), y + 62, 0.52, _GREY)
+    _t(img, note, x + 12, y + 92, 0.56, note_colour, 2 if note_colour == _BAD else 1)
+    if status == "live":
+        if data.temp_c is not None:
+            _draw_right(img, f"{data.temp_c:0.1f} C", x + w - 12, y + 44, 0.6, _WHITE)
+        if data.rh is not None:
+            _draw_right(img, f"{data.rh:0.0f} %RH", x + w - 12, y + 72, 0.6, _WHITE)
+
+
+def _eyes_card(img, x: int, y: int, w: int, h: int, ff, state,
+               data: DashboardData) -> None:
+    _card(img, x, y, w, h, "EYES")
+    if data.calibrating >= 0.0:
+        _t(img, "measuring your open-eye baseline", x + 12, y + 56, 0.54, _GREY)
+        return
+    if state.face_lost:
+        _t(img, "no driver in frame", x + 12, y + 56, 0.56, _BAD)
+        _t(img, "no eye data to show", x + 12, y + 84, 0.5, _GREY)
+        return
+    bar_x, bar_w = x + 12, w - 24
+    _t(img, f"eyes closed (PERCLOS) {ff.perclos*100:0.1f}%", x + 12, y + 40, 0.5)
+    _bar(img, bar_x, y + 46, bar_w, 10, ff.perclos / _PERCLOS_BAR_MAX, _WHITE)
+    _ticks(img, bar_x, y + 46, bar_w, 10,
+           [p / _PERCLOS_BAR_MAX for p in data.perclos_ticks])
+    _t(img, f"eye opening {ff.ear_norm*100:0.0f}% of baseline", x + 12, y + 76, 0.5)
+    _bar(img, bar_x, y + 82, bar_w, 10, ff.ear_norm / _EYE_BAR_MAX, _WHITE)
+    _ticks(img, bar_x, y + 82, bar_w, 10, [data.eye_closed_fraction / _EYE_BAR_MAX])
+    mid = x + w // 2
+    _t(img, f"blinks {ff.blink_rate_per_min:0.0f}/min", x + 12, y + 116, 0.52)
+    _t(img, f"blink {ff.mean_blink_duration_s*1000:0.0f} ms", mid, y + 116, 0.52)
+    _t(img, f"microsleeps {ff.microsleep_count}", x + 12, y + 142, 0.52)
+    _t(img, f"yawns {ff.yawn_count}", mid, y + 142, 0.52)
+
+
+def _head_card(img, x: int, y: int, w: int, h: int, ff, state,
+               data: DashboardData) -> None:
+    _card(img, x, y, w, h, "HEAD")
+    if data.calibrating >= 0.0 or state.face_lost or not ff.pose_valid:
+        _t(img, "--", x + 12, y + 44, 0.52, _DIM)
+        return
+    _draw_right(img, "OFF ROAD" if ff.off_road else "ON ROAD", x + w - 12, y + 20,
+                0.5, _colour_for_level(2) if ff.off_road else _GOOD)
+    _t(img, f"yaw {ff.yaw:+0.0f}   pitch {ff.pitch:+0.0f}   roll {ff.roll:+0.0f}   "
+            f"gaze {ff.gaze_h:+0.2f}", x + 12, y + 44, 0.52)
+
+
+def _response_card(img, x: int, y: int, w: int, h: int,
+                   data: DashboardData) -> None:
+    _card(img, x, y, w, h, "SYSTEM RESPONSE")
+    if data.alerts_on:
+        stage = f"stage {data.stage}: {data.stage_name}"
+        _draw_right(img, stage, x + w - 12, y + 20, 0.5,
+                    _colour_for_level(data.stage) if data.stage else _GREY)
+    else:
+        _draw_right(img, "ALERTS OFF", x + w - 12, y + 20, 0.5, _WARN)
+    lw, lh = (w - 36) // 2, 30
+    left, right = x + 12, x + 24 + lw
+    _light(img, left, y + 30, lw, lh, "IR LED", data.ir_on, (205, 205, 205))
+    _light(img, right, y + 30, lw, lh, "BLUE", data.blue_on, _BLUE_ON)
+    _light(img, left, y + 66, lw, lh, "MIST", data.mist_on, _GOOD)
+    if data.sound_on is None:
+        _light(img, right, y + 66, lw, lh, "SOUND", False, _WARN, note="no speaker")
+    else:
+        _light(img, right, y + 66, lw, lh, "SOUND", data.sound_on, _WARN)
+    if data.last_alert:
+        _t(img, _shorten(f"last: {data.last_alert}", w - 24, 0.48), x + 12, y + 122,
+           0.48, _WHITE)
+    else:
+        _t(img, "no alerts this session", x + 12, y + 122, 0.48, _GREY)
+
+
+def _footer_card(img, x: int, y: int, w: int, h: int, state,
+                 data: DashboardData) -> None:
+    _card(img, x, y, w, h, "REST PLAN")
+    words, urgent = plan_words(data.plan)
+    _t(img, _shorten(words, w - 24, 0.52), x + 12, y + 42, 0.52,
+       _WARN if urgent else _WHITE, 2 if urgent else 1)
+    mins, secs = divmod(int(max(data.session_s, 0.0)), 60)
+    _t(img, f"session {mins:02d}:{secs:02d}", x + 12, y + 64, 0.46, _GREY)
+    fps_text = f"{data.fps:0.1f} fps"
+    if data.pi_celsius is not None:
+        fps_text = f"Pi {data.pi_celsius:0.0f} C   " + fps_text
+    _draw_right(img, fps_text, x + w - 12, y + 64, 0.46, _BAD if data.pi_warm else _GREY)
+    if data.note:
+        _t(img, _shorten(data.note, w - 24, 0.4), x + 12, y + 84, 0.4, (230, 120, 230))
+
+
+def _components_card(img, x: int, y: int, w: int, h: int, state,
+                     data: DashboardData) -> None:
+    _card(img, x, y, w, h, "WHAT DRIVES THE SCORE")
+    comps = data.components or getattr(state, "components", None) or {}
+    if not comps:
+        _t(img, "no evidence yet", x + 12, y + 60, 0.5, _DIM)
+        return
+    row_y, label_w = y + 46, 112
+    top = sorted(comps.items(), key=lambda kv: -float(kv[1]))[:5]
+    for name, value in top:
+        words = _COMPONENT_WORDS.get(name, name.replace("_", " "))
+        _t(img, _shorten(words, label_w, 0.46), x + 12, row_y, 0.46, _WHITE)
+        _bar(img, x + 12 + label_w, row_y - 12, w - 36 - label_w, 12, float(value), _WARN)
+        row_y += 36
+
+
+def render_panels(ff, state, data: DashboardData) -> np.ndarray:
+    """Everything except the camera image, on a fresh canvas."""
+    import cv2
+
+    img = np.full((DASH_H, DASH_W, 3), _BG, np.uint8)
+    x = _COL_X
+    w = _COL_W
+    _state_card(img, x, 8, w, 136, ff, state, data)
+    _air_card(img, x, 150, w, 104, data)
+    _eyes_card(img, x, 260, w, 152, ff, state, data)
+    _head_card(img, x, 418, w, 54, ff, state, data)
+    _response_card(img, x, 478, w, 134, data)
+    _footer_card(img, x, 618, w, 94, state, data)
+
+    cw = (_CAM_RECT[2] - 12) // 3
+    x0, x1, x2 = 8, 8 + cw + 6, 8 + 2 * (cw + 6)
+    y, h = _CHART_Y, _CHART_H
+
+    _card(img, x0, y, cw, h, "DROWSINESS, LAST 2 MIN")
+    _chart(img, x0 + 8, y + 30, cw - 16, h - 40, data.score_history, data.now,
+           _SCORE_WINDOW_S, 0.0, 1.0, _colour_for_level(state.level), data.score_ticks)
+
+    _card(img, x1, y, cw, h, "CO2, LAST 10 MIN")
+    peak = max([v for _t_, v in data.co2_history] + [data.co2_high_ppm])
+    _chart(img, x1 + 8, y + 30, cw - 16, h - 40, data.co2_history, data.now,
+           _CO2_WINDOW_S, _CO2_AXIS_FLOOR, peak * 1.1, _GOOD,
+           (data.co2_elevated_ppm, data.co2_high_ppm))
+
+    _components_card(img, x2, y, cw, h, state, data)
+    cv2.rectangle(img, (_CAM_RECT[0] - 1, _CAM_RECT[1] - 1),
+                  (_CAM_RECT[0] + _CAM_RECT[2], _CAM_RECT[1] + _CAM_RECT[3]), _EDGE, 1)
+    return img
+
+
+def window_to_canvas(x: int, y: int, win_w: int, win_h: int,
+                     canvas: tuple[int, int] = (DASH_W, DASH_H)) -> tuple[int, int]:
+    """Where a click at (x, y) in a window of that size lands on a canvas of
+    ``canvas`` size: the inverse of fit_to_window."""
+    cw, ch = canvas
+    if win_w <= 0 or win_h <= 0 or (win_w, win_h) == (cw, ch):
+        return x, y
+    scale = min(win_w / cw, win_h / ch)
+    ox, oy = (win_w - int(cw * scale)) // 2, (win_h - int(ch * scale)) // 2
+    return int((x - ox) / scale), int((y - oy) / scale)
+
+
+# -- the tall window (a laptop's right third, the game in the other two) ------ #
+#
+# The dashboard is still drawn at 1280x720, then cut and stacked: the camera
+# (with its SETTINGS button, pop-ups and tour cards) on top, and under it the
+# panels that matter, widened to the camera's width. Clicks go back through
+# column_to_dash, so buttons and pop-ups work the same.
+
+def is_tall(win_w: int, win_h: int) -> bool:
+    return win_w > 0 and win_h > win_w * 1.15
+
+
+def _column_layout() -> tuple[list[tuple[tuple[int, int, int, int], tuple[int, int, int, int]]], tuple[int, int]]:
+    parts = [((0, 0, 848, 484), (0, 0, 848, 484))]
+    y = 492
+    parts.append(((-1, -1, QR_STRIP[0], QR_STRIP[1]), (8, y, QR_STRIP[0], QR_STRIP[1])))   # the QR
+    y += QR_STRIP[1] + 8
+    for src in ((_COL_X, 8, _COL_W, 136),       # driver state
+                (_COL_X, 260, _COL_W, 152),     # eyes
+                (_COL_X, 478, _COL_W, 134)):    # system response
+        h = round(src[3] * 832 / src[2])
+        parts.append((src, (8, y, 832, h)))
+        y += h + 8
+    return parts, (848, y)
+
+
+COLUMN_PARTS, COLUMN_SIZE = _column_layout()
+
+
+def column_compose(canvas: np.ndarray, qr_strip: Optional[np.ndarray] = None) -> np.ndarray:
+    """The 1280x720 dashboard, cut and stacked for a tall window, with the
+    visitor's QR (``qr_strip``, QR_STRIP size) under the camera."""
+    import cv2
+
+    out = np.full((COLUMN_SIZE[1], COLUMN_SIZE[0], 3), _BG, np.uint8)
+    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
+        if sx < 0:
+            if qr_strip is not None:
+                q = qr_strip[:dh, :dw]
+                out[dy:dy + q.shape[0], dx:dx + q.shape[1]] = q
+            continue
+        part = canvas[sy:sy + sh, sx:sx + sw]
+        if (dw, dh) != (sw, sh):
+            part = cv2.resize(part, (dw, dh), interpolation=cv2.INTER_CUBIC)
+        out[dy:dy + dh, dx:dx + dw] = part
+    return out
+
+
+def column_to_dash(x: int, y: int) -> tuple[int, int]:
+    """A point on the stacked canvas, back on the 1280x720 dashboard."""
+    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
+        if sx >= 0 and dx <= x < dx + dw and dy <= y < dy + dh:
+            return int(sx + (x - dx) * sw / dw), int(sy + (y - dy) * sh / dh)
+    return -1, -1
+
+
+def window_to_dash(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
+    """A click in the window, on the 1280x720 dashboard, in either layout."""
+    if is_tall(win_w, win_h):
+        return column_to_dash(*window_to_canvas(x, y, win_w, win_h, COLUMN_SIZE))
+    return window_to_canvas(x, y, win_w, win_h)
+
+
+def button_at(x: int, y: int, menu_open: bool = True) -> Optional[str]:
+    """The dashboard button under canvas point (x, y), if any. With the menu
+    closed only SETTINGS is there."""
+    for name, (bx, by, bw, bh) in BUTTONS.items():
+        if (menu_open or name == "settings") and bx <= x <= bx + bw and by <= y <= by + bh:
+            return name
+    return None
+
+
+def _buttons(img, volume: Optional[int] = None, hover: Optional[str] = None,
+             voice: Optional[str] = None, menu_open: bool = False, photos: bool = True) -> None:
+    import cv2
+
+    def draw(name: str, x: int, y: int, w: int, h: int) -> None:
+        lit = name == hover or (name == "settings" and menu_open)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (240, 240, 240) if lit else (40, 40, 44), -1)
+        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255) if lit else (200, 200, 200), 2 if lit else 1)
+        text = _BUTTON_WORDS[name]
+        if name == "voice" and voice == "en":
+            text = "VOICE: ENGLISH (v)"
+        if name == "photos" and not photos:
+            text = "PHOTOS: OFF (p)"
+        if name == "settings":
+            text = "CLOSE" if menu_open else "SETTINGS"
+        _t(img, text, x + (w - _text_w(text, 0.5, 1)) // 2, y + h // 2 + 6, 0.5,
+           (30, 30, 34) if lit else _WHITE)
+
+    if menu_open:
+        top = _menu_row(6) - 10
+        bottom = _menu_row(0) + 36 + 10
+        cv2.rectangle(img, (_MENU_X - 10, top), (_MENU_X + _MENU_W + 10, bottom), (22, 22, 26), -1)
+        cv2.rectangle(img, (_MENU_X - 10, top), (_MENU_X + _MENU_W + 10, bottom), (120, 120, 126), 1)
+        for name, (x, y, w, h) in BUTTONS.items():
+            if name != "settings":
+                draw(name, x, y, w, h)
+        label = "speaker" if volume is None else f"speaker {volume}%"
+        _t(img, label, _MENU_X + (_MENU_W - _text_w(label, 0.5)) // 2, _menu_row(0) + 24, 0.5, _WHITE)
+    draw("settings", *SETTINGS)
+
+
+def fit_to_window(canvas: np.ndarray, win_w: int, win_h: int) -> np.ndarray:
+    """Scale ``canvas`` to the window ourselves, centred on black.
+
+    Left to Qt, the image is scaled without smoothing, which drops whole rows
+    of pixels: on a 1280x673 display the bottom edges of bars and buttons and
+    parts of the small text went missing, and the spare width showed as grey.
+    """
+    import cv2
+
+    h, w = canvas.shape[:2]
+    if win_w <= 0 or win_h <= 0 or (win_w, win_h) == (w, h):
+        return canvas
+    scale = min(win_w / w, win_h / h)
+    fw, fh = max(1, int(w * scale)), max(1, int(h * scale))
+    interp = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+    out = np.zeros((win_h, win_w, 3), np.uint8)
+    ox, oy = (win_w - fw) // 2, (win_h - fh) // 2
+    out[oy:oy + fh, ox:ox + fw] = cv2.resize(canvas, (fw, fh), interpolation=interp)
+    return out
+
+
+class Dashboard:
+    """Composes the camera into panels that are redrawn only a few times a second.
+
+    The panels are text nobody can read any faster than that, and the loop's
+    frame rate is what the blink tracker depends on.
+    """
+
+    def __init__(self, refresh_s: float = 0.2) -> None:
+        self.refresh_s = float(refresh_s)
+        self._panels: Optional[np.ndarray] = None
+        self._drawn_at: Optional[float] = None
+        self._volume: Optional[int] = None
+        self.hover: Optional[str] = None      # the button under the mouse, drawn lit
+        self.voice: Optional[str] = None      # Ollie's language, on the VOICE button
+        self.menu_open = False                # the SETTINGS menu
+        self.photos = True                    # the visitor's photos go with their drive
+        self.qr_card: Optional[np.ndarray] = None   # the visitor's QR, in QR_SLOT
+
+    def due(self, now: float) -> bool:
+        return self._drawn_at is None or now - self._drawn_at >= self.refresh_s
+
+    def refresh(self, ff, state, data: DashboardData) -> None:
+        self._panels = render_panels(ff, state, data)
+        self._volume = data.volume
+        self._drawn_at = data.now
+
+    def compose(self, camera: np.ndarray) -> np.ndarray:
+        """Return a new canvas with ``camera`` fitted into its slot."""
+        import cv2
+
+        if self._panels is None:
+            canvas = np.full((DASH_H, DASH_W, 3), _BG, np.uint8)
+        else:
+            canvas = self._panels.copy()
+        x, y, w, h = _CAM_RECT
+        ch, cw = camera.shape[:2]
+        scale = min(w / cw, h / ch)
+        fw, fh = max(1, int(cw * scale)), max(1, int(ch * scale))
+        fitted = cv2.resize(camera, (fw, fh), interpolation=cv2.INTER_LINEAR)
+        ox, oy = x + (w - fw) // 2, y + (h - fh) // 2
+        canvas[oy:oy + fh, ox:ox + fw] = fitted
+        if self.qr_card is not None:
+            x, y, w, h = QR_SLOT
+            card = self.qr_card[:h, :w]
+            canvas[y:y + card.shape[0], x:x + card.shape[1]] = card
+        _buttons(canvas, self._volume, self.hover, self.voice, self.menu_open, self.photos)
+        return canvas

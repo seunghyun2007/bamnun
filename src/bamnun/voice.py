@@ -1,12 +1,14 @@
 """Ollie's spoken lines, in English and Korean, played on the device speaker.
 
 docs/SPEC.md, section 2: Ollie always speaks through the Bamnun device, never
-the phone. Each line is a clip recorded by the team in both languages:
+the phone. Each line is a clip in both languages:
 
     assets/voice/en/<key>.wav
     assets/voice/ko/<key>.wav
 
-``tools/record_prompts.py --lang en|ko`` records them. A clip that hasn't been
+``tools/make_voice.py`` generates them offline (Supertonic, voice M1, one
+voice for both languages), and ``tools/record_prompts.py --lang en|ko``
+records the team instead, replacing a clip. A clip that hasn't been
 recorded yet is skipped, not fatal, exactly like the ladder's audio: the
 speaker part shows as "simulated" and the phone still gets a ``say`` event
 with the text, so the line can be read on screen.
@@ -41,6 +43,8 @@ LINES: dict[str, tuple[str, str]] = {
               "안녕하세요! 저는 올리예요. 어떤 언어로 말할까요?"),
     "sample": ("I'll keep watch while you drive.",
                "운전하는 동안 제가 지켜볼게요."),
+    "try_sleepy": ("Now try being sleepy. Close your eyes for two seconds.",
+                   "이제 졸린 척 해 보세요. 눈을 2초 동안 감아 보세요."),
     "stage3": ("Your eyes are closing. Let's find a place to rest.",
                "눈이 감기고 있어요. 쉴 곳을 찾아봐요."),
     "stage4": ("Wake up! Pull over now.",

@@ -543,3 +543,26 @@ def test_session_log_survives_a_face_appearing_after_an_empty_start(tmp_path):
     logger.close()
     rows = (tmp_path / logger.csv_path.name).read_text().splitlines()
     assert len(rows) == 3 and "c_perclos" in rows[0]
+
+
+def test_a_camera_to_the_side_does_not_read_a_turn_away_as_a_microsleep():
+    """The booth's device sits 40 degrees to the driver's left. Turning right
+    takes the eyes past what it can see, and they read as shut; that is not a
+    microsleep. Shut eyes while facing the road still are."""
+    cfg = load_config()
+    cfg["calibration"].update(duration_s=12.0, min_blinks=0)
+    ex = FeatureExtractor(cfg["features"], cfg["calibration"])
+    est = StateEstimator(cfg["state"])
+    pol = EscalationPolicy(cfg["alerts"])
+    pl = RestPlanner(cfg["predictor"])
+
+    ex.start_calibration(0.0)
+    run_sequence(ex, est, pol, pl, [(0.30, 0.05, 0.0, 40.0)] * 260)
+    assert abs(ex.calibration.yaw_zero) > 25.0
+
+    out = run_sequence(ex, est, pol, pl, [(0.05, 0.05, 0.0, 65.0)] * 60, t0=13.0)
+    assert any(ff.unreliable == "turned" for (_, ff, _, _) in out)
+    assert not any(st.microsleep_now for (_, _, st, _) in out)
+
+    out = run_sequence(ex, est, pol, pl, [(0.05, 0.05, 0.0, 40.0)] * 60, t0=16.0)
+    assert any(st.microsleep_now for (_, _, st, _) in out)

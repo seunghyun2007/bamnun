@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>밤눈 리모컨</title>
+<style>
+  :root { --bg:#15131A; --card:#1F1C24; --line:#2E2A33; --text:#F2EEE8; --muted:#9A93A0; --cream:#E8D7AE; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+         padding:max(16px, env(safe-area-inset-top)) 16px 24px; }
+  h1 { margin:4px 0 2px; font-size:22px; font-weight:700; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:16px; }
+  h2 { font-size:13px; font-weight:600; color:var(--muted); margin:18px 0 8px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  button { font:inherit; color:var(--text); background:var(--card); border:1px solid var(--line);
+           border-radius:16px; padding:16px 12px; text-align:left; min-height:72px; cursor:pointer; }
+  button b { display:block; font-size:18px; font-weight:700; }
+  button span { display:block; font-size:12.5px; color:var(--muted); margin-top:3px; }
+  button:active { transform:scale(.98); }
+  button.wide { grid-column:1 / -1; }
+  button.stop { border-color:#5a3a3a; }
+  button.sent { border-color:var(--cream); }
+  button.ok { background:#2a2a1f; border-color:var(--cream); }
+  #status { position:fixed; left:16px; right:16px; bottom:max(16px, env(safe-area-inset-bottom));
+            background:var(--cream); color:#15131A; border-radius:14px; padding:12px 14px;
+            font-weight:600; font-size:14.5px; display:none; }
+  .warn { color:#F2B66D; font-size:14px; }
+</style>
+</head>
+<body>
+<h1>밤눈 리모컨</h1>
+<div class="sub">부스 스태프용 · Booth staff remote</div>
+<div id="nokey" class="warn" hidden>스태프 코드가 없는 주소예요. 받은 링크(…staff.html?k=…)로 열어 주세요.</div>
+
+<h2>깨우기 단계 · Wake-up stages</h2>
+<div class="grid">
+  <button data-c="stage1"><b>1 파란 불빛</b><span>Blue light</span></button>
+  <button data-c="stage2"><b>2 민트 미스트</b><span>Mint mist</span></button>
+  <button data-c="stage3"><b>3 차임과 음성</b><span>Chime and voice</span></button>
+  <button data-c="stage4"><b>4 알람</b><span>Alarm</span></button>
+  <button data-c="stage0" class="wide stop"><b>0 모두 끄기</b><span>Everything off</span></button>
+</div>
+
+<h2>체험 진행 · Visitors</h2>
+<div class="grid">
+  <button data-c="next"><b>다음 사람</b><span>Next person</span></button>
+  <button data-c="calibrate"><b>다시 보정</b><span>Recalibrate</span></button>
+  <button data-c="photos_off"><b>사진 끄기</b><span>No photos for this visitor</span></button>
+  <button data-c="photos_on"><b>사진 켜기</b><span>Photos back on</span></button>
+</div>
+
+<h2>소리 · Sound</h2>
+<div class="grid">
+  <button data-c="vol_down"><b>볼륨 −</b><span>Quieter</span></button>
+  <button data-c="vol_up"><b>볼륨 +</b><span>Louder</span></button>
+  <button data-c="voice" class="wide"><b>목소리 한국어 ↔ English</b><span>Ollie's voice language</span></button>
+</div>
+
+<div id="status"></div>
+<script>
+(function () {
+  "use strict";
+  const SB = { url: "__SB_URL__", key: "__SB_KEY__" };
+  const k = new URLSearchParams(location.search).get("k") || "";
+  const status = document.getElementById("status");
+  if (!k) document.getElementById("nokey").hidden = false;
+  let hideAt = 0;
+  function say(text) {
+    status.textContent = text; status.style.display = "block";
+    hideAt = Date.now() + 2600;
+    setTimeout(() => { if (Date.now() >= hideAt) status.style.display = "none"; }, 2700);
+  }
+  async function rpc(name, body) {
+    const r = await fetch(SB.url + "/rest/v1/rpc/" + name, { method: "POST",
+      headers: { apikey: SB.key, Authorization: "Bearer " + SB.key, "Content-Type": "application/json" },
+      body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(r.status);
+    return r.json();
+  }
+  document.querySelectorAll("button[data-c]").forEach((b) => b.addEventListener("click", async () => {
+    const label = b.querySelector("b").textContent;
+    b.classList.add("sent");
+    say("보내는 중… " + label);
+    try {
+      const id = await rpc("send_command", { k, c: b.dataset.c });
+      if (id == null) { say("스태프 코드가 맞지 않아요"); b.classList.remove("sent"); return; }
+      for (let i = 0; i < 12; i++) {                      // the Pi checks once a second
+        await new Promise((r) => setTimeout(r, 500));
+        if (await rpc("command_done", { k, i: id })) {
+          say("✓ 밤눈이 받았어요 · " + label);
+          b.classList.remove("sent"); b.classList.add("ok");
+          setTimeout(() => b.classList.remove("ok"), 1500);
+          return;
+        }
+      }
+      say("밤눈이 응답하지 않아요: 파이의 인터넷과 앱을 확인하세요");
+    } catch (e) {
+      say("보내지 못했어요: 휴대폰의 인터넷을 확인하세요");
+    }
+    b.classList.remove("sent");
+  }));
+})();
+</script>
+</body>
+</html>

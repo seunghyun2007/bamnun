@@ -90,13 +90,13 @@ class FakeCal:
         self.committed += 1
 
 
-def make_controller(store=None, cal=None):
+def make_controller(store=None, cal=None, quiet=False):
     hub = Hub()
     policy = stub_policy()
     speaker = Speaker(player=None)
     c = Controller(hub, store, policy, estimator=StateEstimator(load_config()["state"]),
                    calibration=cal, speaker=speaker,
-                   trip_cfg={"break_min_s": 60, "end_after_s": 300})
+                   trip_cfg={"break_min_s": 60, "end_after_s": 300}, quiet=quiet)
     return hub, policy, c
 
 
@@ -498,3 +498,13 @@ def test_api_route_reports_a_missing_key(api, monkeypatch):
     r = client.get("/api/route?origin=126.7,37.4&destination=129.0,35.1")
     assert r.status_code == 503 and "REST key" in r.json()["detail"]
     assert client.get("/api/route?origin=x&destination=129.0,35.1").status_code == 422
+
+
+def test_booth_mode_fires_nothing_by_itself_but_stage_buttons_still_play():
+    hub, policy, c = make_controller(quiet=True)
+    assert policy.muted == set(policy.actuators)       # the ladder fires no part
+    c.apply()                                          # and settings don't unmute it
+    assert policy.muted == set(policy.actuators)
+    assert c.fire_part("blue_light") != "missing"      # Product control still plays
+    c.handle({"cmd": "test", "part": "alarm"}, 0.0, True)
+    assert events(hub, "test_result")[-1]["part"] == "alarm"

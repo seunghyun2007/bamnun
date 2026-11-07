@@ -8,38 +8,38 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
-<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:inherit;cursor:pointer}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Pretendard:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F2EEE8}a:hover{color:#E8D7AE}button{font:inherit;color:inherit;cursor:pointer}</style>
 </helmet>
-<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(80% 45% at 0% 70%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 60%),radial-gradient(80% 45% at 100% 80%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
+<div style="width:390px;height:844px;box-sizing:border-box;position:relative;overflow:hidden;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 22px 0">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:14px">
-    <a href="Vehicle.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <div style="flex-grow:1;height:8px;border-radius:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);overflow:hidden"><div style="width:33%;height:100%;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4)"></div></div>
+    <a href="Vehicle.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:#1F1C24;border:0;display:grid;place-items:center;color:#F2EEE8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <div style="flex-grow:1;height:8px;border-radius:9px;background:#1F1C24;border:0;overflow:hidden"><div style="width:33%;height:100%;border-radius:9px;background:#E8D7AE"></div></div>
   </div>
-  <h1 style="margin:6px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1.02;text-align:center">When do you work?</h1>
-  <p style="margin:10px auto 0;max-width:31ch;text-align:center;color:#B3A6B4;font-size:15px;line-height:1.4">Ollie learns when your hardest hours are, before you even start.</p>
+  <h1 style="margin:6px 0 0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:36px;line-height:1.02;text-align:center">When do you work?</h1>
+  <p style="margin:10px auto 0;max-width:31ch;text-align:center;color:#9A93A0;font-size:15px;line-height:1.4">Ollie learns when your hardest hours are, before you even start.</p>
 
-  <p style="margin:20px 0 8px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4">Days</p>
+  <p style="margin:20px 0 8px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9A93A0">Days</p>
   <div style="display:flex;justify-content:space-between">
     <sc-for list="{{days}}" as="d" hint-placeholder-count="7">
       <button aria-pressed="{{d.on}}" aria-label="{{d.name}}" onClick="{{d.toggle}}" style="{{d.style}}">{{d.letter}}</button>
     </sc-for>
   </div>
 
-  <p style="margin:18px 0 8px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#B3A6B4">Usual shift</p>
+  <p style="margin:18px 0 8px;font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#9A93A0">Usual shift</p>
   <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
     <sc-for list="{{presets}}" as="p" hint-placeholder-count="4">
-      <button aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}"><b style="display:block;font-size:14px">{{p.label}}</b><span style="display:block;font-size:11px;color:#B3A6B4;margin-top:2px;white-space:nowrap">{{p.range}}</span></button>
+      <button aria-pressed="{{p.on}}" onClick="{{p.pick}}" style="{{p.style}}"><b style="display:block;font-size:14px">{{p.label}}</b><span style="display:block;font-size:11px;color:#9A93A0;margin-top:2px;white-space:nowrap">{{p.range}}</span></button>
     </sc-for>
   </div>
   <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Starts</span><b data-time="start" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{start}}</b></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)"><span style="color:#B3A6B4;font-size:14px">Ends</span><b data-time="end" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{end}}</b></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:#1F1C24;border:0"><span style="color:#9A93A0;font-size:14px">Starts</span><b data-time="start" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{start}}</b></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:#1F1C24;border:0"><span style="color:#9A93A0;font-size:14px">Ends</span><b data-time="end" role="button" tabindex="0" style="cursor:pointer;font-size:15px;padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.11)">{{end}}</b></div>
   </div>
 
-  <div style="position:absolute;left:0;right:0;bottom:0;padding:16px 22px 34px;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(to top,rgba(23,17,26,.9) 35%,rgba(23,17,26,0))">
-    <a id="nNext" href="Ladder.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
-    <div style="display:flex;gap:4px"><a id="nVar" href="Ladder.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">My hours change every week</a><a id="nSkip" href="Ladder.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">Skip</a></div>
+  <div style="position:absolute;left:0;right:0;bottom:0;padding:16px 22px 34px;display:flex;flex-direction:column;align-items:center;gap:6px;background:linear-gradient(to top,rgba(21,19,26,.9) 35%,rgba(21,19,26,0))">
+    <a id="nNext" href="Ladder.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:150px;padding:17px 30px;box-sizing:border-box;border-radius:999px;background:#F2EEE8;color:#15131A;font-weight:700;font-size:16px;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.5)">Next <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+    <div style="display:flex;gap:4px"><a id="nVar" href="Ladder.dc.html" style="color:#9A93A0;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">My hours change every week</a><a id="nSkip" href="Ladder.dc.html" style="color:#9A93A0;font-weight:600;font-size:14px;padding:6px 10px;text-decoration:none">Skip</a></div>
   </div>
 </div>
 </x-dc>
@@ -54,7 +54,7 @@ class Component extends DCLogic {
     const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const days = names.map((n, i) => ({
       name: n, letter: n[0], on: String(s.days[i]),
-      style: 'width:42px;height:42px;border-radius:50%;border:2px solid ' + (s.days[i] ? '#C4B5FD' : 'transparent') + ';background:' + (s.days[i] ? '#C4B5FD' : 'rgba(255,255,255,.07)') + ';color:' + (s.days[i] ? '#241A26' : '#B3A6B4') + ';font-weight:700;font-size:15px;padding:0',
+      style: 'width:42px;height:42px;border-radius:50%;border:2px solid ' + (s.days[i] ? '#E8D7AE' : 'transparent') + ';background:' + (s.days[i] ? '#E8D7AE' : 'rgba(255,255,255,.07)') + ';color:' + (s.days[i] ? '#15131A' : '#9A93A0') + ';font-weight:700;font-size:15px;padding:0',
       toggle: () => { const d = s.days.slice(); d[i] = !d[i]; this.setState({ days: d }); }
     }));
     const P = {
@@ -65,11 +65,11 @@ class Component extends DCLogic {
     };
     const presets = Object.keys(P).map((k) => ({
       label: P[k].label, range: P[k].range, on: String(s.shift === k),
-      style: 'padding:10px 4px;border-radius:14px;text-align:center;border:2px solid ' + (s.shift === k ? '#C4B5FD' : 'transparent') + ';background:' + (s.shift === k ? 'rgba(196,181,253,.16)' : 'rgba(255,255,255,.07)'),
+      style: 'padding:10px 4px;border-radius:14px;text-align:center;border:2px solid ' + (s.shift === k ? '#E8D7AE' : 'transparent') + ';background:' + (s.shift === k ? 'rgba(232,215,174,.16)' : 'rgba(255,255,255,.07)'),
       pick: () => this.setState({ shift: k })
     }));
     const cur = P[s.shift];
-    const seg = (a, b) => ({ style: 'position:absolute;top:5px;bottom:5px;border-radius:5px;background:#C4B5FD;left:' + (a / 24 * 100) + '%;width:' + ((b - a) / 24 * 100) + '%' });
+    const seg = (a, b) => ({ style: 'position:absolute;top:5px;bottom:5px;border-radius:5px;background:#E8D7AE;left:' + (a / 24 * 100) + '%;width:' + ((b - a) / 24 * 100) + '%' });
     const segs = cur.a < cur.b ? [seg(cur.a, cur.b)] : [seg(cur.a, 24), seg(0, cur.b)];
     return { days, presets, segs, start: cur.start, end: cur.end, hardest: cur.hard };
   }

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512">
+  <!-- App icon (option O): flat Ollie peeking up from the bottom edge. -->
+  <rect width="64" height="64" rx="14" fill="#8B5A3C"/>
+  <svg x="3" y="14" width="58" height="60" viewBox="0 0 100 104">
+    <path d="M22 22 L17 9 L31 16 Z" fill="#7A4E33"/><path d="M78 22 L83 9 L69 16 Z" fill="#7A4E33"/>
+    <path d="M18 34 C18 16 32 11 50 11 C68 11 82 16 82 34 L84 66 C84 86 70 96 50 96 C30 96 16 86 16 66 Z" fill="#9B6646"/>
+    <ellipse cx="50" cy="72" rx="20" ry="17" fill="#F4E6CC"/>
+    <circle cx="36" cy="38" r="12" fill="#F4E6CC"/><circle cx="64" cy="38" r="12" fill="#F4E6CC"/>
+    <circle cx="36" cy="38" r="7" fill="#241A16"/><circle cx="64" cy="38" r="7" fill="#241A16"/>
+    <path d="M46 47 L54 47 L50 55 Z" fill="#E7963B"/>
+  </svg>
+</svg>

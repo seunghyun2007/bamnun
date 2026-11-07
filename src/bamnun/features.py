@@ -744,6 +744,11 @@ class FeatureExtractor:
         reason = self.conditions.reason(t, x, yaw, pitch, look_down) if pose.valid else "pose"
         if not reason and off_road:
             reason = "off_road"
+        if pose.valid and abs(pose.yaw) > self.conditions.max_camera_yaw:
+            # Turned too far from the camera to see the eyes at all. Overrides
+            # off_road: an off-road glance still counts (head.update above),
+            # but these lids must not count as a closure.
+            reason = "turned"
         if not reason and o_ear is not None and o_bs is not None and abs(o_ear - o_bs) > self.personal.disagree:
             # Glare or a landmark error: the two estimates disagree. Take the
             # more open one, so a reflection can't fake a closure.
@@ -766,6 +771,8 @@ class FeatureExtractor:
         shut = o is not None and o <= self.shut_level
         if o_ear is not None and o_bs is not None:
             shut = shut and o_ear <= self.shut_each and o_bs <= self.shut_each
+        if reason == "turned":
+            shut = False                 # unseen, not shut
         if shut:
             if self._shut_since is None:
                 self._shut_since = t
@@ -774,7 +781,8 @@ class FeatureExtractor:
             self._micro_latched = False
         shut_s = t - self._shut_since if self._shut_since is not None else 0.0
         need = (self.micro_s if not reason or reason in ("off_road", "disagree")
-                else self.micro_down_s if reason == "looking_down" else self.micro_other_s)
+                else self.micro_down_s if reason == "looking_down"
+                else float("inf") if reason == "turned" else self.micro_other_s)
         micro = shut_s >= need
         if micro and not self._micro_latched:
             self._micro_latched = True

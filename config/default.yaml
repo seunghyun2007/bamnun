@@ -27,6 +27,8 @@ capture:
     manual_focus: true
     lens_position: 4.5         # dioptres ~= 1/distance(m); 4.5 -> ~22 cm. TUNE.
     noise_reduction: fast
+    # The camera is mounted upside down: turn the picture the right way up.
+    rotate_180: true
 
   # 3 W IR LED with its own constant-current driver, switched by a MOSFET
   # board on GPIO25. On only while a listed source is running; a webcam or a
@@ -77,6 +79,9 @@ features:
     light_hold_s: 1.0              # ... frames unreliable for this long after
     min_iod_frac: 0.045            # face smaller than this (eye distance / frame width): too far for eyelids
     reliable_yaw_deg: 30.0         # head turned further than this from neutral: eye shape unreliable
+    reliable_camera_yaw_deg: 55.0  # ... or further than this from the camera itself: the eyes can't
+                                   # be seen (the device sits 40 deg to the driver's left), so no
+                                   # closure, microsleep or PERCLOS is counted from those frames
     reliable_pitch_deg: 30.0
     # -- blinks ---------------------------------------------------------------- #
     blink_half_level: 0.50         # blinks are timed where openness crosses 50 % (half amplitude)
@@ -108,6 +113,14 @@ features:
     head_drop_lost_window_s: 0.6   # face lost within this of a downward movement = the head dropped
     head_drop_min_speed_deg_s: 8.0 # ... if it was going down at least this fast
     head_drop_microsleep_s: 0.5    # a head drop with the face lost this long counts as a microsleep
+    # A face that vanishes just after moving down counts as a head drop (a
+    # microsleep, straight to the top stage). Off at the booth: the camera
+    # sits low on the driver's left, and their arm on the wheel passes in
+    # front of it; the face is lost with a jump in the landmarks first, which
+    # looked exactly like a drop (2026-11-06 log: four false stage-4 alarms).
+    # Shut eyes and nods with the face in view still count. true: a camera
+    # nothing can block, straight ahead of the driver.
+    head_drop_when_lost: false
 
   perclos_window_s: 60.0
   openness_window_s: 45.0          # heavy lids: median openness of reliable, non-blink frames over this
@@ -154,15 +167,21 @@ calibration:
   min_tracking_fraction: 0.60      # the face must be tracked in at least this share of frames
   min_open_samples: 30             # absolute floor, for very slow streams
   max_relative_pose_deg: 12.0      # frames this far from the session's own median pose are dropped
-  max_wobble_deg: 4.0              # head movement (robust std) above this: "Hold still", redo
+  max_wobble_deg: 6.0              # head movement (robust std) above this: "Hold still", redo
+                                   # (4 failed visitors at the booth who were only fidgeting)
   min_separation: 0.30             # (open - closed) / open EAR below this: eyes not separable, redo
   estimated_closed_ratio: 0.33     # no eyes-closed step: closed EAR estimated as this x open
   closed_lead_s: 0.7               # eyes-closed step: frames before this are the eyes still closing
-  min_brightness: 45.0             # face darker than this (0-255): "Too dark"
+  min_brightness: 25.0             # face darker than this (0-255): "Too dark". 45 failed
+                                   # under the infrared light with the face still tracked well
   max_brightness: 235.0            # brighter: "Too bright"
   min_face_frac: 0.06              # eye distance / frame width below this: "Move closer"
   max_face_frac: 0.32              # above: "Move back"
-  max_facing_deg: 28.0             # head turned further from the camera than this: "Face the camera"
+  max_facing_deg: 50.0             # head turned further from the camera than this: "Face the camera".
+                                   # The device sits to the driver's left, looking up: a driver
+                                   # watching the road is 30-40 degrees off its axis, and that's fine
+  max_attempts: 3                  # with an earlier calibration to fall back on, stop after this
+                                   # many failed tries and keep it (no endless recalibrating)
   # Saved per driver: runs/drivers/<profile name>/calibration.json. This is
   # the fallback when there is no profile name.
   save_path: runs/calibration.json
@@ -281,6 +300,10 @@ alerts:
     actuators: [chime]
     cooldown_s: 10.0
     face_lost_cooldown_s: 45.0   # "driver not visible" is often an empty seat
+  # A face out of the camera's view sets off nothing at the booth (an arm on
+  # the wheel, a look at the laptop's game read as "driver not visible" and
+  # chimed up to stage 3, 2026-11-07). true: a real cab, where it matters.
+  face_lost_alerts: false
   # Pi pin map. GPIO18-21 are I2S (INMP441 mic, two MAX98357A amps) and must
   # not be used here; GPIO2/3 are I2C (SCD41); GPIO25 is the IR illuminator.
   actuators:
@@ -329,6 +352,9 @@ alerts:
     calibrated_voice:
       type: audio
       file: "assets/voice/{lang}/cal_done.wav"
+    sleepy_voice:                # the "now try being sleepy" tip while driving
+      type: audio
+      file: "assets/voice/{lang}/try_sleepy.wav"
 
 # Cabin CO2 (SCD41 on I2C). Fires the open_window prompt once per excursion.
 air:
@@ -355,13 +381,38 @@ logging:
 
 ui:
   show_window: true
-  draw_mesh: false             # full 478-point mesh is pretty but slow
+  draw_mesh: true            # face outline and all 478 landmarks (one array write, under 1 ms)
   draw_eyes: true
   draw_gauges: true
   window_scale: 0.75
   # The preview window is redrawn at most this often. Drawing it every frame
   # slowed detection from ~34 to ~13 fps on a laptop; 15 still looks smooth.
   window_max_fps: 15
+  # dashboard: the camera beside large panels of what the detector sees, for
+  # presenting (the booth always uses it). overlay: the camera alone with a
+  # small panel. l switches between them while running, f toggles full screen.
+  layout: dashboard
+  fullscreen: false
+  dashboard_refresh_s: 0.2   # the panels are redrawn this often; the camera every frame
+  # Nobody at the wheel this long: the visitor is forgotten (lights off, their
+  # photos and drive wiped), the dashboard stays. The next face seen for 3 s
+  # starts their guide: fit your face in the oval, calibration, then live hints
+  # on the dashboard (no standby screen; the team helps at the booth). 0: never.
+  standby_after_s: 30
+  # The device speaker (the USB one in ~/.asoundrc): set to start_percent at
+  # every start; the dashboard's VOL buttons and - / = change it from there.
+  speaker_mixer: {card: UACDemoV10, control: PCM, start_percent: 80}
+  # After a visitor has driven after_s seconds (face seen, on the dashboard),
+  # a pop-up offers "learn more"; a click opens a screen with the QR code for
+  # url and four wake-up stage cards that play on the real device (click or
+  # keys 1-4). Back, Esc or qr_close_s untouched closes it. Once per visitor. url "": off.
+  learn_more:
+    url: https://seunghyun2007.github.io/bamnun/
+    sleepy_tip_after_s: 20     # first, Ollie suggests trying to be sleepy (card + voice) ...
+    sleepy_tip_hide_s: 15      # ... gone after this, or as soon as an alert answers it
+    after_s: 60
+    hide_after_s: 40
+    qr_close_s: 60
 
 # Driver profile, settings and trip history, kept on the Pi (docs/SPEC.md,
 # section 0). The phone caches a copy and pushes changes over the API.
@@ -375,3 +426,13 @@ trips:
   auto_start: true
   break_min_s: 180
   end_after_s: 900
+
+# The Pi's own health (thermal.py). The temperature shows on the dashboard;
+# at warm_c a warning bar appears on every screen, at hot_c (or when the
+# firmware throttles) a red one. The Pi 5 throttles at 85 C. A weak power
+# supply (under-voltage) also gets a red bar. It only warns.
+thermal:
+  warm_c: 75
+  hot_c: 80
+  every_s: 2           # temperature reads
+  flags_every_s: 10    # vcgencmd get_throttled

@@ -39,7 +39,7 @@ DYN.Calibrate = function (root, ctx) {
     const old = card;
     const el = document.createElement('section');
     el.className = 'cb-card in';
-    el.style.cssText = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09)';
+    el.style.cssText = 'background:#1F1C24;border:1px solid rgba(255,255,255,.09)';
     el.innerHTML = html;
     const swap = () => { if (old) { old.classList.add('out'); setTimeout(() => old.remove(), 400); } stage.appendChild(el); };
     // A step that passed shows its check for a moment before sliding away.
@@ -52,24 +52,24 @@ DYN.Calibrate = function (root, ctx) {
     newCard(`
       <div style="display:flex;gap:14px;align-items:center">
         <img src="${img}" alt="" style="width:76px;flex-shrink:0">
-        <div style="flex:1;min-width:0"><h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:78%;font-size:30px;line-height:1.02">${esc(T(title))}</h1>
-          <p data-sub style="margin:6px 0 0;color:#B3A6B4;font-size:14.5px;line-height:1.4">${esc(T(sub))}</p></div>
+        <div style="flex:1;min-width:0"><h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:30px;line-height:1.02">${esc(T(title))}</h1>
+          <p data-sub style="margin:6px 0 0;color:#9A93A0;font-size:14.5px;line-height:1.4">${esc(T(sub))}</p></div>
         ${ask ? '' : `<div class="cb-ringwrap" style="position:relative;width:84px;height:84px;flex-shrink:0">
           <svg viewBox="0 0 84 84" width="84" height="84" style="transform:rotate(-90deg);transition:opacity .3s"><circle cx="42" cy="42" r="36" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="8"/>
-            <circle class="cb-ring" cx="42" cy="42" r="36" fill="none" stroke="#C4B5FD" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 226"/></svg>
-          <span class="cb-check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#7BD88F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>`}
+            <circle class="cb-ring" cx="42" cy="42" r="36" fill="none" stroke="#E8D7AE" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 226"/></svg>
+          <span class="cb-check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#E8D7AE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div>`}
       </div>
-      <p data-say style="margin:0;min-height:20px;font-size:13.5px;color:#C4B5FD;font-weight:700"></p>
-      <p data-why style="margin:0;display:none;padding:10px 12px;border-radius:14px;background:rgba(244,143,177,.18);font-size:14px;line-height:1.4"></p>
-      ${ask ? `<div style="display:flex;gap:10px;margin-top:auto"><button type="button" class="cb-ans" data-ans="yes" style="background:#7BD88F;color:#241A26">${esc(T('Yes'))}</button>
-        <button type="button" class="cb-ans" data-ans="no" style="background:rgba(255,255,255,.14);color:#F4EFE6">${esc(T('No'))}</button></div>` : ''}`, key);
+      <p data-say style="margin:0;min-height:20px;font-size:13.5px;color:#E8D7AE;font-weight:700"></p>
+      <p data-why style="margin:0;display:none;padding:10px 12px;border-radius:14px;background:rgba(242,182,109,.18);font-size:14px;line-height:1.4"></p>
+      ${ask ? `<div style="display:flex;gap:10px;margin-top:auto"><button type="button" class="cb-ans" data-ans="yes" style="background:#E8D7AE;color:#15131A">${esc(T('Yes'))}</button>
+        <button type="button" class="cb-ans" data-ans="no" style="background:rgba(255,255,255,.14);color:#F2EEE8">${esc(T('No'))}</button></div>` : ''}`, key);
   }
   function introCard() {
     const online = API().online();
     newCard(`
       <div style="display:flex;gap:14px;align-items:center"><img src="${IMG.thinking}" alt="" style="width:76px">
-        <div><h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:78%;font-size:30px;line-height:1.02">${esc(T('Let Ollie learn your eyes'))}</h1>
-        <p style="margin:6px 0 0;color:#B3A6B4;font-size:14.5px;line-height:1.4">${esc(T(online ? 'About a minute. Ollie learns your normal eyes, blinks and head position, then tests the device.' : 'Connect your Bamnun first.'))}</p></div></div>`, 'intro');
+        <div><h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:30px;line-height:1.02">${esc(T('Let Ollie learn your eyes'))}</h1>
+        <p style="margin:6px 0 0;color:#9A93A0;font-size:14.5px;line-height:1.4">${esc(T(online ? 'About a minute. Ollie learns your normal eyes, blinks and head position, then tests the device.' : 'Connect your Bamnun first.'))}</p></div></div>`, 'intro');
   }
   function summaryCard(s) {
     const size = { small: 'Small', medium: 'Medium', large: 'Large' }[s.eye_size] || 'Medium';
@@ -77,20 +77,20 @@ DYN.Calibrate = function (root, ctx) {
     const row = (k, v) => `<div class="cb-row"><span>${esc(T(k))}</span><b>${esc(v)}</b></div>`;
     newCard(`
       <div style="display:flex;gap:12px;align-items:center"><img src="${IMG.celebrate}" alt="" style="width:64px">
-        <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:78%;font-size:28px;line-height:1.02">${esc(T('What Ollie learned'))}</h1></div>
+        <h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:28px;line-height:1.02">${esc(T('What Ollie learned'))}</h1></div>
       <div style="overflow:auto">
         ${row('Eyes', T(size) + ' · ' + T('closed vs open {n}% apart', { n: Math.round(100 * (s.separation || 0)) }))}
         ${row('Normal blink', T('{ms} ms · {n} a minute', { ms: s.blink_ms, n: Math.round(s.blink_rate) }))}
         ${row('Head position', T('steady within ±{n}°', { n: Math.max(1, Math.round(Math.max(s.wobble.yaw, s.wobble.pitch))) }))}
         ${row('Device', T('{n} of 4 parts work', { n: parts }))}
-        ${s.closed_estimated ? `<p style="margin:8px 0 0;font-size:13px;color:#B3A6B4">${esc(T('Your closed eyes were estimated. Calibrate again for a better result.'))}</p>` : ''}
+        ${s.closed_estimated ? `<p style="margin:8px 0 0;font-size:13px;color:#9A93A0">${esc(T('Your closed eyes were estimated. Calibrate again for a better result.'))}</p>` : ''}
       </div>`, 'summary');
   }
   function failCard(code, why) {
     newCard(`
       <div style="display:flex;gap:14px;align-items:center"><img src="${IMG.wake}" alt="" style="width:76px">
-        <div><h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:78%;font-size:28px;line-height:1.02">${esc(T(FAIL[code] || 'Something went wrong'))}</h1>
-        <p style="margin:6px 0 0;color:#B3A6B4;font-size:14.5px;line-height:1.4">${esc(T(why || 'Try again.'))}</p></div></div>`, 'fail');
+        <div><h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:28px;line-height:1.02">${esc(T(FAIL[code] || 'Something went wrong'))}</h1>
+        <p style="margin:6px 0 0;color:#9A93A0;font-size:14.5px;line-height:1.4">${esc(T(why || 'Try again.'))}</p></div></div>`, 'fail');
   }
 
   function paint(m) {
@@ -98,7 +98,7 @@ DYN.Calibrate = function (root, ctx) {
     const hint = st.active && st.hint ? T(HINTS[st.hint] || '') : '';
     hintEl.textContent = hint;
     hintEl.classList.toggle('on', !!hint);
-    $('#cbOval').setAttribute('stroke', hint ? '#FFB547' : st.active && ['position', 'look'].includes(st.step) ? '#7BD88F' : '#C4B5FD');
+    $('#cbOval').setAttribute('stroke', hint ? '#F2B66D' : st.active && ['position', 'look'].includes(st.step) ? '#E8D7AE' : '#E8D7AE');
     if (st.active && st.step && shown !== st.step) stepCard(st.step);
     if (st.active) {
       ring(st.progress != null ? st.progress : 0);

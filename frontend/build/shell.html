@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bamnun App</title>
+<!--__ICON__-->
+<meta name="theme-color" content="#15131A">
 <style>
-@font-face{font-family:"Bricolage Grotesque";src:url(fonts/bricolage-grotesque.woff2) format("woff2");font-weight:200 800;font-stretch:75% 100%;font-display:swap}
-@font-face{font-family:Figtree;src:url(fonts/figtree.woff2) format("woff2");font-weight:300 900;font-display:swap}
-:root{color-scheme:dark;--void:#110C12;--ink:#17111A;--text:#F4EFE6;--muted:#B3A6B4;--amber:#FFB547}
+@font-face{font-family:Pretendard;src:url(fonts/pretendard.woff2) format("woff2");font-weight:400 800;font-display:swap}
+:root{color-scheme:dark;--void:#15131A;--ink:#15131A;--text:#F2EEE8;--muted:#9A93A0;--amber:#F2B66D}
 html,body{height:100%}
-body{margin:0;background:radial-gradient(900px 600px at 30% 20%,rgba(168,132,232,0.34) 0%,rgba(168,132,232,0) 60%),radial-gradient(700px 500px at 80% 80%,rgba(236,140,172,0.24) 0%,rgba(236,140,172,0) 60%);background-color:var(--void);color:var(--text);font-family:Figtree,Arial,sans-serif;overflow:hidden}
+body{margin:0;background:var(--void);color:var(--text);font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
 button{font:inherit;color:inherit;cursor:pointer}
 a,button{-webkit-tap-highlight-color:transparent}
 .stage{position:fixed;inset:0;overflow:hidden}
-.phone{position:absolute;left:50%;top:50%;width:390px;height:844px;border-radius:48px;overflow:hidden;background:var(--ink);box-shadow:0 40px 120px #000a,0 0 0 10px #110C12,0 0 0 11px rgba(255,255,255,.12);transform-origin:center center}
+.phone{position:absolute;left:50%;top:50%;width:390px;height:844px;border-radius:48px;overflow:hidden;background:var(--ink);box-shadow:0 40px 120px #000a,0 0 0 10px #15131A,0 0 0 11px rgba(255,255,255,.12);transform-origin:center center}
 .phone.full{left:0;top:0;transform-origin:0 0}
 .phone.full{border-radius:0;box-shadow:none}
 .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;background:var(--ink)}
@@ -32,11 +33,13 @@ a,button{-webkit-tap-highlight-color:transparent}
 .hint{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:var(--muted);font-size:12.5px;pointer-events:none}
 .phone.full~.hint{display:none}
 /* Map pins and the position dot: shared by Route, Drive and the Home card. */
-.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.mp-pin.pick{background:#C4B5FD}
+.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F2EEE8;color:#15131A;font:700 12px Pretendard,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.mp-pin.pick{background:#E8D7AE}
 .mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
 @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.35}}
 #s-Home,#s-Trips,#s-Insights{min-height:100%;display:flex;flex-direction:column}
+/* The flat Ollie has no painted eyelids to blink over. */
+#phone .ol-loop img[src^="data:image/svg"]~.ol-eye{display:none!important}
 /*__STYLES__*/
 </style>
 </head>

@@ -47,7 +47,7 @@ DYN.Camera = function (root) {
       : `position:absolute;left:50%;top:50%;width:${H}px;height:${W}px;transform:translate(-50%,-50%) rotate(90deg)`;
     const close = document.createElement('button');
     close.type = 'button'; close.setAttribute('aria-label', T('Close full screen'));
-    close.style.cssText = 'position:absolute;top:12px;right:12px;z-index:2;width:42px;height:42px;border:0;border-radius:50%;background:rgba(23,17,26,.7);color:#F4EFE6;display:grid;place-items:center';
+    close.style.cssText = 'position:absolute;top:12px;right:12px;z-index:2;width:42px;height:42px;border:0;border-radius:50%;background:rgba(21,19,26,.7);color:#F2EEE8;display:grid;place-items:center';
     close.innerHTML = CLOSE;
     const chip = box.querySelector('[data-live="state-chip"]').cloneNode(true);
     chip.style.top = '12px'; chip.style.left = '12px';

@@ -1,6 +1,6 @@
 # Phone app redesign plan ("quiet night instrument")
 
-Status (2026-11-07): **agreed in principle with the owner, nothing built yet.**
+Status (2026-11-07): **part 1 built on `demo-booth`; not published to the website yet** (waiting for the owner's and the friend's OK). Part 2 not started.
 The exhibition is **10 Nov 2026** (창보고 전시회). Read `HANDOFF.md` first for
 the whole booth setup; this file is only the phone app's new look.
 

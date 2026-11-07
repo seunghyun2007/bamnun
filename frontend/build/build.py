@@ -6,6 +6,10 @@ BLOB = {
  "fa546fa5fa5789063fdee0a2beebd5b2":"sleepy","57efe0ac85b17a5178828ea07e413fad":"wake","f6f6ffbf7935cbf40e40727534b41f50":"celebrate",
  "5e3b2ef0811cd96b7ab97688744ccbd7":"peek","e5ad4d3fd744c75caea7c6c78782a441":"driving","070226ec21792f2c9c1824851ca1ff5a":"cup"}
 IMG = {n: "data:image/webp;base64," + base64.b64encode(open(f"{OL}/{n}.webp","rb").read()).decode() for n in BLOB.values()}
+# The default Ollie (idle, hello) is the flat one now (docs/REDESIGN_PLAN.md);
+# the other moods stay painted until they get flat versions too.
+FLAT = "data:image/svg+xml;base64," + base64.b64encode(re.sub(r"<!--.*?-->", "", open(f"{OL}/flat.svg", encoding="utf-8").read(), flags=re.S).encode()).decode()
+IMG["idle"] = IMG["hello"] = FLAT
 
 def scope(css, sid):
     out = []; i = 0; n = len(css)
@@ -49,8 +53,8 @@ for name in ORDER:
         body = re.sub(r'<p ([^>]*)>\{\{hardest\}\}</p>', r'<p id="nHard" \1></p>', body)
         body = re.sub(r'<sc-for list="\{\{segs\}\}".*?</sc-for>', '<div id="nSegs" style="position:absolute;inset:0"></div>', body, flags=re.S)
     if name == "Ladder":
-        tr = "position:relative;width:50px;height:30px;flex-shrink:0;border:0;border-radius:99px;padding:0;background:#7BD88F;transition:background .2s"
-        kn = "position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#F4EFE6;transition:transform .25s cubic-bezier(.3,1.5,.5,1)"
+        tr = "position:relative;width:50px;height:30px;flex-shrink:0;border:0;border-radius:99px;padding:0;background:#E8D7AE;transition:background .2s"
+        kn = "position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#F2EEE8;transition:transform .25s cubic-bezier(.3,1.5,.5,1)"
         body = re.sub(r'<button role="switch" aria-checked="\{\{(\w+)\}\}" aria-label="([^"]+)" onClick="\{\{\w+\}\}" style="\{\{\w+\}\}"><span style="\{\{\w+\}\}"></span></button>',
                       lambda m: f'<button type="button" role="switch" data-tog="{m.group(1)}" aria-checked="true" aria-label="{m.group(2)}" style="{tr}"><span style="{kn}"></span></button>', body)
     if name == "Voice":
@@ -87,6 +91,7 @@ html = (shell.replace("/*__STYLES__*/", "\n".join(styles))
              .replace("<!--__TEMPLATES__-->", "\n".join(tpls))
              .replace("/*__IMG__*/", "const IMG=" + json.dumps(IMG) + ";\n" + dyn)
              .replace("/*__ORDER__*/", json.dumps(ORDER))
+             .replace("<!--__ICON__-->", '<link rel="icon" href="data:image/svg+xml;base64,' + base64.b64encode(re.sub(r"<!--.*?-->", "", open(f"{OL}/icon.svg", encoding="utf-8").read(), flags=re.S).encode()).decode() + '">')
              .replace("/*__KO__*/", open(os.path.join(os.path.dirname(__file__), "ko.json"), encoding="utf-8").read()))
 # Fonts go inside the file, like the images, so the one file is the whole app:
 # it opens from disk, from the Pi or in Capacitor with nothing beside it.

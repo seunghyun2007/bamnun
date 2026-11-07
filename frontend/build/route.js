@@ -35,8 +35,8 @@ const KMAP = {
   },
   failText(e) {
     return e && e.message === 'nokey'
-      ? `<div><b style="display:block;color:#F4EFE6;font-size:15px">${esc(T('The map needs a Kakao key'))}</b><span style="display:block;margin-top:6px">${esc(T('Add KAKAO_JS_KEY and KAKAO_REST_KEY to frontend/.env on the device, then restart it.'))}</span></div>`
-      : `<div><b style="display:block;color:#F4EFE6;font-size:15px">${esc(T("Kakao Maps didn't load"))}</b><span style="display:block;margin-top:6px">${esc(T('Check the internet connection, and that this address is registered for the key in Kakao Developers: {addr}', { addr: location.origin }))}</span></div>`;
+      ? `<div><b style="display:block;color:#F2EEE8;font-size:15px">${esc(T('The map needs a Kakao key'))}</b><span style="display:block;margin-top:6px">${esc(T('Add KAKAO_JS_KEY and KAKAO_REST_KEY to frontend/.env on the device, then restart it.'))}</span></div>`
+      : `<div><b style="display:block;color:#F2EEE8;font-size:15px">${esc(T("Kakao Maps didn't load"))}</b><span style="display:block;margin-top:6px">${esc(T('Check the internet connection, and that this address is registered for the key in Kakao Developers: {addr}', { addr: location.origin }))}</span></div>`;
   },
   ll: (p) => new KMAP.K.LatLng(p.lat, p.lng),
   pin(map, p, label, cls) {
@@ -44,7 +44,7 @@ const KMAP = {
     o.setMap(map); return o;
   },
   line(map, path, color, weight) {
-    const l = new KMAP.K.Polyline({ path: path.map(KMAP.ll), strokeWeight: weight || 6, strokeColor: color || '#8B5CF6', strokeOpacity: 0.92 });
+    const l = new KMAP.K.Polyline({ path: path.map(KMAP.ll), strokeWeight: weight || 6, strokeColor: color || '#E8D7AE', strokeOpacity: 0.92 });
     l.setMap(map); return l;
   },
   fit(map, pts, pad) { const b = new KMAP.K.LatLngBounds(); pts.forEach((p) => b.extend(KMAP.ll(p))); map.setBounds(b, pad || 40, pad || 40, pad || 40, pad || 40); },
@@ -140,12 +140,12 @@ DYN.Route = function (root, ctx) {
   function setDest(p) { dest = p; toIn.value = p.name; remember(p); route(); }
 
   // -- search -------------------------------------------------------------- //
-  const row = (name, sub, right, kind, i) => `<button type="button" class="mp-row" data-${kind}="${i}"><span style="color:#C4B5FD;flex-shrink:0">📍</span><span style="flex:1;min-width:0"><b>${esc(name)}</b><span style="display:block;font-size:12.5px;color:#B3A6B4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sub)}</span></span><span style="font-size:13px;color:#B3A6B4;white-space:nowrap">${esc(right)}</span></button>`;
+  const row = (name, sub, right, kind, i) => `<button type="button" class="mp-row" data-${kind}="${i}"><span style="color:#E8D7AE;flex-shrink:0">📍</span><span style="flex:1;min-width:0"><b>${esc(name)}</b><span style="display:block;font-size:12.5px;color:#9A93A0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sub)}</span></span><span style="font-size:13px;color:#9A93A0;white-space:nowrap">${esc(right)}</span></button>`;
   function showRecent() {
     const r = recent();
     if (!r.length) { list.hidden = true; return; }
     placeList(); list.hidden = false;
-    list.innerHTML = `<p style="margin:10px 14px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4">${esc(T('Recent'))}</p>` + r.map((p, i) => row(p.name, p.address || '', '', 'recent', i)).join('');
+    list.innerHTML = `<p style="margin:10px 14px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9A93A0">${esc(T('Recent'))}</p>` + r.map((p, i) => row(p.name, p.address || '', '', 'recent', i)).join('');
   }
   let found = [];
   function search(q) {
@@ -156,7 +156,7 @@ DYN.Route = function (root, ctx) {
       found = status === K.services.Status.OK ? data : [];
       placeList(); list.hidden = false;
       list.innerHTML = found.length ? found.slice(0, 8).map((p, i) => row(p.place_name, p.road_address_name || p.address_name, p.distance ? kmText(+p.distance) : '', 'place', i)).join('')
-        : `<div style="padding:14px;color:#B3A6B4;font-size:14px">${esc(T(status === K.services.Status.ZERO_RESULT ? 'Nothing found. Try another name.' : "Search isn't working right now."))}</div>`;
+        : `<div style="padding:14px;color:#9A93A0;font-size:14px">${esc(T(status === K.services.Status.ZERO_RESULT ? 'Nothing found. Try another name.' : "Search isn't working right now."))}</div>`;
     }, near ? { location: KMAP.ll(near), sort: K.services.SortBy.ACCURACY } : {});
   }
   function onType(e) {
@@ -307,28 +307,28 @@ DYN.Route = function (root, ctx) {
     const fab = $('#rLocate');
     if (pickMode) {
       const p = pickPlace;
-      sum.innerHTML = `<p style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4">${esc(T(pickMode === 'to' ? 'Move the map to your destination' : 'Move the map to your start'))}</p>
-        <b style="display:block;margin-top:6px;font-size:18px">${esc(p ? p.name : '…')}</b><span style="display:block;font-size:13px;color:#B3A6B4;min-height:18px">${esc(p && p.address || '')}</span>
-        <div style="display:flex;gap:8px;margin-top:12px"><button type="button" id="rPickNo" class="mp-cta" style="flex:0 0 auto;width:auto;padding:16px 20px;background:rgba(255,255,255,.12);color:#F4EFE6">${esc(T('Cancel'))}</button>
+      sum.innerHTML = `<p style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#9A93A0">${esc(T(pickMode === 'to' ? 'Move the map to your destination' : 'Move the map to your start'))}</p>
+        <b style="display:block;margin-top:6px;font-size:18px">${esc(p ? p.name : '…')}</b><span style="display:block;font-size:13px;color:#9A93A0;min-height:18px">${esc(p && p.address || '')}</span>
+        <div style="display:flex;gap:8px;margin-top:12px"><button type="button" id="rPickNo" class="mp-cta" style="flex:0 0 auto;width:auto;padding:16px 20px;background:rgba(255,255,255,.12);color:#F2EEE8">${esc(T('Cancel'))}</button>
         <button type="button" id="rPickOk" class="mp-cta" ${p ? '' : 'disabled'}>${esc(T(pickMode === 'to' ? 'Set destination here' : 'Start from here'))}</button></div>`;
     } else if (state === 'finding') {
-      sum.innerHTML = `<p style="margin:4px 0 8px;color:#B3A6B4;font-size:15px">${esc(T('Finding the route…'))}</p>`;
+      sum.innerHTML = `<p style="margin:4px 0 8px;color:#9A93A0;font-size:15px">${esc(T('Finding the route…'))}</p>`;
     } else if (state === 'error') {
-      sum.innerHTML = `<p style="margin:4px 0 8px;color:#F49AC1;font-size:14.5px;line-height:1.4">${esc(T("Couldn't get directions."))} ${esc(detail || '')}</p>`;
+      sum.innerHTML = `<p style="margin:4px 0 8px;color:#9A93A0;font-size:14.5px;line-height:1.4">${esc(T("Couldn't get directions."))} ${esc(detail || '')}</p>`;
     } else if (!result) {
-      sum.innerHTML = `<p style="margin:2px 0 6px;font-size:15px;font-weight:700">${esc(T('Where are you going?'))}</p><p style="margin:0;font-size:13.5px;color:#B3A6B4;line-height:1.4">${esc(T('Search above, or tap the pin and move the map to the exact spot.'))}</p>`;
+      sum.innerHTML = `<p style="margin:2px 0 6px;font-size:15px;font-weight:700">${esc(T('Where are you going?'))}</p><p style="margin:0;font-size:13.5px;color:#9A93A0;line-height:1.4">${esc(T('Search above, or tap the pin and move the map to the exact spot.'))}</p>`;
     } else {
       const v = API().profile().vehicle, truck = ['long_haul', 'delivery', 'bus'].includes(v);
-      const cell = (k, val) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:21px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800;white-space:nowrap">${esc(val)}</b></div>`;
+      const cell = (k, val) => `<div><span style="display:block;font-size:12px;color:#9A93A0">${esc(T(k))}</span><b style="font-size:21px;font-family:Pretendard,system-ui,sans-serif;font-weight:700;white-space:nowrap">${esc(val)}</b></div>`;
       sum.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">${cell('Distance', kmText(result.distance_m))}${cell('Time', dur(result.duration_s))}${cell('Arrive', clockIn(result.duration_s))}</div>
-        ${result.toll_won || truck ? `<p style="margin:6px 0 0;font-size:12.5px;color:#B3A6B4;line-height:1.4">${result.toll_won ? esc(T('Tolls about {n} won', { n: result.toll_won.toLocaleString() })) + (truck ? ' · ' : '') : ''}${truck ? esc(T("Kakao's car route. Truck height and weight limits aren't checked.")) : ''}</p>` : ''}
-        <div style="margin-top:12px;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(196,181,253,.14)">
+        ${result.toll_won || truck ? `<p style="margin:6px 0 0;font-size:12.5px;color:#9A93A0;line-height:1.4">${result.toll_won ? esc(T('Tolls about {n} won', { n: result.toll_won.toLocaleString() })) + (truck ? ' · ' : '') : ''}${truck ? esc(T("Kakao's car route. Truck height and weight limits aren't checked.")) : ''}</p>` : ''}
+        <div style="margin-top:12px;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:rgba(232,215,174,.14)">
           <img src="${IMG.cup}" alt="" style="width:36px;flex-shrink:0">
-          <span style="flex:1;min-width:0">${pick ? `<b style="display:block;font-size:14.5px">${esc(pick.name)}</b><span style="font-size:12.5px;color:#C4B5FD">${esc(reason)}</span>`
-            : `<span style="font-size:13.5px;color:#B3A6B4">${esc(T(searching ? 'Looking for rest areas…' : 'No highway rest areas on this route.'))}</span>`}</span>
+          <span style="flex:1;min-width:0">${pick ? `<b style="display:block;font-size:14.5px">${esc(pick.name)}</b><span style="font-size:12.5px;color:#E8D7AE">${esc(reason)}</span>`
+            : `<span style="font-size:13.5px;color:#9A93A0">${esc(T(searching ? 'Looking for rest areas…' : 'No highway rest areas on this route.'))}</span>`}</span>
           ${stops.length ? `<button type="button" id="rStopsTog" style="border:0;background:rgba(255,255,255,.1);border-radius:99px;padding:7px 10px;font-size:12.5px;font-weight:700;white-space:nowrap">${esc(T(showStops ? 'Hide' : '{n} stops', { n: stops.length }))}</button>` : ''}
         </div>
-        ${showStops ? `<div style="margin-top:8px;border-radius:16px;background:rgba(255,255,255,.05);overflow:hidden">${stops.map((s, i) => `<button type="button" class="mp-row" data-stop="${i}" style="${s === pick ? 'background:rgba(196,181,253,.12)' : ''}"><span style="width:22px;text-align:center;font-weight:800;color:#B3A6B4">${i + 1}</span><span style="flex:1;min-width:0"><b style="font-size:14.5px">${esc(s.name)}</b><span style="display:block;font-size:12.5px;color:#B3A6B4">${esc(T('{km} · around {t}', { km: kmText(s.along), t: clockIn(s.eta_s) }))}</span></span></button>`).join('')}</div>` : ''}
+        ${showStops ? `<div style="margin-top:8px;border-radius:16px;background:rgba(255,255,255,.05);overflow:hidden">${stops.map((s, i) => `<button type="button" class="mp-row" data-stop="${i}" style="${s === pick ? 'background:rgba(232,215,174,.12)' : ''}"><span style="width:22px;text-align:center;font-weight:700;color:#9A93A0">${i + 1}</span><span style="flex:1;min-width:0"><b style="font-size:14.5px">${esc(s.name)}</b><span style="display:block;font-size:12.5px;color:#9A93A0">${esc(T('{km} · around {t}', { km: kmText(s.along), t: clockIn(s.eta_s) }))}</span></span></button>`).join('')}</div>` : ''}
         <button type="button" id="rSet" class="mp-cta" style="margin-top:12px">${esc(T('Set route'))}</button>`;
     }
     requestAnimationFrame(() => { if (alive()) fab.style.bottom = ($('#rSheet').offsetHeight + 12) + 'px'; });
@@ -369,17 +369,17 @@ function driveCard(root) {
     const p = BN_DRIVE.progress(), next = BN_DRIVE.nextStop(p), pos = BN_DRIVE.pos();
     if (!built) {
       built = true;
-      card.innerHTML = `<div id="hdMap" style="height:150px;pointer-events:none;background:#17111A"></div>
+      card.innerHTML = `<div id="hdMap" style="height:150px;pointer-events:none;background:#15131A"></div>
         <div style="padding:12px 14px 14px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#F48FB1"><i style="width:8px;height:8px;border-radius:50%;background:#F48FB1;animation:livePulse 1.4s infinite"></i>${esc(T('Live'))}</span><span style="font-size:12.5px;color:#C4B5FD;font-weight:700">${esc(T('Open map'))} ›</span></div>
-          <b id="hdTo" style="display:block;margin-top:4px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800;font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></b>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#F2B66D"><i style="width:8px;height:8px;border-radius:50%;background:#F2B66D;animation:livePulse 1.4s infinite"></i>${esc(T('Live'))}</span><span style="font-size:12.5px;color:#E8D7AE;font-weight:700">${esc(T('Open map'))} ›</span></div>
+          <b id="hdTo" style="display:block;margin-top:4px;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></b>
           <span id="hdLeft" style="display:block;font-size:14px;margin-top:2px"></span>
-          <span id="hdNext" style="display:block;font-size:12.5px;color:#B3A6B4;margin-top:4px"></span>
+          <span id="hdNext" style="display:block;font-size:12.5px;color:#9A93A0;margin-top:4px"></span>
         </div>`;
       KMAP.load().then((K) => {
         if (!card.isConnected) return;
         map = new K.Map(card.querySelector('#hdMap'), { center: KMAP.ll(r.dest), level: 10, draggable: false, scrollwheel: false, disableDoubleClickZoom: true });
-        KMAP.line(map, r.path, '#8B5CF6', 5);
+        KMAP.line(map, r.path, '#E8D7AE', 5);
         KMAP.pin(map, r.dest, r.to, 'pick');
         KMAP.fit(map, r.path, 20);
         paint();
@@ -422,17 +422,17 @@ DYN.Drive = function (root, ctx) {
     if (!BN_DRIVE.pos()) KMAP.fit(map, r.path, 50);
     paint();
   }
-  function paintFollow() { $('#dFollow').style.color = follow ? '#4C8DFF' : '#F4EFE6'; }
+  function paintFollow() { $('#dFollow').style.color = follow ? '#4C8DFF' : '#F2EEE8'; }
   function paint() {
     const p = BN_DRIVE.progress(), pos = BN_DRIVE.pos(), next = BN_DRIVE.nextStop(p);
     $('#dLeft').textContent = kmText(p.left_m);
     $('#dTime').textContent = dur(p.left_s);
     $('#dEta').textContent = clockIn(p.left_s);
     const fresh = pos && Date.now() - pos.at < 30000;
-    $('#dDot').style.background = fresh ? '#7BD88F' : '#B3A6B4';
+    $('#dDot').style.background = fresh ? '#E8D7AE' : '#9A93A0';
     $('#dLiveTxt').textContent = T(fresh ? 'Live' : 'GPS');
-    $('#dNext').innerHTML = next ? `<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:${next.pick ? 'rgba(196,181,253,.14)' : 'rgba(255,255,255,.06)'}">
-        <img src="${IMG.cup}" alt="" style="width:34px;flex-shrink:0"><span style="flex:1;min-width:0"><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(next.pick ? "Ollie's stop" : 'Next rest area'))}</span><b style="display:block;font-size:15px">${esc(next.name)}</b></span>
+    $('#dNext').innerHTML = next ? `<div style="display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:16px;background:${next.pick ? 'rgba(232,215,174,.14)' : 'rgba(255,255,255,.06)'}">
+        <img src="${IMG.cup}" alt="" style="width:34px;flex-shrink:0"><span style="flex:1;min-width:0"><span style="display:block;font-size:12px;color:#9A93A0">${esc(T(next.pick ? "Ollie's stop" : 'Next rest area'))}</span><b style="display:block;font-size:15px">${esc(next.name)}</b></span>
         <b style="white-space:nowrap">${esc(kmText(next.along - p.along))}</b></div>` : '';
     const off = p.off_m != null && p.off_m > 400;
     $('#dNote').textContent = !pos ? T('Waiting for your location…') : off ? T("You're off the route.") : p.left_m < 300 ? T("You've arrived.") : '';
@@ -441,7 +441,7 @@ DYN.Drive = function (root, ctx) {
       if (!me) { me = new KMAP.K.CustomOverlay({ position: KMAP.ll(pos), content: '<div class="mp-me"></div>', zIndex: 5 }); me.setMap(map); }
       me.setPosition(KMAP.ll(pos));
       if (done) done.setMap(null);
-      if (p.idx > 0) done = KMAP.line(map, r.path.slice(0, p.idx + 1), '#7d6f7f', 6);
+      if (p.idx > 0) done = KMAP.line(map, r.path.slice(0, p.idx + 1), '#9A93A0', 6);
       // Follow every new fix (they come about once a second); skip repeats.
       const key = pos.lat.toFixed(5) + ',' + pos.lng.toFixed(5);
       if (follow && key !== last) { last = key; map.setCenter(KMAP.ll(pos)); }

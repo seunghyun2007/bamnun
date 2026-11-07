@@ -8,7 +8,7 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Pretendard:wght@400;500;600;700&amp;display=swap">
 <style>
 body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
 .olw{position:relative;aspect-ratio:600/640}
@@ -30,15 +30,15 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
 .a-peek{animation:olPeekBob 2.8s 1.1s ease-in-out infinite}
 .a-drive{animation:olDrive 3.2s ease-in-out infinite}
 .s-jump{animation:olShadow 1.1s cubic-bezier(.45,0,.55,1) infinite}
-.ol-fx{position:absolute;pointer-events:none;line-height:1;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;color:#F4EFE6}
+.ol-fx{position:absolute;pointer-events:none;line-height:1;font-family:Pretendard,system-ui,sans-serif;font-weight:700;color:#F2EEE8}
 .fx-q{animation:olQ 2.4s ease-in-out infinite}
 .fx-z{opacity:0;animation:olZ 3.3s ease-out infinite}
-.fx-bang{color:#C4B5FD;animation:olBang .55s .15s cubic-bezier(.3,1.8,.5,1) both,olBangP 1.6s .8s ease-in-out infinite}
-.fx-ray{position:absolute;left:50%;top:30%;width:.28em;height:1em;margin-left:-.14em;border-radius:.2em;background:#F4EFE6;opacity:0;animation:olRay 1.3s ease-out infinite}
+.fx-bang{color:#E8D7AE;animation:olBang .55s .15s cubic-bezier(.3,1.8,.5,1) both,olBangP 1.6s .8s ease-in-out infinite}
+.fx-ray{position:absolute;left:50%;top:30%;width:.28em;height:1em;margin-left:-.14em;border-radius:.2em;background:#F2EEE8;opacity:0;animation:olRay 1.3s ease-out infinite}
 .fx-cf{position:absolute;top:-6%;width:.38em;height:.6em;border-radius:.12em;opacity:0;animation:olCf 2s linear infinite}
 .fx-star{position:absolute;width:1.3em;height:1.3em;animation:olTw 1.4s ease-in-out infinite}
-.fx-wl{position:absolute;width:1em;height:1em;border-right:.2em solid #F4EFE6;border-radius:50%;opacity:0;animation:olWl 1.4s ease-in-out infinite}
-.fx-ledge{left:2%;right:2%;bottom:2.4%;height:.3em;border-radius:.3em;background:#F4EFE6;opacity:.9}
+.fx-wl{position:absolute;width:1em;height:1em;border-right:.2em solid #F2EEE8;border-radius:50%;opacity:0;animation:olWl 1.4s ease-in-out infinite}
+.fx-ledge{left:2%;right:2%;bottom:2.4%;height:.3em;border-radius:.3em;background:#F2EEE8;opacity:.9}
 .fx-cup{position:absolute;right:-4%;bottom:2%;width:15%}
 .fx-steam{opacity:0;animation:olSteam 2.6s ease-out infinite}
 @keyframes olIn{0%{opacity:0;transform:translateY(14%) scale(.5,.42)}38%{opacity:1;transform:translateY(-5%) scale(1.07,.95)}58%{transform:translateY(0) scale(.95,1.05)}78%{transform:scale(1.02,.98)}100%{opacity:1;transform:none}}
@@ -65,13 +65,13 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
 @keyframes olSteam{0%{opacity:0;transform:translateY(0) scaleX(1)}30%{opacity:.8}100%{opacity:0;transform:translateY(-1.6em) scaleX(1.4)}}
 </style>
 </helmet>
-<div style="width:1200px;height:940px;box-sizing:border-box;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;padding:56px 64px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:56px">
+<div style="width:1200px;height:940px;box-sizing:border-box;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif;padding:56px 64px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:56px">
   <div style="display:flex;flex-direction:column;gap:18px">
     <div>
-      <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:64px;line-height:1">Ollie</h1>
-      <p style="margin:6px 0 0;color:#B3A6B4;font-size:16px">Bamnun's night co-pilot · 8 animated states · tap a state to play it</p>
+      <h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:64px;line-height:1">Ollie</h1>
+      <p style="margin:6px 0 0;color:#9A93A0;font-size:16px">Bamnun's night co-pilot · 8 animated states · tap a state to play it</p>
     </div>
-    <div style="position:relative;height:500px;border-radius:32px;background:radial-gradient(360px 300px at 50% 55%,#383D6E 0%,rgba(255,255,255,.05) 75%);display:grid;place-items:center;overflow:hidden">
+    <div style="position:relative;height:500px;border-radius:32px;background:transparent;display:grid;place-items:center;overflow:hidden">
       <sc-if value="{{showA}}" hint-placeholder-val="{{true}}">
         <sc-for list="{{stage}}" as="o" hint-placeholder-count="1">
           <div class="olw" style="{{o.wrap}}">
@@ -84,9 +84,9 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
             <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
             <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
             <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
-            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#E8D7AE"></path></svg></sc-for></sc-if>
             <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
-            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
+            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F2EEE8" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F2EEE8" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
           </div>
         </sc-for>
       </sc-if>
@@ -102,16 +102,16 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
             <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
             <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
             <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
-            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#E8D7AE"></path></svg></sc-for></sc-if>
             <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
-            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F4EFE6" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
+            <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""><svg class="ol-fx fx-steam" style="right:2%;bottom:20%;width:1em;height:1.4em" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F2EEE8" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg><svg class="ol-fx fx-steam" style="right:6%;bottom:19%;width:.8em;height:1.2em;animation-delay:1.2s" viewBox="0 0 10 14" aria-hidden="true"><path d="M5 13c-3-3 3-5 0-8s2-4 0-5" stroke="#F2EEE8" stroke-width="1.4" fill="none" stroke-linecap="round"></path></svg></sc-if>
           </div>
         </sc-for>
       </sc-if>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px">
-      <h2 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:30px;font-weight:800">{{curName}}</h2>
-      <span style="color:#B3A6B4;font-size:15px;text-align:right">{{curUse}}</span>
+      <h2 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-size:30px;font-weight:700">{{curName}}</h2>
+      <span style="color:#9A93A0;font-size:15px;text-align:right">{{curUse}}</span>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       <sc-for list="{{chips}}" as="c" hint-placeholder-count="8">
@@ -121,7 +121,7 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
   </div>
 
   <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
-    <p style="margin:12px 0 0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4">All states, looping</p>
+    <p style="margin:12px 0 0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9A93A0">All states, looping</p>
     <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
       <sc-for list="{{grid}}" as="o" hint-placeholder-count="8">
         <div style="display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center;padding:14px 12px 12px;border-radius:22px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07)">
@@ -135,11 +135,11 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}
             <sc-if value="{{o.q}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-q" style="left:68%;top:-8%;font-size:2.6em">?</span><span class="ol-fx fx-q" style="left:84%;top:4%;font-size:1.8em;animation-delay:.5s">?</span></sc-if>
             <sc-if value="{{o.z}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.3em">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:1.7em;animation-delay:1.1s">z</span><span class="ol-fx fx-z" style="left:76%;top:4%;font-size:2.1em;animation-delay:2.2s">z</span></sc-if>
             <sc-if value="{{o.bang}}" hint-placeholder-val="{{false}}"><span class="ol-fx fx-bang" style="left:46%;top:-20%;font-size:3em">!</span><sc-for list="{{o.rays}}" as="r" hint-placeholder-count="6"><i class="fx-ray" style="{{r.style}}"></i></sc-for></sc-if>
-            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#C4B5FD"></path></svg></sc-for></sc-if>
+            <sc-if value="{{o.cf}}" hint-placeholder-val="{{false}}"><sc-for list="{{o.conf}}" as="c" hint-placeholder-count="12"><i class="fx-cf" style="{{c.style}}"></i></sc-for><sc-for list="{{o.stars}}" as="s" hint-placeholder-count="3"><svg class="fx-star" style="{{s.style}}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.6 6.9L22 9.3l-5.8 4.6L18.2 21 12 17l-6.2 4 2-7.1L2 9.3l7.4-.4z" fill="#E8D7AE"></path></svg></sc-for></sc-if>
             <sc-if value="{{o.wl}}" hint-placeholder-val="{{false}}"><i class="fx-wl" style="left:88%;top:6%"></i><i class="fx-wl" style="left:92%;top:14%;width:1.3em;height:1.3em;animation-delay:.2s"></i></sc-if>
             <sc-if value="{{o.cup}}" hint-placeholder-val="{{false}}"><img class="fx-cup" src="/_blob/070226ec21792f2c9c1824851ca1ff5a" alt=""></sc-if>
           </div>
-          <div style="min-width:0"><b style="display:block;font-size:16px">{{o.name}}</b><span style="display:block;color:#B3A6B4;font-size:13px;line-height:1.35;margin-top:2px">{{o.use}}</span></div>
+          <div style="min-width:0"><b style="display:block;font-size:16px">{{o.name}}</b><span style="display:block;color:#9A93A0;font-size:13px;line-height:1.35;margin-top:2px">{{o.use}}</span></div>
         </div>
       </sc-for>
     </div>
@@ -170,7 +170,7 @@ class Component extends DCLogic {
     ];
     const angles = [-75, -48, -24, 24, 48, 75];
     const rays = angles.map((a, i) => ({ style: '--a:' + a + 'deg;animation-delay:' + (0.6 + i * 0.05).toFixed(2) + 's' }));
-    const cols = ['#C4B5FD', '#F8C4A4', '#A99BF0', '#F48FB1', '#F5B5C8', '#F5E6C8'];
+    const cols = ['#E8D7AE', '#E8D7AE', '#9A93A0', '#F2B66D', '#9A93A0', '#F5E6C8'];
     const conf = Array.from({ length: 12 }, (_, i) => ({ style: 'left:' + (6 + i * 7.8) + '%;background:' + cols[i % 6] + ';animation-duration:' + (1.6 + (i * 37 % 10) / 10) + 's;animation-delay:' + ((i * 53 % 17) / 10) + 's;--r:' + (i % 2 ? 540 : -480) + 'deg' }));
     const stars = [{ style: 'left:4%;top:8%' }, { style: 'left:86%;top:0%;animation-delay:.4s' }, { style: 'left:90%;top:40%;animation-delay:.8s;width:1em;height:1em' }];
     const build = (s, w) => ({
@@ -185,7 +185,7 @@ class Component extends DCLogic {
     const cur = S[st.cur];
     const chips = S.map((s, i) => ({
       name: s.name, on: String(i === st.cur),
-      style: 'padding:10px 16px;border-radius:99px;font-weight:700;font-size:14px;border:2px solid ' + (i === st.cur ? '#C4B5FD' : 'transparent') + ';background:' + (i === st.cur ? '#C4B5FD' : 'rgba(255,255,255,.07)') + ';color:' + (i === st.cur ? '#241A26' : '#F4EFE6'),
+      style: 'padding:10px 16px;border-radius:99px;font-weight:700;font-size:14px;border:2px solid ' + (i === st.cur ? '#E8D7AE' : 'transparent') + ';background:' + (i === st.cur ? '#E8D7AE' : 'rgba(255,255,255,.07)') + ';color:' + (i === st.cur ? '#15131A' : '#F2EEE8'),
       pick: () => this.setState({ cur: i, flip: !st.flip, manual: true })
     }));
     return {

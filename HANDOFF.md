@@ -130,6 +130,22 @@ the Wi-Fi hotspot.
 - **Mac simulator**: `tools/sim_server.py` (port 8000) plays a fake sleepy
   driver on repeat; an app tab open on localhost:8000 then rings alarms and
   "Are you OK? … tap your phone". Stop it with Ctrl+C when not needed.
+- **Phone app look** (redesign part 1, `docs/REDESIGN_PLAN.md`): one flat
+  dark page (#15131A), flat cards (#1F1C24, radius 20, no borders), one cream
+  accent (#E8D7AE) for what matters, amber (#F2B66D) only for real warnings,
+  no gradients, glass, glow or stars; one font, Pretendard (OFL,
+  `frontend/fonts/pretendard.woff2`, cut down by `frontend/build/subset_font.py`,
+  run it again after adding text with rare Hangul). The default Ollie is the
+  flat one (`frontend/ollie/flat.svg`, from `assets/brand/ollie_flat_M.svg`;
+  the other moods are still painted); the favicon is `frontend/ollie/icon.svg`.
+  Home: "Right now" as one big word (깨어 있음 / 조금 피곤 / 졸림…), a cream
+  sleepiness bar (KSS / 9), blinks/min and next rest (break_every_min), the
+  last trip as one row, links to Live camera and the wake-up stages. Trips: a
+  one-line summary and, opened, one sentence ("새벽 2시 38분, 추풍령휴게소
+  지나서 두 번 졸았어요", `tripSentence` in dyn.js), cream route map and
+  curve, then the numbers. Insights: leads with one finding ("새벽 2시가 가장
+  위험해요") over the hourly chart with one cream bar. The 6-step phone tour
+  still lands on each step (checked in KO and EN at 375×812).
 - **Website** (the phone app as a web page): **https://seunghyun2007.github.io/bamnun/**,
   GitHub Pages from the `gh-pages` branch (just `index.html` + `.nojekyll`).
   There's no Pi behind it, so on `*.github.io` the app runs its built-in demo
@@ -167,8 +183,10 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Open items
 
-- **Next up: the phone app redesign**, see `docs/REDESIGN_PLAN.md` (agreed
-  direction, new flat Ollie in `assets/brand/`, part 1 before 10 Nov).
+- **Phone app redesign part 1 is built** (on `demo-booth`, 2026-11-07), see
+  `docs/REDESIGN_PLAN.md`. **Not yet on the website**: waiting for the owner's
+  OK (and the friend's, it's their design) before publishing to `gh-pages`.
+  Part 2 (setup screens, Settings, Camera, maps, Ollie's moods) after 10 Nov.
 - PR #5 (`demo-booth` -> `main`) is open: the friend should review it before
   it's merged. No CI on the repo.
 - Compare `local-wip` with the friend's detection code.
@@ -178,6 +196,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: phone app redesign part 1 built (flat colours, Pretendard, flat Ollie, Home/Trips/Insights/Stages layouts); website not updated yet.
 - 2026-11-07: redesign plan + flat Ollie drafts (docs/REDESIGN_PLAN.md, assets/brand/); not built yet.
 - 2026-11-07: visitor drive + photos to their phone (consent, Supabase, own QR), history on real Korean routes, phone tour; Pi tour 4 steps.
 - 2026-11-07: face-centring page, sleepy tip while driving, guided tour, Korean voice + toggle, blue light off on time.
@@ -202,4 +221,4 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
   fix, calibration fixes, dashboard + buttons, camera rotation.
 - 2026-11-05: booth mode, voice, Supabase sign-in, merge of app-accounts (PR #4).
 
-_Last updated: 2026-11-06._
+_Last updated: 2026-11-07._

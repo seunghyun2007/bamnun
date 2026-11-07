@@ -117,15 +117,14 @@
     const P = (i) => [(ox + (xs[i] - x0) * s).toFixed(1), (oy + (ys[i] - y0) * s).toFixed(1)];
     const d = p.map((_, i) => (i ? "L" : "M") + P(i).join(",")).join("");
     const stops = t.route.stops || [];
-    const dots = stops.map((x) => { const [cx, cy] = P(Math.round(x.f * (p.length - 1))); return `<circle cx="${cx}" cy="${cy}" r="4" fill="#F8C4A4"/>`; }).join("");
+    const dots = stops.map((x) => { const [cx, cy] = P(Math.round(x.f * (p.length - 1))); return `<circle cx="${cx}" cy="${cy}" r="4.5" fill="#E8D7AE" stroke="#24212A" stroke-width="2"/>`; }).join("");
     const [ax, ay] = P(0), [bx, by] = P(p.length - 1);
-    return `<div style="margin-top:12px"><svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;border-radius:14px;background:rgba(255,255,255,.05)">
-      <path d="${d}" fill="none" stroke="rgba(196,181,253,.35)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="${d}" fill="none" stroke="#C4B5FD" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}
-      <circle cx="${ax}" cy="${ay}" r="6" fill="#F4EFE6"/><circle cx="${bx}" cy="${by}" r="6" fill="#F48FB1"/>
-      <text x="${ax}" y="${+ay - 10}" fill="#F4EFE6" font-size="12" font-weight="700" text-anchor="middle">${esc(t.route.from)}</text>
-      <text x="${bx}" y="${+by - 10}" fill="#F48FB1" font-size="12" font-weight="700" text-anchor="middle">${esc(t.route.to)}</text></svg>
-      ${stops.length ? `<p style="margin:8px 0 0;font-size:12.5px;color:#B3A6B4">${esc(W("쉬어 간 곳: ", "Stops: "))}${esc(stops.map((x) => x.name).join(" · "))}</p>` : ""}</div>`;
+    return `<div style="margin-top:14px"><svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;border-radius:14px;background:#24212A">
+      <path d="${d}" fill="none" stroke="#E8D7AE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${dots}
+      <circle cx="${ax}" cy="${ay}" r="6" fill="#F2EEE8"/><circle cx="${bx}" cy="${by}" r="6" fill="#24212A" stroke="#F2EEE8" stroke-width="2.5"/>
+      <text x="${ax}" y="${+ay - 10}" fill="#F2EEE8" font-size="12" font-weight="600" text-anchor="middle">${esc(t.route.from)}</text>
+      <text x="${bx}" y="${+by - 10}" fill="#F2EEE8" font-size="12" font-weight="600" text-anchor="middle">${esc(t.route.to)}</text></svg>
+      ${stops.length ? `<p style="margin:8px 0 0;font-size:12.5px;color:#9A93A0">${esc(W("쉬어 간 곳: ", "Stops: "))}${esc(stops.map((x) => x.name).join(" · "))}</p>` : ""}</div>`;
   }
   function curveSvg(t) {
     const tr = t.trace;
@@ -133,17 +132,17 @@
     const Wd = 300, Hd = 110, end = tr[tr.length - 1][0] || 1;
     const X = (s) => (8 + (Wd - 16) * s / end).toFixed(1), Y = (v) => (Hd - 14 - (Hd - 26) * v).toFixed(1);
     const line = tr.map((q, i) => (i ? "L" : "M") + X(q[0]) + "," + Y(q[1])).join("");
-    const marks = ((t.summary || {}).episodes || []).map((e) => { const s = e.at - t.started_at; return s >= 0 && s <= end ? `<line x1="${X(s)}" x2="${X(s)}" y1="10" y2="${Hd - 14}" stroke="#F48FB1" stroke-dasharray="3 3"/><circle cx="${X(s)}" cy="10" r="4" fill="#F48FB1"/>` : ""; }).join("");
-    return `<div style="margin-top:12px"><span style="font-size:12px;color:#B3A6B4">${esc(W("졸음 정도", "How sleepy"))}</span>
-      <svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;margin-top:4px;border-radius:14px;background:rgba(255,255,255,.05)">
-      <line x1="8" x2="${Wd - 8}" y1="${Y(0.5)}" y2="${Y(0.5)}" stroke="rgba(255,255,255,.12)" stroke-dasharray="4 4"/>${marks}
-      <path d="${line} L${X(end)},${Hd - 14} L8,${Hd - 14} Z" fill="rgba(196,181,253,.18)"/>
-      <path d="${line}" fill="none" stroke="#C4B5FD" stroke-width="2.5" stroke-linejoin="round"/></svg></div>`;
+    const marks = ((t.summary || {}).episodes || []).map((e) => { const s = e.at - t.started_at; return s >= 0 && s <= end ? `<line x1="${X(s)}" x2="${X(s)}" y1="10" y2="${Hd - 14}" stroke="#F2B66D" stroke-dasharray="3 3"/><circle cx="${X(s)}" cy="10" r="4" fill="#F2B66D"/>` : ""; }).join("");
+    return `<div style="margin-top:14px"><span style="font-size:12.5px;color:#9A93A0">${esc(W("졸음 정도", "How sleepy"))}</span>
+      <svg viewBox="0 0 ${Wd} ${Hd}" width="100%" style="display:block;margin-top:6px;border-radius:14px;background:#24212A">
+      <line x1="8" x2="${Wd - 8}" y1="${Y(0.5)}" y2="${Y(0.5)}" stroke="#2E2A33" stroke-dasharray="4 4"/>${marks}
+      <path d="${line} L${X(end)},${Hd - 14} L8,${Hd - 14} Z" fill="rgba(232,215,174,.10)"/>
+      <path d="${line}" fill="none" stroke="#E8D7AE" stroke-width="2.5" stroke-linejoin="round"/></svg></div>`;
   }
   function caughtHtml(t) {
     if (!t.caught) return "";
     return `<div style="margin-top:12px;display:flex;gap:12px;align-items:center"><img src="${t.caught}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:14px;flex-shrink:0">
-      <div><b style="font-size:15px">${esc(W("여기서 졸았어요 😴", "Caught you dozing 😴"))}</b><p style="margin:4px 0 0;font-size:13px;color:#B3A6B4;line-height:1.4">${esc(W("밤눈이 이 순간 처음으로 깨웠어요.", "The moment Bamnun first woke you."))}</p></div></div>`;
+      <div><b style="font-size:15px">${esc(W("여기서 졸았어요 😴", "Caught you dozing 😴"))}</b><p style="margin:4px 0 0;font-size:13px;color:#9A93A0;line-height:1.4">${esc(W("밤눈이 이 순간 처음으로 깨웠어요.", "The moment Bamnun first woke you."))}</p></div></div>`;
   }
 
   // -- the guided tour (once per visit) ------------------------------------- //
@@ -181,13 +180,13 @@
       }
       const r = el.getBoundingClientRect(), pad = 8, [h, p] = st[ko() ? "ko" : "en"];
       const below = r.bottom + 190 < innerHeight;
-      box.innerHTML = `<div style="position:fixed;left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px;border-radius:18px;box-shadow:0 0 0 9999px rgba(10,6,12,.72);outline:3px solid #F4EFE6;transition:all .25s"></div>
-        <div style="position:fixed;left:16px;right:16px;${below ? `top:${r.bottom + pad + 14}px` : `bottom:${innerHeight - r.top + pad + 14}px`};background:#F4EFE6;color:#241A26;border-radius:20px;padding:16px 18px;font-family:Figtree,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">
-          <span style="font-size:12px;color:#8a7d8c">${i + 1} / ${STEPS.length}</span>
-          <h3 style="margin:4px 0 0;font-size:20px;font-weight:800">${esc(h)}</h3>
+      box.innerHTML = `<div style="position:fixed;left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + 2 * pad}px;height:${r.height + 2 * pad}px;border-radius:18px;box-shadow:0 0 0 9999px rgba(10,6,12,.72);outline:3px solid #F2EEE8;transition:all .25s"></div>
+        <div style="position:fixed;left:16px;right:16px;${below ? `top:${r.bottom + pad + 14}px` : `bottom:${innerHeight - r.top + pad + 14}px`};background:#F2EEE8;color:#15131A;border-radius:20px;padding:16px 18px;font-family:Pretendard,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4)">
+          <span style="font-size:12px;color:#9A93A0">${i + 1} / ${STEPS.length}</span>
+          <h3 style="margin:4px 0 0;font-size:20px;font-weight:700">${esc(h)}</h3>
           <p style="margin:6px 0 12px;font-size:14.5px;line-height:1.45">${esc(p)}</p>
-          <div style="display:flex;justify-content:space-between;align-items:center"><button data-skip="1" style="background:none;border:0;color:#8a7d8c;font-size:14px;padding:6px 0">${esc(W("건너뛰기", "Skip"))}</button>
-          <span style="background:#241A26;color:#F4EFE6;font-weight:700;font-size:14px;padding:9px 16px;border-radius:99px">${esc(i === STEPS.length - 1 ? W("시작하기", "Done") : W("다음", "Next"))} ›</span></div></div>`;
+          <div style="display:flex;justify-content:space-between;align-items:center"><button data-skip="1" style="background:none;border:0;color:#9A93A0;font-size:14px;padding:6px 0">${esc(W("건너뛰기", "Skip"))}</button>
+          <span style="background:#15131A;color:#F2EEE8;font-weight:700;font-size:14px;padding:9px 16px;border-radius:99px">${esc(i === STEPS.length - 1 ? W("시작하기", "Done") : W("다음", "Next"))} ›</span></div></div>`;
     }
     show();
   }
@@ -196,7 +195,7 @@
   function toast(text) {
     const d = document.createElement("div");
     d.textContent = text;
-    d.style.cssText = "position:fixed;left:16px;right:16px;top:16px;z-index:9998;background:#F4EFE6;color:#241A26;border-radius:16px;padding:14px 16px;font:600 14.5px Figtree,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)";
+    d.style.cssText = "position:fixed;left:16px;right:16px;top:16px;z-index:9998;background:#F2EEE8;color:#15131A;border-radius:16px;padding:14px 16px;font:600 14.5px Pretendard,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)";
     document.body.appendChild(d);
     setTimeout(() => d.remove(), 5000);
   }

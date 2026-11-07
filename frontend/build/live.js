@@ -6,14 +6,15 @@
   const T = (s, v) => window.BN_T(s, v);
   // Ladder stage names, as the Wake-up ladder screen calls them.
   const STAGES = ["", "Blue light", "Mint mist", "Chime and voice", "Rising alarm"];
-  const STAGE_COLOURS = ["#F8C4A4", "#A99BF0", "#F5B5C8", "#C4B5FD", "#F48FB1"];
+  // Cream while all is well; amber only while Ollie is really waking you.
+  const STAGE_COLOURS = ["#E8D7AE", "#F2B66D", "#F2B66D", "#F2B66D", "#F2B66D"];
   const CO2_PROMPT = 1500;
   // The driver's state in one word, decided on the device (SPEC.md, 13), and
   // its colour on the app's lavender -> pink scale.
   const LABEL = {
-    alert: ["Alert", "#D9CEFF"], a_bit: ["A bit tired", "#C4B5FD"], drowsy: ["Drowsy", "#E2A8EC"],
-    very: ["Very drowsy", "#F9A8D4"], eyes_closed: ["Eyes closed", "#F48FB1"], head_drop: ["Head dropping", "#F48FB1"],
-    away: ["Looking away", "#FFB547"], no_face: ["No face", "#B3A6B4"],
+    alert: ["Alert", "#F2EEE8"], a_bit: ["A bit tired", "#E8D7AE"], drowsy: ["Drowsy", "#F2B66D"],
+    very: ["Very drowsy", "#F2B66D"], eyes_closed: ["Eyes closed", "#F2B66D"], head_drop: ["Head dropping", "#F2B66D"],
+    away: ["Looking away", "#F2B66D"], no_face: ["No face", "#9A93A0"],
   };
   // The drowsiness signals (SPEC.md, 15), on the driver's own scale.
   const SIGNALS = {
@@ -148,10 +149,10 @@
   };
 
   function chip(s, v) {
-    if (v === "offline" || v === "connecting" || v === "nocam") return [T("Not connected"), "rgba(255,255,255,.16)", "#F4EFE6"];
-    if (s.calibrating) return [T("Calibrating"), "#C4B5FD", "#241A26"];
+    if (v === "offline" || v === "connecting" || v === "nocam") return [T("Not connected"), "rgba(255,255,255,.16)", "#F2EEE8"];
+    if (s.calibrating) return [T("Calibrating"), "#E8D7AE", "#15131A"];
     const [text, colour] = LABEL[s.label] || LABEL[s.face ? "alert" : "no_face"];
-    return [T(text), colour, "#241A26"];
+    return [T(text), colour, "#15131A"];
   }
 
   // The Home tile shows the video cropped around the face: scale so the face
@@ -179,10 +180,10 @@
     return Object.keys(SIGNALS).map((k) => {
       const [name, fmt] = SIGNALS[k], [val, part] = sig[k] || [0, 0];
       return `<div style="display:grid;grid-template-columns:1fr auto 74px;gap:10px;align-items:center;font-size:13px">
-        <span style="color:#B3A6B4">${T(name)}</span><b>${fmt(val || 0)}</b>
-        <span style="position:relative;height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, (part || 0) / 30 * 100).toFixed(0)}%;background:#C4B5FD;border-radius:6px"></i></span></div>`;
-    }).join("") + (s.unreliable ? `<p style="margin:4px 0 0;font-size:12.5px;color:#FFB547">${T("Eyes not scored right now: {why}", { why: T(UNRELIABLE[s.unreliable] || s.unreliable) })}</p>` : "")
-      + `<p style="margin:4px 0 0;font-size:11.5px;color:#B3A6B4">${T("Bars: each signal's share of the score, in points.")}</p>`;
+        <span style="color:#9A93A0">${T(name)}</span><b>${fmt(val || 0)}</b>
+        <span style="position:relative;height:8px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${Math.min(100, (part || 0) / 30 * 100).toFixed(0)}%;background:#E8D7AE;border-radius:6px"></i></span></div>`;
+    }).join("") + (s.unreliable ? `<p style="margin:4px 0 0;font-size:12.5px;color:#F2B66D">${T("Eyes not scored right now: {why}", { why: T(UNRELIABLE[s.unreliable] || s.unreliable) })}</p>` : "")
+      + `<p style="margin:4px 0 0;font-size:11.5px;color:#9A93A0">${T("Bars: each signal's share of the score, in points.")}</p>`;
   }
 
   function paint() {
@@ -191,19 +192,29 @@
     // Connection chip (Home) and pill (Camera).
     text("conn", DEMO ? T("Demo · simulated driver")
       : T(conn === "open" ? "Bamnun connected" : conn === "connecting" ? "Connecting…" : "Not connected"));
-    css("conn-dot", "background", conn === "open" ? "#7BD88F" : conn === "connecting" ? "#FFB547" : "#B3A6B4");
+    css("conn-dot", "background", conn === "open" ? "#E8D7AE" : conn === "connecting" ? "#F2B66D" : "#9A93A0");
     text("live", T(DEMO ? "Demo" : live ? "Live" : "Offline"));
-    css("live-dot", "background", live ? "#F48FB1" : "#B3A6B4");
+    css("live-dot", "background", live ? "#F2B66D" : "#9A93A0");
 
     // "Right now" card.
-    const [title, note] = v === "alert" ? [STAGES[s.stage] || "Rising alarm", "Ollie is waking you up."] : STATUS[v];
+    // Watching: the one word is how the driver is right now.
+    const AWAKE = { alert: "Awake", a_bit: "A bit tired", drowsy: "Drowsy", very: "Very drowsy" };
+    const [title, note] = v === "alert" ? [STAGES[s.stage] || "Rising alarm", "Ollie is waking you up."]
+      : v === "watching" && AWAKE[s.label] ? [AWAKE[s.label], STATUS.watching[1]] : STATUS[v];
     text("status", T(title));
     text("status-note", T(note));
     css("status", "color", v === "alert" ? STAGE_COLOURS[s.stage] || STAGE_COLOURS[4]
-      : live ? "#F8C4A4" : "#B3A6B4");
+      : live ? "#E8D7AE" : "#9A93A0");
     const kss = live && s.calibrated && !s.calibrating ? Math.round(s.kss) : null;
     text("kss", kss == null ? dash : String(kss));
     attr("kss-ring", "stroke-dasharray", (kss == null ? 0 : 207 * kss / 9).toFixed(1) + " 277");
+    css("kss-bar", "width", (kss == null ? 0 : 100 * kss / 9).toFixed(0) + "%");
+    // Next rest: the break reminder's own rhythm (Settings, every N min).
+    const every = ((window.BN_API && BN_API.settings && BN_API.settings()) || {}).break_every_min || 120;
+    if (s && live && s.trip_s != null) {
+      const left = Math.max(0, Math.ceil((every * 60 - (s.trip_s % (every * 60))) / 60));
+      text("next-rest", left >= 60 ? T("{h}h {m}m", { h: Math.floor(left / 60), m: String(left % 60).padStart(2, "0") }) : T("{m} min", { m: left }));
+    } else text("next-rest", dash);
     text("perclos", live ? pct(s.perclos) : dash);
     text("blinks", live && s.blink_rate != null ? String(Math.round(s.blink_rate)) : dash);
     if (s && live) {
@@ -227,13 +238,13 @@
     // Time-of-day risk: shown on its own, never part of the camera score.
     const risk = live && s.time_risk ? s.time_risk.level : null;
     text("time-risk", risk ? T({ low: "Low", medium: "Medium", high: "High" }[risk]) : dash);
-    css("time-risk", "color", risk === "high" ? "#F48FB1" : risk === "medium" ? "#FFB547" : "#B3A6B4");
+    css("time-risk", "color", risk === "high" ? "#F2B66D" : risk === "medium" ? "#F2B66D" : "#9A93A0");
 
     // Cab air.
     const ppm = live ? s.co2_ppm : null;
     text("co2", ppm == null ? dash : String(Math.round(ppm)));
     css("co2-bar", "width", ppm == null ? "0%" : Math.min(100, ppm / CO2_PROMPT * 100).toFixed(0) + "%");
-    css("co2-bar", "background", ppm != null && ppm >= CO2_PROMPT ? "#F48FB1" : "#F5B5C8");
+    css("co2-bar", "background", ppm != null && ppm >= CO2_PROMPT ? "#F2B66D" : "#9A93A0");
     text("co2-note", ppm == null ? T("Sensor offline")
       : T(ppm < 1000 ? "Fresh" : ppm < CO2_PROMPT ? "Getting stale" : "Open a window") + " · " +
         T("window prompt at {n}", { n: CO2_PROMPT }));
@@ -242,7 +253,7 @@
     for (const el of document.querySelectorAll("[data-live-stage]")) {
       const n = +el.dataset.liveStage, on = live && s.stage === n;
       el.style.background = on ? STAGE_COLOURS[n] + "55" : "rgba(255,255,255,.11)";
-      el.style.color = on ? "#F4EFE6" : "#B3A6B4";
+      el.style.color = on ? "#F2EEE8" : "#9A93A0";
       el.style.boxShadow = on ? "0 0 0 2px " + STAGE_COLOURS[n] : "none";
     }
 

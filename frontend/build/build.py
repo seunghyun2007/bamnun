@@ -131,4 +131,9 @@ for out in OUT.split(","):
     if sb_url and sb_key and "www" in os.path.normpath(out).split(os.sep):
         page = page.replace("<script>", "<script>window.BN_SUPABASE=" + json.dumps({"url": sb_url, "key": sb_key}) + ";", 1)
     open(out, "w", encoding="utf-8", newline="\n").write(page)
+    # The booth's staff remote (staff.html), next to the website's page.
+    if sb_url and sb_key and "www" in os.path.normpath(out).split(os.sep):
+        staff = open(os.path.join(os.path.dirname(__file__), "staff.html"), encoding="utf-8").read()
+        staff = staff.replace("__SB_URL__", sb_url).replace("__SB_KEY__", sb_key)
+        open(os.path.join(os.path.dirname(out), "staff.html"), "w", encoding="utf-8", newline="\n").write(staff)
 print("ok", len(html))

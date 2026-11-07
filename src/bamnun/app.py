@@ -268,6 +268,10 @@ class Monitor:
         from .visit import Visit
         self.visit = Visit(self.root, self._learn_url or "https://seunghyun2007.github.io/bamnun/")
         self._learn_shown = False
+        # The booth remote (remote.py): a staff phone's commands, via Supabase.
+        from .remote import Remote
+        self.remote = Remote(self.root)
+        self.remote.start()
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
         self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
@@ -799,6 +803,36 @@ class Monitor:
     def _page_progress(self, now: float) -> float:
         return min(1.0, max(0.0, (now - self._brief_at) / self._page_s()))
 
+    def _remote_commands(self, now: float, t: float) -> None:
+        """Commands from the staff phone (remote.py), on any screen."""
+        for c in self.remote.take():
+            self.logger.log_event("remote", {"cmd": c})
+            console.print(f"[magenta]remote: {c}[/]")
+            if c.startswith("stage") and c != "stage0":
+                self._play_stage(int(c[5:]), now, t)
+            elif c == "stage0":                       # everything off, now
+                self._last_alert = self.policy.reset(now)
+                self._stage_play = (0, 0.0, 0.0)
+                with AudioActuator._play_lock:
+                    if AudioActuator.busy():
+                        AudioActuator._playing.terminate()
+            elif c == "next":
+                self._seat_empty = False
+                self._next_visitor(now)
+            elif c == "calibrate":
+                if self.mode != "live":
+                    self.mode = "live"
+                self._start_calibration(t)
+                self._voice("calibrate_voice", t)
+            elif c in ("photos_off", "photos_on"):
+                self.visit.photos_off = c == "photos_off"
+            elif c == "vol_up":
+                self.volume.change(VOLUME_STEP)
+            elif c == "vol_down":
+                self.volume.change(-VOLUME_STEP)
+            elif c == "voice":
+                self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
+
     def _start_guide(self, now: float) -> None:
         self._guide_t0, self._guide_done_at = now, None
         self._guide_had_alert, self._guide_stage = False, (0, 0.0)
@@ -1056,6 +1090,7 @@ class Monitor:
             self._guarded(self._give_up_calibration, frame.timestamp)
             self._guarded(self._update_mode, time.monotonic(), bool(ff.face_found))
             self._guarded(self._mode_changed, time.monotonic(), frame.timestamp)
+            self._guarded(self._remote_commands, time.monotonic(), frame.timestamp)
             self._guarded(self._check_health, time.monotonic())
 
             now = time.monotonic()

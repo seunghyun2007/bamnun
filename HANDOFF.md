@@ -29,7 +29,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (341 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (344 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -206,6 +206,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: booth remote: a staff phone controls the Pi without touching the laptop. Page `staff.html?k=<STAFF_CODE>` (frontend/build/staff.html, published next to the website): stages 1-4, 0 = all off, next person, recalibrate, photos off/on, volume, voice. Mailbox `booth_commands` in Supabase (supabase/booth_remote.sql, run with the real code; the code is NOT in git: it's in the Pi's frontend/.env as STAFF_CODE and in the staff link). The Pi polls every 1 s (`remote.py`), commands older than 15 s are dropped. Needs the Pi online.
 - 2026-11-07: QR always on the dashboard (middle bottom card; under the camera in a tall window), no pop-ups/hints over the camera (the team explains and asks consent in person). Each visitor gets a code when their guide starts (`Visit.begin`); from calibration the drive is sent every 15 s and once more when they leave: the Pi records the yes in `visit_consents`, then `put_visit` (supabase/booth_consent.sql, run and tested). SETTINGS > PHOTOS: OFF (p) for someone who says no to photos. The website waits (up to 10 min) for a drive scanned early and refreshes it every 20 s. GUIDE is gone from the menu.
 - 2026-11-07: no standby screen and no slideshow: the dashboard stays up; 30 s with nobody = visitor forgotten; the next face (3 s) starts their guide = one page (fit your face in the oval; moves on when green 2 s) → calibration → live hints on the dashboard in the pop-up's place with the part outlined (운전해 보세요 / 지금 졸음 상태예요 / 눈을 보고 있어요; each alert explained when it fires, "1단계: 파란 불빛"…; "잘했어요" then the QR offer). The 'click Drive' page is gone (the team helps). GUIDE replays the hints. Old standby/briefing/tour code remains but is unused.
 - 2026-11-07: fewer clicks: standby starts the briefing by itself 3 s after someone sits, pages turn by themselves (7 s; the centring page once the face fits the oval 2 s, at most 14 s), the last page starts calibration, the tour moves every 6 s; clicks still skip ahead. Standby is the big live camera + lines fading in and out (no owl); briefing pages and calibration show the live camera (calibration with the face oval). docs/LAPTOP_NAV_PROMPT.md: a prompt for the laptop's Claude Code to make switching between the game and Bamnun easy.

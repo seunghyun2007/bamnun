@@ -760,14 +760,71 @@ def render_panels(ff, state, data: DashboardData) -> np.ndarray:
     return img
 
 
-def window_to_canvas(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
-    """Where a click at (x, y) in a window of that size lands on the dashboard
-    canvas: the inverse of fit_to_window."""
-    if win_w <= 0 or win_h <= 0 or (win_w, win_h) == (DASH_W, DASH_H):
+def window_to_canvas(x: int, y: int, win_w: int, win_h: int,
+                     canvas: tuple[int, int] = (DASH_W, DASH_H)) -> tuple[int, int]:
+    """Where a click at (x, y) in a window of that size lands on a canvas of
+    ``canvas`` size: the inverse of fit_to_window."""
+    cw, ch = canvas
+    if win_w <= 0 or win_h <= 0 or (win_w, win_h) == (cw, ch):
         return x, y
-    scale = min(win_w / DASH_W, win_h / DASH_H)
-    ox, oy = (win_w - int(DASH_W * scale)) // 2, (win_h - int(DASH_H * scale)) // 2
+    scale = min(win_w / cw, win_h / ch)
+    ox, oy = (win_w - int(cw * scale)) // 2, (win_h - int(ch * scale)) // 2
     return int((x - ox) / scale), int((y - oy) / scale)
+
+
+# -- the tall window (a laptop's right third, the game in the other two) ------ #
+#
+# The dashboard is still drawn at 1280x720, then cut and stacked: the camera
+# (with its SETTINGS button, pop-ups and tour cards) on top, and under it the
+# panels that matter, widened to the camera's width. Clicks go back through
+# column_to_dash, so buttons and pop-ups work the same.
+
+def is_tall(win_w: int, win_h: int) -> bool:
+    return win_w > 0 and win_h > win_w * 1.15
+
+
+def _column_layout() -> tuple[list[tuple[tuple[int, int, int, int], tuple[int, int, int, int]]], tuple[int, int]]:
+    parts = [((0, 0, 848, 484), (0, 0, 848, 484))]
+    y = 492
+    for src in ((_COL_X, 8, _COL_W, 136),       # driver state
+                (_COL_X, 260, _COL_W, 152),     # eyes
+                (_COL_X, 418, _COL_W, 54),      # head
+                (_COL_X, 478, _COL_W, 134)):    # system response
+        h = round(src[3] * 832 / src[2])
+        parts.append((src, (8, y, 832, h)))
+        y += h + 8
+    return parts, (848, y)
+
+
+COLUMN_PARTS, COLUMN_SIZE = _column_layout()
+
+
+def column_compose(canvas: np.ndarray) -> np.ndarray:
+    """The 1280x720 dashboard, cut and stacked for a tall window."""
+    import cv2
+
+    out = np.full((COLUMN_SIZE[1], COLUMN_SIZE[0], 3), _BG, np.uint8)
+    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
+        part = canvas[sy:sy + sh, sx:sx + sw]
+        if (dw, dh) != (sw, sh):
+            part = cv2.resize(part, (dw, dh), interpolation=cv2.INTER_CUBIC)
+        out[dy:dy + dh, dx:dx + dw] = part
+    return out
+
+
+def column_to_dash(x: int, y: int) -> tuple[int, int]:
+    """A point on the stacked canvas, back on the 1280x720 dashboard."""
+    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
+        if dx <= x < dx + dw and dy <= y < dy + dh:
+            return int(sx + (x - dx) * sw / dw), int(sy + (y - dy) * sh / dh)
+    return -1, -1
+
+
+def window_to_dash(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
+    """A click in the window, on the 1280x720 dashboard, in either layout."""
+    if is_tall(win_w, win_h):
+        return column_to_dash(*window_to_canvas(x, y, win_w, win_h, COLUMN_SIZE))
+    return window_to_canvas(x, y, win_w, win_h)
 
 
 def button_at(x: int, y: int, menu_open: bool = True) -> Optional[str]:

@@ -55,8 +55,8 @@ STEPS = [
      "운전하는 동안 눈을 지켜보고, 졸면 깨워 줘요.",
      "I watch your eyes while you drive, and wake you if you doze."),
     ("driving", "핸들 앞에 앉으세요", "Sit at the wheel",
-     "왼쪽 카메라 말고, 오른쪽 게임 화면을 보세요.",
-     "Look at the game screen on the right, not the camera."),
+     "카메라 말고 게임 화면을 보세요.",
+     "Look at the game screen, not the camera."),
     ("center", "카메라에 얼굴을 맞추세요", "Line your face up with the camera",
      "타원이 초록색이 되게 얼굴을 맞추세요.",
      "Move until the oval turns green."),
@@ -216,6 +216,7 @@ class Screens:
         self._fonts: dict[tuple[str, int], object] = {}
         self._images: dict[tuple, Optional[np.ndarray]] = {}
         self._cache: dict[tuple, object] = {}
+        self.game_left = False        # the game is left of this window (a laptop's side panel)
 
     # -- pieces -------------------------------------------------------------- #
 
@@ -445,7 +446,9 @@ class Screens:
 
     def calibrating(self, t: float, progress: float, hint: str = "",
                     size: tuple[int, int] = (DASH_W, DASH_H)) -> np.ndarray:
-        """Calibration: look at the game screen (to the right), blink normally."""
+        """Calibration: look at the game screen, blink normally. The arrow
+        points at the game: right of a booth monitor, left of a laptop's
+        side panel (``game_left``)."""
         import cv2
 
         f = _Frame(size)
@@ -455,10 +458,12 @@ class Screens:
                                             [("평소처럼 눈을 깜빡이세요", "Blink normally")], title_y=110)
         canvas = self._cache[key].copy()
         self._draw_owl(canvas, f, "thinking", t)
-        # The big arrow, sliding to the right, towards the game.
+        # The big arrow, sliding towards the game.
         slide = (0.5 + 0.5 * math.sin(t * 3.0)) * 60
         y = f.y(430)
         x0, x1 = f.x(_SPLIT + 130 + slide), f.x(DASH_W - 150 + slide)
+        if self.game_left:
+            x0, x1 = f.x(DASH_W - 150 - slide), f.x(_SPLIT + 130 - slide)
         cv2.arrowedLine(canvas, (x0, y), (x1, y), _WHITE, f.n(22), cv2.LINE_AA, tipLength=0.28)
         # Progress, thin and white.
         bx0, bx1, by = f.x(_SPLIT + 60), f.x(DASH_W - 60), f.y(540)
@@ -859,7 +864,7 @@ TOUR = [
      "얼굴 위의 점과 선이 밤눈이 따라가는 곳이에요", "The dots and lines are what Bamnun tracks"),
     ((848, 8, 424, 136), 410, 30, "지금 상태", "Right now",
      "졸음 점수: 깨어 있음부터 위험까지", "How sleepy you are, from alert to danger"),
-    ((848, 478, 424, 134), 410, 450, "깨우기 단계", "Wake-up stages",
+    ((848, 478, 424, 134), 410, 300, "깨우기 단계", "Wake-up stages",
      "졸리면 불빛, 미스트, 소리, 알람이 여기 켜져요", "Light, mist, sound and alarm light up here"),
     ((666, 422, 172, 48), 420, 230, "설정", "Settings",
      "운전이 끝나면 여기서 QR + STAGES로 기록을 받아요", "After your drive: QR + STAGES here takes it home"),
@@ -919,3 +924,54 @@ def health_banner(screens: Optional["Screens"], canvas: np.ndarray, level: str,
                         scale, (255, 255, 255), 2, cv2.LINE_AA)
         cache[key] = strip
     return np.vstack([cache[key], fit_to_window(canvas, w, h - bar)])
+
+
+# -- the tall window --------------------------------------------------------- #
+#
+# A slide (picture left, words right) is drawn landscape, then its two halves
+# are stacked, picture on top, so it fills a tall side panel at a readable size.
+
+def _tall_scale(size: tuple[int, int]) -> float:
+    w, h = size
+    return min(w / (DASH_W - _SPLIT), h / (2 * DASH_H))
+
+
+def tall_slide_size(size: tuple[int, int]) -> tuple[int, int]:
+    """The landscape size to draw a slide at, for a tall window of ``size``."""
+    s = _tall_scale(size)
+    return max(320, int(DASH_W * s)), max(180, int(DASH_H * s))
+
+
+def stack_tall(slide: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    """The slide's halves stacked to fill a tall window of ``size``."""
+    w, h = size
+    sh, sw = slide.shape[:2]
+    split = int(round(sw * _SPLIT / DASH_W))
+    left, right = slide[:, :split], slide[:, split:]
+    cw = right.shape[1]
+    top = np.empty((sh, cw, 3), np.uint8)
+    top[:] = _PANEL
+    lx = max(0, (cw - split) // 2)
+    top[:, lx:lx + min(split, cw)] = left[:, :min(split, cw)]
+    column = np.vstack([top, right])
+    out = np.empty((h, w, 3), np.uint8)
+    out[:] = _BOARD
+    ch = min(h, column.shape[0])
+    ox, oy = max(0, (w - cw) // 2), max(0, (h - ch) // 2)
+    out[oy:oy + ch, ox:ox + min(cw, w)] = column[:ch, :min(cw, w)]
+    return out
+
+
+def tall_to_slide(x: int, y: int, size: tuple[int, int]) -> tuple[int, int]:
+    """A click in the tall window, on the landscape slide (the inverse of
+    stack_tall), to hand to learn_hit with tall_slide_size(size)."""
+    w, h = size
+    sw, sh = tall_slide_size(size)
+    split = int(round(sw * _SPLIT / DASH_W))
+    cw = sw - split
+    ch = min(h, 2 * sh)
+    ox, oy = max(0, (w - cw) // 2), max(0, (h - ch) // 2)
+    u, v = x - ox, y - oy
+    if v < sh:                                   # the picture half
+        return u - max(0, (cw - split) // 2), v
+    return split + u, v - sh

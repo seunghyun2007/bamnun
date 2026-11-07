@@ -43,7 +43,8 @@ from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
 from .thermal import PiHealth
-from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, draw_face_mesh,
+from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, column_compose, draw_face_mesh,
+                  is_tall, window_to_dash,
                   fit_to_window, window_to_canvas)
 
 # Console output must never stop detection. A Windows console in a legacy
@@ -559,9 +560,12 @@ class Monitor:
                 _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
             except Exception:  # noqa: BLE001
                 return
-            from .attract import learn_hit
-            hit = learn_hit(x, y, (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H),
-                            asking=self.visit.state == "ask")
+            from .attract import learn_hit, tall_slide_size, tall_to_slide
+            size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+            if is_tall(*size):
+                x, y = tall_to_slide(x, y, size)
+                size = tall_slide_size(size)
+            hit = learn_hit(x, y, size, asking=self.visit.state == "ask")
             if hit:
                 self._clicks.append(hit)
             return
@@ -574,7 +578,7 @@ class Monitor:
             _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
         except Exception:  # noqa: BLE001
             return
-        cx, cy = window_to_canvas(x, y, win_w, win_h)
+        cx, cy = window_to_dash(x, y, win_w, win_h)
         name = None
         if self._popup_at is not None:
             from .attract import popup_hit
@@ -1001,8 +1005,14 @@ class Monitor:
                         from .attract import Screens
                         self._screens = Screens(self.root)
                     # Drawn at the window's own size: stretched, the text went soft.
+                    # In a tall window (a laptop's side panel, the game left of
+                    # it) a slide is drawn landscape and its halves stacked.
+                    from .attract import stack_tall, tall_slide_size
                     _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
-                    size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    tall = is_tall(*win_size)
+                    self._screens.game_left = tall
+                    size = tall_slide_size(win_size) if tall else win_size
                     if self.mode == "standby":
                         cam = frame.image
                         cam = cv2.cvtColor(cam, cv2.COLOR_GRAY2BGR) if cam.ndim == 2 else cam.copy()
@@ -1027,15 +1037,18 @@ class Monitor:
                         on = n if now < until else 0
                         hover = None
                         if self._mouse is not None:
-                            from .attract import learn_hit
-                            hover = learn_hit(*self._mouse, size, asking=self.visit.state == "ask")
+                            from .attract import learn_hit, tall_to_slide
+                            mx, my = tall_to_slide(*self._mouse, win_size) if tall else self._mouse
+                            hover = learn_hit(mx, my, size, asking=self.visit.state == "ask")
                         canvas = self._screens.learn_more(
                             now, self._learn_url, size, playing=on,
                             progress=(now - start) / max(0.1, until - start) if on else 0.0,
                             hover=hover, visit=self._visit_view())
-                    else:      # calibrating: look at the game screen, to the right
+                    else:      # calibrating: look at the game screen
                         canvas = self._screens.calibrating(now, progress,
                                                            self.features.calibrator.hint or "", size)
+                    if tall:
+                        canvas = stack_tall(canvas, win_size)
                 else:
                     canvas = draw_overlay(
                         frame.image, lms, ff, state,
@@ -1054,9 +1067,10 @@ class Monitor:
                                 frame.timestamp, frame.timestamp - t_start, fps,
                                 progress if calibrating else -1.0, alerts_on))
                         _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                        tall = is_tall(win_w, win_h)
                         hover = None
                         if self._mouse is not None:
-                            mx, my = window_to_canvas(*self._mouse, win_w, win_h)
+                            mx, my = window_to_dash(*self._mouse, win_w, win_h)
                             if self._popup_at is not None or self._tip_at is not None:
                                 from .attract import popup_hit
                                 hover = popup_hit(mx, my)
@@ -1066,7 +1080,8 @@ class Monitor:
                         dash.hover = hover
                         dash.voice = AudioActuator.lang
                         canvas = dash.compose(canvas)
-                        canvas = fit_to_window(canvas, win_w, win_h)
+                        if not tall:
+                            canvas = fit_to_window(canvas, win_w, win_h)
                         if self.mode == "tour":
                             if self._screens is None:
                                 from .attract import Screens
@@ -1082,6 +1097,8 @@ class Monitor:
                                 from .attract import Screens
                                 self._screens = Screens(self.root)
                             self._screens.learn_popup(canvas, now - self._tip_at, now, hover, "sleepy")
+                        if tall:                       # cut and stacked for the side panel
+                            canvas = fit_to_window(column_compose(canvas), win_w, win_h)
                     if self.demo and dash is None:
                         h = canvas.shape[0]
                         label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")

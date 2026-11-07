@@ -6,6 +6,10 @@ the last update is at the bottom.
 
 ## The goal right now
 
+**Exhibition 10 Nov 2026. No personal monitor allowed: the booth runs on the
+teammate's Windows laptop, game ⅔ + the Pi's screen over VNC ⅓. See
+`docs/LAPTOP_SETUP.md`.**
+
 A **demo booth / exhibition** for Bamnun, the Raspberry Pi drowsiness monitor.
 The person at the booth sits at a game steering wheel (Euro Truck Simulator on
 a separate computer), the Bamnun device sits **low on the table to the
@@ -25,7 +29,7 @@ the Wi-Fi hotspot.
   `~/.ssh/config` has the host) or Pi Connect. The Mac's SSH key is on the Pi.
 - Update the Pi: `tools/booth/pi.sh update` from the Mac (git pull on the Pi),
   then **close and reopen bamnun on the Pi** (desktop icon → `tools/run_pi.sh`).
-- Tests: `python -m pytest -q` (335 pass). On the Mac a venv with the deps is
+- Tests: `python -m pytest -q` (337 pass). On the Mac a venv with the deps is
   needed; on the Pi use `~/bamnun/.venv/bin/python`.
 - `local-wip` branch (Mac and Pi): the owner's own older uncommitted edits
   (dashboard, rotation, voice recordings). Never compared with the friend's
@@ -202,6 +206,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-07: laptop setup: VNC on the Pi (wayvnc :5900), cable profile `bamnun-laptop` (Pi = 10.43.0.1, DHCP, no route/DNS), Bamnun auto-switches to a tall layout (stacked dashboard and slides, arrow left) when its window is taller than wide; docs/LAPTOP_SETUP.md.
 - 2026-11-07: website published with redesign part 1 + walkthrough for everyone; fixed the app frame sliding out of place on phones (the walkthrough's scrollIntoView scrolled the stage/phone frame; now only `.screen` scrolls, and `BN_UNSCROLL` in shell.html snaps the frame back).
 - 2026-11-07: dashboard buttons folded into one SETTINGS menu (bottom-right of the camera); phone walkthrough for every website visitor (not only with a personal code; not published yet).
 - 2026-11-07: phone app redesign part 1 built (flat colours, Pretendard, flat Ollie, Home/Trips/Insights/Stages layouts); website not updated yet.

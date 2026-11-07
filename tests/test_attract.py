@@ -337,3 +337,36 @@ def test_only_settings_shows_until_it_is_opened():
     d.menu_open = True
     opened = d.compose(cam)
     assert not closed[y + 3, x + 3].any() and opened[y + 3, x + 3].any()
+
+
+def test_a_tall_window_stacks_the_dashboard_and_clicks_still_land():
+    from bamnun.viz import (COLUMN_SIZE, SETTINGS, Dashboard, column_compose, fit_to_window,
+                            is_tall, window_to_dash)
+    assert is_tall(640, 1040) and not is_tall(1280, 720)
+    d = Dashboard()
+    col = column_compose(d.compose(np.zeros((480, 640, 3), np.uint8)))
+    assert col.shape[:2] == (COLUMN_SIZE[1], COLUMN_SIZE[0])
+    win = (640, 1040)
+    assert fit_to_window(col, *win).shape[:2] == (1040, 640)
+    # SETTINGS, clicked in the tall window, is SETTINGS on the dashboard.
+    sx, sy, sw, sh = SETTINGS
+    s = min(win[0] / COLUMN_SIZE[0], win[1] / COLUMN_SIZE[1])
+    ox, oy = (win[0] - int(COLUMN_SIZE[0] * s)) // 2, (win[1] - int(COLUMN_SIZE[1] * s)) // 2
+    wx, wy = int(ox + (sx + sw / 2) * s), int(oy + (sy + sh / 2) * s)
+    x, y = window_to_dash(wx, wy, *win)
+    assert sx <= x <= sx + sw and sy <= y <= sy + sh
+
+
+def test_a_tall_window_stacks_the_slides_and_the_cards_still_click():
+    from bamnun.attract import (_card_rect, learn_hit, stack_tall, tall_slide_size,
+                                tall_to_slide)
+    s = Screens(ROOT)
+    win = (640, 1040)
+    size = tall_slide_size(win)
+    out = stack_tall(s.learn_more(0.0, "https://example.org/", size), win)
+    assert out.shape[:2] == (1040, 640)
+    # Card 3 sits in the lower (words) half: find it by searching the window.
+    hits = {learn_hit(*tall_to_slide(x, y, win), size) for x in range(0, 640, 16) for y in range(520, 1040, 16)}
+    assert {"stage1", "stage2", "stage3", "stage4", "qr_back"} <= hits
+    s.game_left = True                             # the arrow points at the game, left
+    assert s.calibrating(0.0, 0.5, "", size).shape[:2] == (size[1], size[0])

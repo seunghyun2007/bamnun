@@ -136,4 +136,9 @@ for out in OUT.split(","):
         staff = open(os.path.join(os.path.dirname(__file__), "staff.html"), encoding="utf-8").read()
         staff = staff.replace("__SB_URL__", sb_url).replace("__SB_KEY__", sb_key)
         open(os.path.join(os.path.dirname(out), "staff.html"), "w", encoding="utf-8", newline="\n").write(staff)
+        # Install as an app, full screen (Chrome: menu > 홈 화면에 추가 / 앱 설치).
+        import shutil
+        pwa = os.path.join(os.path.dirname(__file__), "pwa")
+        for f in os.listdir(pwa):
+            shutil.copy(os.path.join(pwa, f), os.path.join(os.path.dirname(out), f))
 print("ok", len(html))

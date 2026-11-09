@@ -208,6 +208,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-09: full screen on Android: the remote has a ⛶ 전체 화면 button (Fullscreen API) and bigger buttons on tablets; both pages have app manifests (`frontend/build/pwa/`: app.webmanifest, staff.webmanifest, icons, `display: fullscreen`), so Chrome ⋮ > 홈 화면에 추가 / 앱 설치 opens them with no browser bars. The remote remembers its staff code (localStorage) so the installed app works without ?k=. build.py copies pwa/ into www; publish all of www/ to gh-pages.
 - 2026-11-09: website: on any touch screen (unfolded foldables, tablets, phones sideways) the app fills the screen with no phone frame: the 390-wide layout scales up to 1.6x and is centred on the app's own background (`fit()` in shell.html). Only desktop browsers still show the framed phone.
 - 2026-11-09: docs/NEW_SESSION.md, a brief for a Claude Code session on another computer.
 - 2026-11-07: booth remote: a staff phone controls the Pi without touching the laptop. Page `staff.html?k=<STAFF_CODE>` (frontend/build/staff.html, published next to the website): stages 1-4, 0 = all off, next person, recalibrate, photos off/on, volume, voice. Mailbox `booth_commands` in Supabase (supabase/booth_remote.sql, run with the real code; the code is NOT in git: it's in the Pi's frontend/.env as STAFF_CODE and in the staff link). The Pi polls every 1 s (`remote.py`), commands older than 15 s are dropped. Needs the Pi online.

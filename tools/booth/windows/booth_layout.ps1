@@ -1,4 +1,4 @@
-# Booth layout: Euro Truck Simulator 2 on the left 2/3, RealVNC on the right 1/3.
+﻿# Booth layout: Euro Truck Simulator 2 on the left 2/3, RealVNC on the right 1/3.
 #
 # Why: Windows Snap can't place ETS2 when its window is as big as the screen
 # (the title bar sits off the top, nothing to grab). This script places both
@@ -9,7 +9,8 @@
 # Run it again any time a window gets moved. It changes nothing permanent.
 
 param(
-    [double]$GameShare = 2.0 / 3.0   # part of the screen width for the game
+    [double]$GameShare = 2.0 / 3.0,  # part of the screen width for the game
+    [switch]$KeepVncTitleBar         # leave RealVNC's title bar (and its X) in place
 )
 
 Add-Type @"
@@ -34,6 +35,19 @@ public static class BoothWin {
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int a, out RECT r, int size);
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
+
+    // Take away the title bar and resize border (and with them the X button).
+    // Lasts until the window is closed; nothing is saved anywhere.
+    public static void NoTitleBar(IntPtr h) {
+        long style = GetWindowLongPtr(h, -16).ToInt64();            // GWL_STYLE
+        long bare = style & ~(0x00C00000L | 0x00040000L);            // WS_CAPTION | WS_THICKFRAME
+        if (bare != style) {
+            SetWindowLongPtr(h, -16, new IntPtr(bare));
+            SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0237);        // FRAMECHANGED | NOMOVE | NOSIZE | NOZORDER | NOACTIVATE
+        }
+    }
 
     public class Win { public IntPtr Handle; public uint Pid; public string Title; public int Area; }
 
@@ -98,6 +112,7 @@ if (-not $vnc) {
 
 $missing = @()
 if ($game) { [BoothWin]::Place($game.Handle, $work.L, $work.T, $gameW, $H) } else { $missing += 'Euro Truck Simulator 2' }
+if ($vnc -and -not $KeepVncTitleBar) { [BoothWin]::NoTitleBar($vnc.Handle) }
 if ($vnc)  { [BoothWin]::Place($vnc.Handle, $work.L + $gameW, $work.T, $W - $gameW, $H) } else { $missing += 'RealVNC (connected to the Pi)' }
 
 # Give the game the focus last, so the wheel drives it straight away.

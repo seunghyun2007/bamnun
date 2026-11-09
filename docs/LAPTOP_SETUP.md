@@ -46,6 +46,16 @@ screen.
    the right ⅓, in real pixels at any display scaling, then gives the game
    the focus. It changes nothing permanent; run it again whenever a window
    moves.
+5. Optional, recommended: a desktop shortcut **Booth guard** to
+   `powershell -NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File <repo>\tools\booth\windows\booth_guard.ps1`.
+   It runs Booth layout, then lets visitors use only the game and RealVNC:
+   anything else that comes to the front is covered by a full-screen lock
+   ("게임으로 돌아가기 · Back to the game" button + staff PIN), and the
+   Windows keys, Alt+F4, Ctrl+Esc and Ctrl+Shift+Esc do nothing. The right
+   PIN unlocks everything for 10 minutes; while unlocked, the shield icon in
+   the tray can quit it. The PIN is chosen at the first start and kept as a
+   salted hash in `%APPDATA%\BamnunBoothGuard\pin.txt` (delete it to choose a
+   new one). Ctrl+Alt+Del always works if something goes wrong.
 
 ## At the booth, every time
 
@@ -54,7 +64,8 @@ screen.
    - Not connecting? Backup 1: Pi Connect in a browser
      (connect.raspberrypi.com). Backup 2: `inpi.local` in RealVNC Viewer.
 3. In the VNC window, open **bamnun** from the Pi's desktop icon.
-4. Double-click **Booth layout** on the laptop's desktop. Or arrange the
+4. Double-click **Booth guard** (it arranges the windows too), or just
+   **Booth layout** on the laptop's desktop. Or arrange the
    windows by hand (Windows Snap, or a FancyZones ⅔ / ⅓ layout):
    - Game: drag to the left, make it two thirds wide, full height.
      The game renders at the window's size; it isn't stretched.

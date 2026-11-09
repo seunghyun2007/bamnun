@@ -208,6 +208,7 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
 
 ## Log (newest first)
 
+- 2026-11-09: Windows split screen: `tools/booth/windows/booth_layout.ps1` (desktop shortcut "Booth layout") puts ETS2 on the left ⅔ and the RealVNC window showing the Pi on the right ⅓, in real pixels at any scaling (owner confirmed it works with the Pi connected). Snap failed on the owner's PC because ETS2's window was 1920×1080 on a 1920×1080 screen (125% scaling); its config.cfg is now 1280×980 (backup `config.cfg.before-booth`). Owner's new Windows PC set up: Git, Node, Tailscale (`ssh inpi` works via Tailscale SSH), RealVNC Connect Viewer 8.6 (the old "VNC Viewer" winget package 404s).
 - 2026-11-09: full screen on Android: the remote has a ⛶ 전체 화면 button (Fullscreen API) and bigger buttons on tablets; both pages have app manifests (`frontend/build/pwa/`: app.webmanifest, staff.webmanifest, icons, `display: fullscreen`), so Chrome ⋮ > 홈 화면에 추가 / 앱 설치 opens them with no browser bars. The remote remembers its staff code (localStorage) so the installed app works without ?k=. build.py copies pwa/ into www; publish all of www/ to gh-pages.
 - 2026-11-09: website: on any touch screen (unfolded foldables, tablets, phones sideways) the app fills the screen with no phone frame: the 390-wide layout scales up to 1.6x and is centred on the app's own background (`fit()` in shell.html). Only desktop browsers still show the framed phone.
 - 2026-11-09: docs/NEW_SESSION.md, a brief for a Claude Code session on another computer.
@@ -244,4 +245,4 @@ Supabase project `oyfhampefdytoikzxcgd` (keys in `frontend/.env`, not in git).
   fix, calibration fixes, dashboard + buttons, camera rotation.
 - 2026-11-05: booth mode, voice, Supabase sign-in, merge of app-accounts (PR #4).
 
-_Last updated: 2026-11-07._
+_Last updated: 2026-11-09._

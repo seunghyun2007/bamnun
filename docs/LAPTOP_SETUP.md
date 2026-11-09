@@ -35,7 +35,17 @@ screen.
 2. Install **Microsoft PowerToys** (optional, for "always on top" and exact
    window sizes with FancyZones).
 3. Euro Truck Simulator 2: Options → Graphics → **windowed / borderless**
-   (not full screen), so it can share the screen.
+   (not full screen), so it can share the screen. If the game window is as
+   big as the screen (its title bar off the top), Snap can't move it: close
+   the game and set `r_mode_width` / `r_mode_height` in
+   `Documents\Euro Truck Simulator 2\config.cfg` to about two thirds of the
+   screen (e.g. 1280 / 980 on a 1920×1080 screen). Back the file up first.
+4. Make a desktop shortcut **Booth layout** to
+   `powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File <repo>\tools\booth\windows\booth_layout.ps1`.
+   It puts the game on the left ⅔ and the RealVNC window showing the Pi on
+   the right ⅓, in real pixels at any display scaling, then gives the game
+   the focus. It changes nothing permanent; run it again whenever a window
+   moves.
 
 ## At the booth, every time
 
@@ -44,7 +54,8 @@ screen.
    - Not connecting? Backup 1: Pi Connect in a browser
      (connect.raspberrypi.com). Backup 2: `inpi.local` in RealVNC Viewer.
 3. In the VNC window, open **bamnun** from the Pi's desktop icon.
-4. Arrange the windows (Windows Snap, or a FancyZones ⅔ / ⅓ layout):
+4. Double-click **Booth layout** on the laptop's desktop. Or arrange the
+   windows by hand (Windows Snap, or a FancyZones ⅔ / ⅓ layout):
    - Game: drag to the left, make it two thirds wide, full height.
      The game renders at the window's size; it isn't stretched.
    - RealVNC Viewer: right third, full height. In the viewer, set scaling to
@@ -76,6 +87,7 @@ screen.
 | VNC can't connect | Unplug/replug the cable, wait 30 s; try `inpi.local`; else Pi Connect in a browser |
 | Bamnun looks tiny / landscape | The window isn't taller than wide: narrow the VNC window or set the viewer to "fit to window" |
 | Wheel stops working | Click the game window |
+| Game and Bamnun won't split / Snap does nothing | Double-click **Booth layout**; if the game is still full screen, see setup step 3 |
 | The visitor's QR says offline | The Pi has no internet: switch the Pi to a phone hotspot (Pi Connect or VNC → Wi-Fi menu) |
 | Pi too hot banner | Let it cool; check the fan |
 

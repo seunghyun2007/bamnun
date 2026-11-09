@@ -2728,12 +2728,14 @@ setLang(LANG);
 function fit(){
   const w=innerWidth,h=innerHeight;
   // A phone, or any touch screen (an unfolded foldable, a tablet, a phone on
-  // its side): fill it edge to edge, no phone frame. Wider screens get a
-  // wider layout (up to 560) so the app doesn't just grow huge.
+  // its side): no phone frame. The screens are drawn 390 wide, so they're
+  // scaled to the width (at most 1.6x, past that they'd look blown up) and
+  // centred on the app's own background, with no visible edge.
   const touch=matchMedia("(pointer: coarse)").matches||navigator.maxTouchPoints>0;
-  if(w<=500||touch){ const base=Math.max(390,Math.min(560,w/1.25)), s=w/base;
-    phone.classList.add("full"); phone.style.width=base+"px"; phone.style.height=(h/s)+"px"; phone.style.transform=`scale(${s})`; }
-  else { phone.classList.remove("full"); phone.style.width=""; phone.style.height="844px"; const s=Math.min(1.15,(h-48)/844,(w-48)/390); phone.style.transform=`translate(-50%,-50%) scale(${s})`; }
+  if(w<=500||touch){ const s=Math.min(w/390,1.6), ox=Math.max(0,(w-390*s)/2);
+    phone.classList.add("full"); phone.style.height=(h/s)+"px"; phone.style.transform=`translate(${ox}px,0) scale(${s})`;
+    document.body.style.background=getComputedStyle(phone).backgroundColor; }
+  else { phone.classList.remove("full"); document.body.style.background=""; phone.style.height="844px"; const s=Math.min(1.15,(h-48)/844,(w-48)/390); phone.style.transform=`translate(-50%,-50%) scale(${s})`; }
   fitScreen(phone.querySelector(".screen:not(.leave)"));
 }
 // The setup screens are drawn 844 tall, with their buttons pinned to the

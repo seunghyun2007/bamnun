@@ -1,0 +1,9 @@
+node_modules/
+.venv/
+frames/
+stills/
+check/
+built.html
+*.mp4
+audio/*.wav
+package-lock.json

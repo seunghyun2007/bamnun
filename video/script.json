@@ -1,0 +1,80 @@
+[
+ {
+  "id": "s01",
+  "ko": "밤길 운전, 가장 위험한 순간은 눈이 감기는 단 1초예요.",
+  "en": "Night driving: the most dangerous moment is the one second your eyes close.",
+  "say": "밤길 운전, 가장 위험한 순간은 눈이 감기는 단 일 초예요."
+ },
+ {
+  "id": "s02",
+  "ko": "고속도로 사망 사고 원인의 약 70%가 졸음과 주시 태만이에요.",
+  "en": "About 70% of fatal highway crashes come from drowsiness and inattention.",
+  "say": "고속도로 사망 사고 원인의 약 칠십 퍼센트가 졸음과 주시 태만이에요."
+ },
+ {
+  "id": "s03",
+  "ko": "그래서 저희가 밤눈을 만들었어요. 저는 밤눈의 운전 친구, 올리예요.",
+  "en": "So we built Bamnun. I'm Ollie, your night-driving companion."
+ },
+ {
+  "id": "s04",
+  "ko": "적외선 카메라가 어둠 속에서도 얼굴과 눈을 읽어요.",
+  "en": "An infrared camera reads your face and eyes, even in the dark."
+ },
+ {
+  "id": "s05",
+  "ko": "눈이 얼마나 감겼는지, 얼마나 자주 깜빡이는지, 고개가 떨어지는지까지요.",
+  "en": "How closed your eyes are, how often you blink, whether your head drops."
+ },
+ {
+  "id": "s06",
+  "ko": "이 신호들을 모아 지금 얼마나 졸린지 점수로 알려 줘요.",
+  "en": "Together, they become a live drowsiness score."
+ },
+ {
+  "id": "s07",
+  "ko": "졸음이 느껴지면, 네 단계로 깨워요.",
+  "en": "When drowsiness builds, I wake you in four steps."
+ },
+ {
+  "id": "s08",
+  "ko": "먼저 은은한 파란 불빛.",
+  "en": "First, a soft blue light."
+ },
+ {
+  "id": "s09",
+  "ko": "다음은 시원한 민트 향.",
+  "en": "Then a cool mint mist."
+ },
+ {
+  "id": "s10",
+  "ko": "그래도 졸리면 제가 직접 말을 걸고,",
+  "en": "Still sleepy? I'll talk to you,"
+ },
+ {
+  "id": "s11",
+  "ko": "마지막엔 알람이 울려요.",
+  "en": "and finally, an alarm."
+ },
+ {
+  "id": "s12",
+  "ko": "휴대폰 앱에서는 운전 기록과 졸음 패턴을 볼 수 있어요.",
+  "en": "The phone app shows your drives and your drowsiness patterns."
+ },
+ {
+  "id": "s13",
+  "ko": "언제 가장 졸린지, 무엇이 나를 깨웠는지까지요.",
+  "en": "When you get sleepiest, and what woke you up."
+ },
+ {
+  "id": "s14",
+  "ko": "지금 부스에서 직접 체험해 보세요. QR 코드로 내 운전 기록도 받을 수 있어요.",
+  "en": "Try it here at the booth, and scan the QR code to take your drive home.",
+  "say": "지금 부스에서 직접 체험해 보세요. 큐알 코드로 내 운전 기록도 받을 수 있어요."
+ },
+ {
+  "id": "s15",
+  "ko": "밤길엔, 밤눈.",
+  "en": "For night roads: Bamnun."
+ }
+]

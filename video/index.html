@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>밤눈 product film</title>
+<style>
+  @font-face { font-family: Pretendard; src: url(../frontend/fonts/pretendard.woff2) format("woff2"); font-weight: 100 900; }
+  :root { --night:#141218; --panel:#1F1C24; --line:#2E2A33; --text:#F2EEE8; --muted:#9A93A0; --cream:#E8D7AE;
+          --blue:#4C7DFF; --mint:#8FE3C8; --amber:#F2B66D; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--night); }
+  body { font-family: Pretendard, "Apple SD Gothic Neo", sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .ko-xl { font-size: 120px; font-weight: 800; letter-spacing: -2px; }
+  .ko-l { font-size: 76px; font-weight: 750; letter-spacing: -1px; }
+  .ko-m { font-size: 46px; font-weight: 650; }
+  .en { color: var(--muted); font-weight: 450; }
+  .chip { display: inline-block; padding: 18px 30px; border-radius: 999px; background: var(--panel); border: 2px solid var(--line);
+          font-size: 40px; font-weight: 650; margin: 0 12px; }
+  .chip small { display: block; font-size: 22px; color: var(--muted); font-weight: 450; margin-top: 4px; }
+  #subs { position: absolute; left: 0; right: 0; bottom: 46px; text-align: center; }
+  #subs .ko { font-size: 44px; font-weight: 650; text-shadow: 0 2px 10px rgba(0,0,0,.8); }
+  #subs .en { font-size: 26px; margin-top: 8px; text-shadow: 0 2px 8px rgba(0,0,0,.8); }
+  .card { position: absolute; background: var(--panel); border: 2px solid var(--line); border-radius: 28px; }
+  .phone { position: absolute; width: 400px; height: 862px; border-radius: 56px; background: #0c0b0f; border: 10px solid #2a2730;
+           overflow: hidden; }
+  .phone img { position: absolute; left: 0; top: 0; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- A: the night road, eyes closing -->
+<div class="scene" id="A">
+  <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+    <rect width="1920" height="1080" fill="#0b0a0e"/>
+    <polygon points="760,520 1160,520 1920,1080 0,1080" fill="#16141b"/>
+    <g id="dashes"></g>
+    <line x1="960" y1="520" x2="960" y2="520" stroke="none"/>
+    <ellipse id="glow" cx="960" cy="560" rx="520" ry="160" fill="#E8D7AE" opacity=".06"/>
+  </svg>
+  <div id="lidTop" style="position:absolute;left:0;right:0;top:0;height:0;background:#000;border-bottom-left-radius:50% 60px;border-bottom-right-radius:50% 60px"></div>
+  <div id="lidBot" style="position:absolute;left:0;right:0;bottom:0;height:0;background:#000;border-top-left-radius:50% 60px;border-top-right-radius:50% 60px"></div>
+  <div class="center" style="position:absolute;inset:0">
+    <div id="oneSec" style="opacity:0"><div class="ko-xl" style="color:var(--cream)">단 1초</div><div class="en" style="font-size:40px;margin-top:8px">just one second</div></div>
+  </div>
+</div>
+
+<!-- B: the statistic -->
+<div class="scene center" id="B">
+  <div class="ko-m" style="color:var(--muted)">고속도로 사망 사고 원인</div>
+  <div style="font-size:300px;font-weight:850;letter-spacing:-8px;color:var(--cream);line-height:1.05"><span id="pct">0</span>%</div>
+  <div class="ko-l">졸음 · 주시 태만</div>
+  <div class="en" style="font-size:34px;margin-top:10px">of fatal highway crashes: drowsiness and inattention</div>
+  <div style="position:absolute;bottom:170px;font-size:24px;color:#6f6875">출처: 한국도로공사, 최근 5년 고속도로 사망사고 원인 69.8% (서울신문 2022.9.27)</div>
+</div>
+
+<!-- C: meet Bamnun and Ollie -->
+<div class="scene" id="C">
+  <div id="device" style="position:absolute;left:300px;top:250px;width:640px;height:520px">
+    <svg viewBox="0 0 640 520" width="640" height="520">
+      <path d="M70 120 L560 70 Q600 66 604 104 L620 380 Q622 420 584 428 L110 470 Q70 474 64 434 L40 170 Q36 124 70 120 Z" fill="#1b1a1d"/>
+      <path d="M90 140 L540 96 L560 400 L110 440 Z" fill="#232126"/>
+      <g transform="translate(250,120) rotate(-5)">
+        <path d="M22 22 L17 9 L31 16 Z M78 22 L83 9 L69 16 Z" fill="#E8D7AE"/>
+        <path d="M18 34 C18 16 32 11 50 11 C68 11 82 16 82 34 L84 66 C84 86 70 96 50 96 C30 96 16 86 16 66 Z" fill="#E8D7AE" transform="scale(1.6)"/>
+        <g transform="scale(1.6)"><circle cx="36" cy="38" r="11" fill="none" stroke="#1b1a1d" stroke-width="4"/><circle cx="64" cy="38" r="11" fill="none" stroke="#1b1a1d" stroke-width="4"/><circle cx="36" cy="38" r="4.5" fill="#1b1a1d"/><circle cx="64" cy="38" r="4.5" fill="#1b1a1d"/><path d="M46 47 L54 47 L50 55 Z" fill="#1b1a1d"/></g>
+      </g>
+      <text x="300" y="400" fill="#E8D7AE" font-size="74" font-weight="800" font-family="Pretendard" transform="rotate(-5 300 400)">밤눈</text>
+      <rect x="130" y="330" width="90" height="62" rx="6" fill="#0d0c0f" transform="rotate(-5 175 361)"/>
+    </svg>
+  </div>
+  <img id="ollieC" src="assets/hello.webp" style="position:absolute;left:1180px;top:250px;width:440px">
+  <div id="nameC" style="position:absolute;left:1080px;top:720px;width:640px;text-align:center">
+    <div class="ko-l">밤눈 · <span style="color:var(--cream)">올리</span></div>
+    <div class="en" style="font-size:34px">Bamnun, with Ollie, your night-driving companion</div>
+  </div>
+</div>
+
+<!-- D: how it sees -->
+<div class="scene" id="D">
+  <div style="position:absolute;left:180px;top:140px;width:760px;height:700px;border-radius:32px;background:#0f0e13;border:2px solid var(--line);overflow:hidden">
+    <svg viewBox="0 0 760 700" width="760" height="700">
+      <defs><radialGradient id="ir" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#3a3542"/><stop offset="1" stop-color="#0f0e13"/></radialGradient></defs>
+      <rect width="760" height="700" fill="url(#ir)"/>
+      <path d="M380 110 C520 110 580 230 570 360 C560 500 470 610 380 610 C290 610 200 500 190 360 C180 230 240 110 380 110 Z" fill="#5a5363"/>
+      <g id="mesh"></g>
+      <g id="eyes"></g>
+      <text x="24" y="44" fill="#9A93A0" font-size="22" font-family="Pretendard">IR CAMERA · 적외선</text>
+    </svg>
+  </div>
+  <div style="position:absolute;left:1020px;top:160px;width:760px">
+    <div class="ko-l" id="dTitle">어둠 속에서도<br>눈을 읽어요</div>
+    <div class="en" style="font-size:34px;margin-top:12px">An infrared camera reads your eyes, even in the dark</div>
+    <div style="margin-top:56px;display:flex;flex-direction:column;gap:22px;align-items:flex-start">
+      <div class="chip" id="chip1">눈 감김 정도<small>how closed</small></div>
+      <div class="chip" id="chip2">깜빡임<small>blinks</small></div>
+      <div class="chip" id="chip3">고개 떨굼<small>head drop</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- E: the drowsiness score -->
+<div class="scene center" id="E">
+  <div class="ko-l">지금, 얼마나 졸린지</div>
+  <div class="en" style="font-size:34px;margin-top:8px">a live drowsiness score</div>
+  <div style="position:relative;width:1300px;height:44px;margin-top:80px;border-radius:22px;background:var(--panel);border:2px solid var(--line);overflow:hidden">
+    <div id="bar" style="position:absolute;left:0;top:0;bottom:0;width:0;border-radius:22px;background:var(--cream)"></div>
+  </div>
+  <div style="width:1300px;display:flex;justify-content:space-between;margin-top:22px;font-size:34px;font-weight:650">
+    <span id="l1">깨어 있음</span><span id="l2" style="color:var(--muted)">졸림</span><span id="l3" style="color:var(--muted)">위험</span>
+  </div>
+  <div id="score" style="font-size:150px;font-weight:850;margin-top:40px;color:var(--cream)">1</div>
+</div>
+
+<!-- F: the four wake-up stages -->
+<div class="scene" id="F">
+  <div style="position:absolute;top:120px;left:0;right:0;text-align:center">
+    <div class="ko-l">네 단계로 깨워요</div>
+    <div class="en" style="font-size:34px;margin-top:8px">four steps to wake you</div>
+  </div>
+  <div id="stages"></div>
+</div>
+
+<!-- G: the phone app -->
+<div class="scene" id="G">
+  <div class="phone" id="phone" style="left:1300px;top:44px">
+    <img id="scrHome" src="assets/app_home.png">
+    <img id="scrTrip" src="assets/app_trip.png">
+    <img id="scrIns" src="assets/app_insights.png">
+  </div>
+  <div style="position:absolute;left:200px;top:300px;width:900px">
+    <div class="ko-l" id="gT1">운전 기록과<br>졸음 패턴</div>
+    <div class="en" style="font-size:34px;margin-top:12px" id="gE1">your drives and drowsiness patterns, on your phone</div>
+    <div style="margin-top:50px;display:flex;gap:16px;flex-wrap:wrap" id="gChips">
+      <div class="chip" id="g1">실제 경로<small>real routes</small></div>
+      <div class="chip" id="g2">가장 졸린 시간<small>when you're sleepiest</small></div>
+      <div class="chip" id="g3">무엇이 깨웠는지<small>what woke you</small></div>
+    </div>
+  </div>
+</div>
+
+<!-- H: the booth and the QR -->
+<div class="scene" id="H">
+  <img src="assets/game_drive.jpg" style="position:absolute;left:150px;top:200px;width:980px;border-radius:24px;opacity:.85">
+  <div style="position:absolute;left:150px;top:110px;font-size:40px;font-weight:650">부스에서 직접 운전해 보세요 <span class="en" style="font-size:28px">try it at the booth</span></div>
+  <div id="qrCard" style="position:absolute;left:1220px;top:150px;width:560px;height:700px;background:#fff;border-radius:32px;padding:30px;text-align:center">
+    <img src="assets/qr_site.png" style="width:500px;height:500px">
+    <div style="color:#15131A;font-size:52px;font-weight:800;margin-top:6px">내 운전 기록 받기</div>
+    <div style="color:#55505c;font-size:26px;margin-top:6px">scan to take your drive home</div>
+  </div>
+</div>
+
+<!-- I: end card -->
+<div class="scene center" id="I">
+  <img src="assets/ollie_flat_M.svg" id="ollieEnd" style="width:300px">
+  <div style="font-size:150px;font-weight:850;color:var(--cream);letter-spacing:6px;margin-top:10px">밤눈</div>
+  <div class="ko-m" style="margin-top:6px">밤길엔, 밤눈.</div>
+  <div class="en" style="font-size:30px;margin-top:8px">Bamnun · for night roads</div>
+  <div style="position:absolute;bottom:60px;font-size:24px;color:#6f6875">2026 창보고 전시회</div>
+</div>
+
+<div id="subs"><div class="ko"></div><div class="en"></div></div>
+
+<script>
+const LINES = __LINES__;            // [{id, ko, en, start, dur}]
+const END = 66.0;
+const SCENES = { A: [0, 5.8], B: [5.8, 11.7], C: [11.7, 17.9], D: [17.9, 28.5], E: [28.5, 33.1], F: [33.1, 45.6],
+                 G: [45.6, 54.1], H: [54.1, 61.2], I: [61.2, 66.6] };
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const inout = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const $ = (id) => document.getElementById(id);
+const appear = (el, t, t0, d = 0.6, dy = 24) => { const k = ease((t - t0) / d); el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * dy}px)`; };
+
+// static builds
+(function build() {
+  // lane dashes
+  let g = '';
+  for (let i = 0; i < 14; i++) g += `<polygon class="dash" points="0,0 0,0 0,0 0,0" fill="#E8D7AE" opacity=".5"/>`;
+  $('dashes').innerHTML = g;
+  // face mesh dots (seeded)
+  let s = 7, rnd = () => (s = (s * 16807) % 2147483647) / 2147483647, dots = '';
+  for (let i = 0; i < 220; i++) {
+    let a = rnd() * Math.PI * 2, r = Math.sqrt(rnd());
+    const x = 380 + Math.cos(a) * r * 175, y = 360 + Math.sin(a) * r * 235;
+    dots += `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="#E8D7AE" opacity="0"/>`;
+  }
+  $('mesh').innerHTML = dots;
+  $('eyes').innerHTML = [300, 460].map((x) => `<ellipse class="eyeRing" cx="${x}" cy="330" rx="46" ry="22" fill="none" stroke="#8FE3C8" stroke-width="4" opacity="0"/>
+     <ellipse class="lid" cx="${x}" cy="330" rx="40" ry="16" fill="#2b2731"/>`).join('');
+  // stage cards
+  const ST = [['1', '파란 불빛', 'soft blue light', '#4C7DFF'], ['2', '민트 미스트', 'cool mint mist', '#8FE3C8'],
+              ['3', '차임과 목소리', 'chime and Ollie\'s voice', '#E8D7AE'], ['4', '알람', 'rising alarm', '#F2B66D']];
+  $('stages').innerHTML = ST.map(([n, ko, en, c], i) => `
+    <div class="card stageCard" style="left:${150 + i * 420}px;top:340px;width:380px;height:460px;text-align:center;overflow:hidden">
+      <div class="stageGlow" style="position:absolute;inset:0;background:${c};opacity:0"></div>
+      <div class="stageIcon" style="position:relative;margin:70px auto 0;width:150px;height:150px;border-radius:50%;border:4px solid ${c};display:flex;align-items:center;justify-content:center;font-size:70px;font-weight:850;color:${c}">${n}</div>
+      <div style="position:relative;font-size:46px;font-weight:750;margin-top:46px">${ko}</div>
+      <div class="en" style="position:relative;font-size:26px;margin-top:8px">${en}</div>
+      <div class="fx" style="position:absolute;left:0;right:0;bottom:0;height:120px"></div>
+    </div>`).join('');
+})();
+
+function scene(id, t) {
+  const [a, b] = SCENES[id], el = $(id);
+  const k = Math.min(clamp((t - a) / 0.5), clamp((b - t) / 0.5));
+  el.style.opacity = (t >= a && t <= b) ? k : 0;
+  return t - a;
+}
+
+window.render = function (t) {
+  // A: road rushes, eyelids close
+  let u = scene('A', t);
+  if (u >= -0.5 && u <= 7) {
+    document.querySelectorAll('.dash').forEach((d, i) => {
+      const z = ((i / 14 + t * 0.35) % 1);               // 0 far .. 1 near
+      const y0 = 520 + 560 * z * z, y1 = 520 + 560 * Math.min(1, (z + 0.035) ** 2 * 1.0 + 0.0);
+      const w0 = 4 + 40 * z * z, w1 = 4 + 40 * Math.min(1, (z + 0.035) ** 2);
+      d.setAttribute('points', `${960 - w0 / 2},${y0} ${960 + w0 / 2},${y0} ${960 + w1 / 2},${y1 + 30 * z} ${960 - w1 / 2},${y1 + 30 * z}`);
+    });
+    const close = inout((u - 1.6) / 2.8);                // eyes slowly close
+    const blink = u > 4.6 ? 1 : 0;
+    const h = 540 * Math.max(close * 0.92, blink);
+    $('lidTop').style.height = h + 'px'; $('lidBot').style.height = h + 'px';
+    const o = clamp((u - 4.7) / 0.4); $('oneSec').style.opacity = o; $('oneSec').style.transform = `scale(${0.96 + 0.04 * o})`;
+  }
+  // B: the number counts up
+  u = scene('B', t);
+  if (u > -0.5 && u < 7) $('pct').textContent = Math.round(70 * ease((u - 0.4) / 2.2));
+  // C: device slides in, Ollie pops
+  u = scene('C', t);
+  if (u > -0.5 && u < 7) {
+    const k = ease((u - 0.1) / 0.9); $('device').style.transform = `translateX(${(1 - k) * -80}px)`; $('device').style.opacity = k;
+    const p = clamp((u - 0.9) / 0.6), pop = p < 1 ? Math.sin(p * Math.PI) * 0.12 : 0;
+    $('ollieC').style.opacity = p; $('ollieC').style.transform = `translateY(${(1 - p) * 40 + Math.sin(u * 2.2) * 6}px) rotate(${Math.sin(u * 1.8) * 3}deg) scale(${0.9 + 0.1 * p + pop})`;
+    appear($('nameC'), t, 11.7 + 1.6);
+  }
+  // D: the IR face, dots, eyes, chips
+  u = scene('D', t);
+  if (u > -0.5 && u < 12) {
+    const n = Math.floor(220 * ease((u - 0.5) / 2.5));
+    document.querySelectorAll('.dot').forEach((d, i) => d.setAttribute('opacity', i < n ? 0.85 : 0));
+    const ring = clamp((u - 2.6) / 0.6);
+    document.querySelectorAll('.eyeRing').forEach((e) => e.setAttribute('opacity', ring));
+    // lids: blink every ~1.6 s, then heavier from u > 7
+    const ph = (u % 1.6) / 1.6, blink = ph > 0.9 ? Math.sin((ph - 0.9) / 0.1 * Math.PI) : 0;
+    const heavy = clamp((u - 7) / 3) * 0.55;
+    document.querySelectorAll('.lid').forEach((l) => l.setAttribute('ry', (16 * Math.max(0.12, 1 - Math.max(blink, heavy))).toFixed(1)));
+    document.querySelectorAll('.lid').forEach((l) => l.setAttribute('cy', (330 - 14 * (1 - Math.max(blink, heavy))).toFixed(1)));
+    appear($('dTitle'), t, 17.9 + 0.4);
+    appear($('chip1'), t, 22.4 + 0.2); appear($('chip2'), t, 22.4 + 2.0); appear($('chip3'), t, 22.4 + 3.8);
+  }
+  // E: the score bar rises
+  u = scene('E', t);
+  if (u > -0.5 && u < 6) {
+    const k = 0.08 + 0.8 * inout((u - 0.6) / 3.2);
+    $('bar').style.width = (k * 100) + '%';
+    $('bar').style.background = k < 0.45 ? '#E8D7AE' : k < 0.7 ? '#F2C98A' : '#F2B66D';
+    $('score').textContent = Math.max(1, Math.round(k * 9)) + ' / 9';
+    $('l2').style.color = k >= 0.45 ? '#F2EEE8' : '#9A93A0'; $('l3').style.color = k >= 0.7 ? '#F2B66D' : '#9A93A0';
+  }
+  // F: the stages light up in turn
+  u = scene('F', t);
+  if (u > -0.5 && u < 14) {
+    const on = [36.3, 38.4, 40.3, 43.1];
+    document.querySelectorAll('.stageCard').forEach((c, i) => {
+      appear(c, t, 33.1 + 0.3 + i * 0.15, 0.6, 40);
+      const since = t - on[i], next = i < 3 ? t - on[i + 1] : -1;
+      const lit = since >= 0 ? (next >= 0 ? 0.35 : 1) : 0;
+      const ramp = clamp(since / 0.3);
+      const glow = c.querySelector('.stageGlow');
+      glow.style.opacity = (since >= 0 ? (i === 3 ? 0.18 + 0.12 * Math.abs(Math.sin(since * 6)) : 0.16) * ramp * lit : 0);
+      c.style.borderColor = since >= 0 && next < 0 ? ['#4C7DFF', '#8FE3C8', '#E8D7AE', '#F2B66D'][i] : '#2E2A33';
+      c.style.transform += ` scale(${since >= 0 && next < 0 ? 1.04 : 1})`;
+      const fx = c.querySelector('.fx');
+      if (i === 1 && since >= 0) {                        // mist: soft rising puffs
+        let h = '';
+        for (let j = 0; j < 9; j++) { const ph = ((since * 0.6 + j / 9) % 1); h += `<div style="position:absolute;left:${60 + j * 30}px;bottom:${ph * 110}px;width:${30 + ph * 40}px;height:${30 + ph * 40}px;border-radius:50%;background:#8FE3C8;opacity:${(1 - ph) * 0.35 * lit}"></div>`; }
+        fx.innerHTML = h;
+      } else if (i === 2 && since >= 0) {                 // voice: a waveform
+        let h = '';
+        for (let j = 0; j < 24; j++) { const a = 10 + 40 * Math.abs(Math.sin(since * 7 + j * 0.7)) * (next >= 0 ? 0.3 : 1); h += `<div style="position:absolute;left:${40 + j * 13}px;bottom:${50 - a / 2}px;width:6px;height:${a}px;border-radius:3px;background:#E8D7AE;opacity:.8"></div>`; }
+        fx.innerHTML = h;
+      } else fx.innerHTML = '';
+    });
+  }
+  // G: the phone screens
+  u = scene('G', t);
+  if (u > -0.5 && u < 9.5) {
+    const ph = ease((u - 0.1) / 0.8); $('phone').style.transform = `translateY(${(1 - ph) * 60}px)`;
+    const tHome = 0, tTrip = 3.6, tIns = 6.4;
+    const show = (el, s, e) => { el.style.opacity = clamp((u - s) / 0.4) * (e ? clamp((e - u) / 0.4) : 1); };
+    show($('scrHome'), tHome, tTrip + 0.4); show($('scrTrip'), tTrip, tIns + 0.4); show($('scrIns'), tIns, 0);
+    $('scrTrip').style.transform = `translateY(${-120 * inout((u - tTrip - 0.6) / 2)}px)`;
+    appear($('gT1'), t, 45.6 + 0.3); appear($('gE1'), t, 45.6 + 0.6);
+    appear($('g1'), t, 45.6 + tTrip + 0.2); appear($('g2'), t, 50.1 + 0.4); appear($('g3'), t, 50.1 + 1.8);
+  }
+  // H: the booth and the QR
+  u = scene('H', t);
+  if (u > -0.5 && u < 8) { const k = ease((u - 0.8) / 0.8); $('qrCard').style.transform = `scale(${0.9 + 0.1 * k})`; $('qrCard').style.opacity = k; }
+  // I: end card
+  u = scene('I', t);
+  if (u > -0.5 && u < 6) { const k = ease(u / 0.9); $('ollieEnd').style.transform = `translateY(${(1 - k) * 30 + Math.sin(u * 2) * 5}px)`; $('ollieEnd').style.opacity = k; }
+  // subtitles
+  const line = LINES.find((l) => t >= l.start - 0.1 && t <= l.start + l.dur + 0.35);
+  const sub = $('subs');
+  sub.querySelector('.ko').textContent = line ? line.ko : '';
+  sub.querySelector('.en').textContent = line ? line.en : '';
+  sub.style.opacity = line ? clamp((t - line.start + 0.1) / 0.2) * clamp((line.start + line.dur + 0.35 - t) / 0.2) : 0;
+};
+window.END = END;
+render(0);
+</script>
+</body>
+</html>

@@ -405,3 +405,20 @@ def test_live_hints_explain_an_alert_when_it_happens_then_offer_the_qr():
     words, rect = Monitor._guide_now(m, 26.0 + GUIDE_ALERT_S)
     assert words[0].startswith("잘했어요") and rect is None
     assert Monitor._guide_now(m, 40.0 + GUIDE_ALERT_S + GUIDE_DONE_S) is None
+
+
+def test_nothing_goes_off_unless_a_visitor_is_driving():
+    m = SimpleNamespace(mode="live", _seat_empty=False, _quiet_until=0.0,
+                        features=SimpleNamespace(calibrating=False))
+    assert Monitor._alerts_allowed(m, 10.0)               # someone driving
+    m._seat_empty = True                                  # waiting for the next visitor
+    assert not Monitor._alerts_allowed(m, 10.0)
+    m._seat_empty = False
+    m.mode = "briefing"                                   # "next person": their guide
+    assert not Monitor._alerts_allowed(m, 10.0)
+    m.mode = "live"
+    m.features.calibrating = True                         # calibrating
+    assert not Monitor._alerts_allowed(m, 10.0)
+    m.features.calibrating = False
+    m._quiet_until = 15.0                                 # just back from a screen
+    assert not Monitor._alerts_allowed(m, 10.0) and Monitor._alerts_allowed(m, 15.0)

@@ -423,7 +423,7 @@ class Monitor:
             self._air_seen_at = air.updated_at
             self.logger.log_event("co2", {"t": t, "ppm": air.ppm,
                                           "temp_c": air.temp_c, "rh": air.rh})
-        if self.mode == "live" and air.should_prompt(level):
+        if self._alerts_allowed(time.monotonic()) and air.should_prompt(level):
             console.print(f"[bold yellow]CO2 {air.ppm:.0f} ppm[/]: open the window")
             a = self.policy.prompt(air.actuator, t, "co2")
             self.logger.log_event("co2_prompt", {"t": t, "ppm": air.ppm, "level": level,
@@ -552,7 +552,7 @@ class Monitor:
     def _control(self, t: float, ff: FeatureFrame) -> None:
         """Phone commands, guided calibration, trips, reminders, emergency."""
         face = bool(ff.face_found)
-        live = self.mode == "live"               # no "are you OK?" over the booth's screens
+        live = self._alerts_allowed(time.monotonic())   # no "are you OK?" unless someone's driving
         self.controller.tick(
             t, face=face, calibrated=bool(self.features.calibration.complete),
             eye_closed=bool(ff.eye_closed) if face and live and not self.features.calibrating else None,
@@ -695,7 +695,7 @@ class Monitor:
         calibrating); after learn_more.after_s, pop the offer up once."""
         dt = 0.0 if self._mode_t is None else min(1.0, max(0.0, now - self._mode_t))
         self._mode_t = now
-        if self.mode == "live" and face and not self.features.calibrating:
+        if self.mode == "live" and face and not self.features.calibrating and not self._seat_empty:
             self._driven_s += dt
         if (not self._tip_shown and self.mode == "live" and self._tip_after_s > 0
                 and self._driven_s >= self._tip_after_s and self._popup_at is None
@@ -802,6 +802,15 @@ class Monitor:
 
     def _page_progress(self, now: float) -> float:
         return min(1.0, max(0.0, (now - self._brief_at) / self._page_s()))
+
+    def _alerts_allowed(self, now: float) -> bool:
+        """Whether anything may go off on its own (wake-up stages, the
+        distraction chime, voice prompts, "are you OK?"). Only while a
+        visitor is driving: never while waiting for one (seat empty), during
+        their guide or calibration, on a booth screen, or in the first
+        seconds back from one. The staff remote and stage cards still work."""
+        return (self.mode == "live" and not self._seat_empty and not self.features.calibrating
+                and now >= self._quiet_until)
 
     def _remote_commands(self, now: float, t: float) -> None:
         """Commands from the staff phone (remote.py), on any screen."""
@@ -1050,7 +1059,7 @@ class Monitor:
                     self._plan = self.planner.plan(frame.timestamp)
                     self._last_plan_t = frame.timestamp
                     plan = self._plan
-                    if self.mode == "live" and plan.valid and (plan.recommend_rest_now or (
+                    if self._alerts_allowed(time.monotonic()) and plan.valid and (plan.recommend_rest_now or (
                             plan.rest_at_s is not None and plan.rest_at_s < 600.0)):
                         self._voice("rest_voice", frame.timestamp)
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
@@ -1058,7 +1067,7 @@ class Monitor:
                 hold = self.controller.holds_ladder(frame.timestamp)
                 # Nothing interrupts the booth's own screens (QR, briefing,
                 # standby), nor the first seconds back from one.
-                quiet = self.mode != "live" or time.monotonic() < self._quiet_until
+                quiet = not self._alerts_allowed(time.monotonic())
                 decision = (self.policy.update(state)
                             if alerts_on and not hold and not quiet else None)
                 if decision is not None:
@@ -1078,7 +1087,7 @@ class Monitor:
                 if self.visit.active and self.mode == "live":
                     self._guarded(self._record_visit, time.monotonic(), frame.image, lms, ff, state)
 
-            if calibrating or self.mode != "live" or time.monotonic() < self._quiet_until \
+            if calibrating or not self._alerts_allowed(time.monotonic()) \
                     or not alerts_on:
                 self._guarded(self.policy.tick, frame.timestamp)   # a light's hold still ends
             if self.demo:

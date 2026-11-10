@@ -356,9 +356,10 @@ class GuidedCalibration:
 
 # The booth's four wake-up stages, each as device commands and how long it
 # plays: from a phone (server.py) or the "learn more" screen (app.py).
+MIST_TEST_S = 6.0      # a test or showcase mist runs this long (at least 5 s to show)
 SHOWCASE_STAGES: dict[int, tuple[tuple[dict[str, Any], ...], float]] = {
     1: (({"cmd": "test", "part": "blue_light"},), 4.0),
-    2: (({"cmd": "test", "part": "mist"},), 4.0),
+    2: (({"cmd": "test", "part": "mist"},), MIST_TEST_S + 1.0),
     3: (({"cmd": "test", "part": "chime"}, {"cmd": "say", "line": "stage3"}), 6.0),
     4: (({"cmd": "test", "part": "alarm"}, {"cmd": "say", "line": "stage4"}), 6.0),
 }
@@ -451,7 +452,9 @@ class Controller:
         if isinstance(act, LightActuator):
             params = {"hold_s": 3.0}
         elif isinstance(act, AtomizerActuator):
-            params = {"duration_s": 2.0}
+            # Long enough to see: a 2 s pulse barely got the disc misting
+            # before it stopped (booth test, 2026-11-10).
+            params = {"duration_s": MIST_TEST_S}
         try:
             act._do_fire(self._t, **params)
         except Exception as exc:  # noqa: BLE001

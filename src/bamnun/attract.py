@@ -673,6 +673,67 @@ class Screens:
         self._cache[key] = card
         return card
 
+    # -- the tall window's panel under the camera ------------------------------- #
+
+    def standby_panel(self, t: float, size: tuple[int, int]) -> np.ndarray:
+        """Nobody at the wheel: the standby lines, fading one into the next."""
+        w, h = size
+        n = len(STANDBY_LINES)
+        k = t / STANDBY_S
+        i, frac = int(k) % n, k - int(k)
+
+        def line(j: int) -> np.ndarray:
+            key = ("standby_panel", j, w, h)
+            if key not in self._cache:
+                c = np.empty((h, w, 3), np.uint8)
+                c[:] = _BOARD
+                f = _Frame((w, h))
+                f.s, f.ox, f.oy = 1.0, 0.0, 0.0
+                ko, en = STANDBY_LINES[j]
+                c, _ = self._text(c, f, [(ko, "bold", 64, _WHITE, h / 2 - 90),
+                                         (en, "regular", 34, _GREY, h / 2 + 4),
+                                         ("핸들 앞에 앉으면 바로 시작돼요", "regular", 30, _GREY, h - 120),
+                                         ("Sit at the wheel and it starts by itself", "regular", 22, (120, 120, 120), h - 76)],
+                                  cx=w / 2, max_w=w - 60)
+                self._cache[key] = c
+            return self._cache[key]
+
+        fade = max(0.0, (frac - 0.8) / 0.2)
+        if fade == 0:
+            return line(i)
+        src = line(i if fade < 0.5 else (i + 1) % n)
+        a = 1 - fade * 2 if fade < 0.5 else fade * 2 - 1
+        empty = np.empty_like(src)
+        empty[:] = _BOARD
+        # keep the foot line steady: only the top part fades
+        out = (src * a + empty * (1 - a)).astype(np.uint8)
+        out[h - 140:] = src[h - 140:]
+        return out
+
+    def qr_panel(self, url: str, size: tuple[int, int]) -> np.ndarray:
+        """The visitor's QR code as big as the panel allows, to scan from afar."""
+        w, h = size
+        key = ("qr_panel", url, w, h)
+        if key not in self._cache:
+            c = np.empty((h, w, 3), np.uint8)
+            c[:] = (255, 255, 255)
+            f = _Frame((w, h))
+            f.s, f.ox, f.oy = 1.0, 0.0, 0.0
+            text_h = 150
+            side = min(w - 24, h - text_h - 12)
+            code = self._qr(url, side)
+            if code is not None:
+                import cv2
+                code = cv2.resize(code, (side, side), interpolation=cv2.INTER_NEAREST)   # fill the panel
+                cs = side
+                y0 = 8 + (h - text_h - 8 - cs) // 2
+                c[y0:y0 + cs, (w - cs) // 2:(w - cs) // 2 + cs] = code
+            c, _ = self._text(c, f, [("내 운전 기록 받기", "bold", 60, _BOARD, h - text_h + 6),
+                                     ("Scan: your drive, on your phone", "regular", 30, (80, 80, 80), h - text_h + 84)],
+                              cx=w / 2, max_w=w - 40)
+            self._cache[key] = c
+        return self._cache[key]
+
     # -- learn more: the pop-up and the QR code --------------------------------- #
 
     def _popup_card(self, f: _Frame, hot: bool = False, kind: str = "learn") -> tuple[np.ndarray, _Frame]:

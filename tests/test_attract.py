@@ -356,23 +356,28 @@ def test_only_settings_shows_until_it_is_opened():
     assert not closed[y + 3, x + 3].any() and opened[y + 3, x + 3].any()
 
 
-def test_a_tall_window_stacks_the_dashboard_and_clicks_still_land():
-    from bamnun.viz import (COLUMN_SIZE, SETTINGS, Dashboard, column_compose, fit_to_window,
-                            is_tall, window_to_dash)
-    assert is_tall(640, 1040) and not is_tall(1280, 720)
+def test_a_tall_window_is_the_camera_over_one_panel_and_clicks_still_land():
+    from bamnun.viz import (SETTINGS, Dashboard, column_compose, column_size, data_panel,
+                            fit_to_window, is_tall, panel_size, window_to_dash)
+    assert is_tall(720, 1200) and not is_tall(1280, 720)
+    win = (720, 1200)
     d = Dashboard()
-    col = column_compose(d.compose(np.zeros((480, 640, 3), np.uint8)))
-    assert col.shape[:2] == (COLUMN_SIZE[1], COLUMN_SIZE[0])
-    win = (640, 1040)
-    assert fit_to_window(col, *win).shape[:2] == (1040, 640)
+    dash = d.compose(np.zeros((480, 640, 3), np.uint8))
+    psize = panel_size(*win)
+    col = column_compose(dash, data_panel(dash, psize), *win)
+    assert col.shape[:2] == column_size(*win)[::-1]
+    assert fit_to_window(col, *win).shape[:2] == (1200, 720)         # fills it: no wasted space
+    s = Screens(ROOT)
+    assert s.standby_panel(0.0, psize).shape[:2] == psize[::-1]
+    url = "https://seunghyun2007.github.io/bamnun/?v=abcdefghij"
+    shown = fit_to_window(column_compose(dash, s.qr_panel(url, psize), *win), *win)
+    assert cv2.QRCodeDetector().detectAndDecode(shown)[0] == url
     # SETTINGS, clicked in the tall window, is SETTINGS on the dashboard.
     sx, sy, sw, sh = SETTINGS
-    s = min(win[0] / COLUMN_SIZE[0], win[1] / COLUMN_SIZE[1])
-    ox, oy = (win[0] - int(COLUMN_SIZE[0] * s)) // 2, (win[1] - int(COLUMN_SIZE[1] * s)) // 2
-    wx, wy = int(ox + (sx + sw / 2) * s), int(oy + (sy + sh / 2) * s)
-    x, y = window_to_dash(wx, wy, *win)
+    k = win[0] / column_size(*win)[0]
+    x, y = window_to_dash(int((sx + sw / 2) * k), int((sy + sh / 2) * k), *win)
     assert sx <= x <= sx + sw and sy <= y <= sy + sh
-
+    assert window_to_dash(360, 1000, *win) == (-1, -1)               # the panel isn't clickable
 
 def test_a_tall_window_stacks_the_slides_and_the_cards_still_click():
     from bamnun.attract import (_card_rect, learn_hit, stack_tall, tall_slide_size,

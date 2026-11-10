@@ -119,6 +119,7 @@ class Visit:
         self.code: Optional[str] = None
         self.number: Optional[int] = None
         self.photos_off = False
+        self.ready = False                      # the drive has reached the server: the QR works
         self._synced_at: Optional[float] = None
         self._consented = False
 
@@ -254,7 +255,9 @@ class Visit:
                     self._consented = True
             st, body = post("/rest/v1/rpc/put_visit", {"c": code, "p": payload})
             if self.code == code:
-                self.state = "sent" if st == 200 and body.strip() == b"true" else "failed"
+                ok = st == 200 and body.strip() == b"true"
+                self.state = "sent" if ok else "failed"
+                self.ready = self.ready or ok
 
         threading.Thread(target=run, name="visit-send", daemon=True).start()
 

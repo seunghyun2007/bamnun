@@ -254,6 +254,7 @@ class Monitor:
         lm = ui.get("learn_more") or {}
         self._learn_url = str(lm.get("url") or "")
         self._learn_after_s = float(lm.get("after_s", 60.0))
+        self._qr_after_s = float(lm.get("qr_after_s", 40.0))   # the QR replaces the data after this much driving
         # Before it, the tip to try being sleepy (left out of the briefing:
         # too much at once before someone has even driven).
         self._tip_after_s = float(lm.get("sleepy_tip_after_s", 20.0))
@@ -1192,11 +1193,17 @@ class Monitor:
                         dash.voice = AudioActuator.lang
                         dash.photos = not self.visit.photos_off
                         from .attract import Screens
-                        from .viz import QR_SLOT, QR_STRIP
+                        from .viz import QR_SLOT, data_panel, panel_size
                         if self._screens is None:
                             self._screens = Screens(self.root)
                         qr_url = self.visit.link() if self.visit.code else self._learn_url
-                        dash.qr_card = self._screens.qr_card(qr_url, bool(self.visit.code), QR_SLOT[2:])
+                        # The QR only once it works (the drive is on the server),
+                        # the visitor has driven a bit, and no alert is showing.
+                        qr_on = (bool(self.visit.code) and self.visit.ready and not self._seat_empty
+                                 and self._driven_s >= self._qr_after_s
+                                 and int(getattr(self.policy, "stage", 0)) == 0)
+                        dash.qr_card = (self._screens.qr_card(qr_url, True, QR_SLOT[2:])
+                                        if qr_on and not tall else None)
                         canvas = dash.compose(canvas)
                         if not tall:
                             canvas = fit_to_window(canvas, win_w, win_h)
@@ -1226,8 +1233,15 @@ class Monitor:
                                 self._screens = Screens(self.root)
                             self._screens.learn_popup(canvas, now - self._tip_at, now, hover, "sleepy")
                         if tall:                       # cut and stacked for the side panel
-                            strip = self._screens.qr_card(qr_url, bool(self.visit.code), QR_STRIP)
-                            canvas = fit_to_window(column_compose(canvas, strip), win_w, win_h)
+                            psize = panel_size(win_w, win_h)
+                            if self._seat_empty:
+                                panel = self._screens.standby_panel(now, psize)
+                            elif qr_on:
+                                panel = self._screens.qr_panel(qr_url, psize)
+                            else:
+                                panel = data_panel(canvas, psize)
+                            canvas = fit_to_window(column_compose(canvas, panel, win_w, win_h),
+                                                   win_w, win_h)
                     if self.demo and dash is None:
                         h = canvas.shape[0]
                         label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")

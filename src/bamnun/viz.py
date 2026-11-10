@@ -400,7 +400,6 @@ BUTTONS = {"settings": SETTINGS,
 # needed to take a drive home. Drawn by attract.Screens.qr_card.
 _CHART_CW = (_CAM_RECT[2] - 12) // 3
 QR_SLOT = (8 + _CHART_CW + 6, _CHART_Y, _CHART_CW, _CHART_H)
-QR_STRIP = (832, 250)                     # the same, across a tall window
 _BUTTON_WORDS = {"vol_down": "VOL -", "vol_up": "VOL +",
                  "calibrate": "CALIBRATE (c)", "fullscreen": "FULL SCREEN (f)",
                  "next_visitor": "NEXT PERSON (n)", "learn_more": "QR + STAGES (m)",
@@ -789,54 +788,65 @@ def is_tall(win_w: int, win_h: int) -> bool:
     return win_w > 0 and win_h > win_w * 1.15
 
 
-def _column_layout() -> tuple[list[tuple[tuple[int, int, int, int], tuple[int, int, int, int]]], tuple[int, int]]:
-    parts = [((0, 0, 848, 484), (0, 0, 848, 484))]
-    y = 492
-    parts.append(((-1, -1, QR_STRIP[0], QR_STRIP[1]), (8, y, QR_STRIP[0], QR_STRIP[1])))   # the QR
-    y += QR_STRIP[1] + 8
-    for src in ((_COL_X, 8, _COL_W, 136),       # driver state
-                (_COL_X, 260, _COL_W, 152),     # eyes
-                (_COL_X, 478, _COL_W, 134)):    # system response
-        h = round(src[3] * 832 / src[2])
-        parts.append((src, (8, y, 832, h)))
-        y += h + 8
-    return parts, (848, y)
+# The tall window: the camera on top (with SETTINGS), and under it ONE panel
+# filling the rest of the height: the standby words, the driver's data, or
+# the visitor's QR code, as big as the panel allows.
+CAM_PART = (0, 0, 848, 484)                    # the dashboard's camera, cut out
+COLUMN_W = 848
+DATA_PARTS = ((_COL_X, 8, _COL_W, 136),        # driver state
+              (_COL_X, 260, _COL_W, 152),      # eyes
+              (_COL_X, 478, _COL_W, 134))      # system response
 
 
-COLUMN_PARTS, COLUMN_SIZE = _column_layout()
+def column_size(win_w: int, win_h: int) -> tuple[int, int]:
+    """The stacked canvas for a window of that shape: as wide as the camera
+    part, as tall as the window's shape makes it (so nothing is wasted)."""
+    return COLUMN_W, max(CAM_PART[3] + 200, int(round(COLUMN_W * win_h / max(1, win_w))))
 
 
-def column_compose(canvas: np.ndarray, qr_strip: Optional[np.ndarray] = None) -> np.ndarray:
-    """The 1280x720 dashboard, cut and stacked for a tall window, with the
-    visitor's QR (``qr_strip``, QR_STRIP size) under the camera."""
+def panel_size(win_w: int, win_h: int) -> tuple[int, int]:
+    """The panel under the camera (w, h), for Screens to draw into."""
+    return COLUMN_W - 16, column_size(win_w, win_h)[1] - CAM_PART[3] - 16
+
+
+def data_panel(canvas: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    """The driver's data for the panel: state, eyes and system response cut
+    from the 1280x720 dashboard, enlarged to share the panel's height."""
     import cv2
 
-    out = np.full((COLUMN_SIZE[1], COLUMN_SIZE[0], 3), _BG, np.uint8)
-    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
-        if sx < 0:
-            if qr_strip is not None:
-                q = qr_strip[:dh, :dw]
-                out[dy:dy + q.shape[0], dx:dx + q.shape[1]] = q
-            continue
-        part = canvas[sy:sy + sh, sx:sx + sw]
-        if (dw, dh) != (sw, sh):
-            part = cv2.resize(part, (dw, dh), interpolation=cv2.INTER_CUBIC)
-        out[dy:dy + dh, dx:dx + dw] = part
+    w, h = size
+    out = np.full((h, w, 3), _BG, np.uint8)
+    gap = 8
+    total = sum(p[3] for p in DATA_PARTS)
+    k = min(w / _COL_W, (h - gap * (len(DATA_PARTS) - 1)) / total)
+    pw = int(_COL_W * k)
+    y = 0
+    for sx, sy, sw, sh in DATA_PARTS:
+        ph = int(sh * k)
+        part = cv2.resize(canvas[sy:sy + sh, sx:sx + sw], (pw, ph), interpolation=cv2.INTER_CUBIC)
+        out[y:y + ph, (w - pw) // 2:(w - pw) // 2 + pw] = part
+        y += ph + gap
     return out
 
 
-def column_to_dash(x: int, y: int) -> tuple[int, int]:
-    """A point on the stacked canvas, back on the 1280x720 dashboard."""
-    for (sx, sy, sw, sh), (dx, dy, dw, dh) in COLUMN_PARTS:
-        if sx >= 0 and dx <= x < dx + dw and dy <= y < dy + dh:
-            return int(sx + (x - dx) * sw / dw), int(sy + (y - dy) * sh / dh)
-    return -1, -1
+def column_compose(canvas: np.ndarray, panel: np.ndarray, win_w: int, win_h: int) -> np.ndarray:
+    """The camera part of the 1280x720 dashboard with ``panel`` under it."""
+    cw, ch = column_size(win_w, win_h)
+    out = np.full((ch, cw, 3), _BG, np.uint8)
+    sx, sy, sw, sh = CAM_PART
+    out[:sh, :sw] = canvas[sy:sy + sh, sx:sx + sw]
+    ph, pw = panel.shape[:2]
+    ph, pw = min(ph, ch - sh - 8), min(pw, cw - 16)
+    out[sh + 8:sh + 8 + ph, 8:8 + pw] = panel[:ph, :pw]
+    return out
 
 
 def window_to_dash(x: int, y: int, win_w: int, win_h: int) -> tuple[int, int]:
-    """A click in the window, on the 1280x720 dashboard, in either layout."""
+    """A click in the window, on the 1280x720 dashboard, in either layout.
+    In the tall one only the camera part (its SETTINGS menu) is clickable."""
     if is_tall(win_w, win_h):
-        return column_to_dash(*window_to_canvas(x, y, win_w, win_h, COLUMN_SIZE))
+        cx, cy = window_to_canvas(x, y, win_w, win_h, column_size(win_w, win_h))
+        return (cx, cy) if 0 <= cx < CAM_PART[2] and 0 <= cy < CAM_PART[3] else (-1, -1)
     return window_to_canvas(x, y, win_w, win_h)
 
 

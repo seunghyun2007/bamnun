@@ -36,6 +36,21 @@ begin
   return query
     update public.booth_commands b set done_at = now()
     where b.done_at is null and b.created_at > now() - interval '15 seconds'
+      and b.cmd not in ('video', 'video_stop')
+    returning b.id, b.cmd;
+end $$;
+
+-- The film commands are the booth PC's (tools/booth/windows/booth_film.ps1
+-- plays the film over the game), not the Pi's.
+create or replace function public.take_film_commands(k text)
+returns table (id bigint, cmd text)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not staff_ok(k) then return; end if;
+  return query
+    update public.booth_commands b set done_at = now()
+    where b.done_at is null and b.created_at > now() - interval '15 seconds'
+      and b.cmd in ('video', 'video_stop')
     returning b.id, b.cmd;
 end $$;
 
@@ -46,9 +61,11 @@ $$;
 
 revoke all on function public.send_command(text, text) from public;
 revoke all on function public.take_commands(text) from public;
+revoke all on function public.take_film_commands(text) from public;
 revoke all on function public.command_done(text, bigint) from public;
 grant execute on function public.send_command(text, text) to anon;
 grant execute on function public.take_commands(text) to anon;
+grant execute on function public.take_film_commands(text) to anon;
 grant execute on function public.command_done(text, bigint) to anon;
 
 select cron.unschedule(jobid) from cron.job where jobname = 'bamnun-commands-clean';

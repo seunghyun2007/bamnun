@@ -63,6 +63,7 @@ def stub():
     m._seat_empty = False
     m._guide_t0 = m._guide_done_at = None
     m.film = FakeFilm()
+    m._film_on_pi = True
     m._next_visitor = lambda now, t: Monitor._next_visitor(m, now, t)
     m._next = lambda now, t: Monitor._next(m, now, t)
     m._page_s = lambda: Monitor._page_s(m)
@@ -71,6 +72,14 @@ def stub():
     m._start_calibration = lambda t: m.calibrations.append(t)
     m._voice = lambda key, t: None
     return m, events
+
+
+def test_the_film_stays_off_on_the_pi_unless_asked():
+    m, _ = stub()
+    m._film_on_pi = False
+    Monitor._update_mode(m, 0.0, False)
+    Monitor._update_mode(m, 30.5, False)
+    assert m._seat_empty and not m.film.playing
 
 
 def test_an_empty_seat_plays_the_film_and_a_face_starts_nothing():

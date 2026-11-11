@@ -437,3 +437,9 @@ thermal:
   hot_c: 80
   every_s: 2           # temperature reads
   flags_every_s: 10    # vcgencmd get_throttled
+
+# The product film. The booth PC plays it over the game (remote ▶ 영상 재생,
+# tools/booth/windows/booth_film.ps1); on_pi: true also loops it on the Pi
+# screen while nobody is driving (stutters over RealVNC + spacedesk).
+film:
+  on_pi: false

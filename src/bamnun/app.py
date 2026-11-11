@@ -275,9 +275,14 @@ class Monitor:
         self.remote.start()
         # The product film (film.py): loops muted while nobody is driving;
         # the remote plays it with sound.
+        # Off by default: over RealVNC + spacedesk it stutters, so the booth
+        # PC plays it over the game instead (tools/booth/windows/booth_film.ps1,
+        # the remote's film buttons). film.on_pi: true brings it back here.
         from .film import Film
         self.film = Film(self.root)
-        self.film.start(time.monotonic())
+        self._film_on_pi = bool((self.cfg.get("film") or {}).get("on_pi", False))
+        if self._film_on_pi:
+            self.film.start(time.monotonic())
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
         self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
@@ -682,7 +687,7 @@ class Monitor:
             self.visit.reset()
             self.logger.log_event("seat_empty", {"after_s": self._standby_after_s})
             console.print("[dim]nobody at the wheel: the film until NEXT PERSON[/]")
-            if not self.film.playing:
+            if self._film_on_pi and not self.film.playing:
                 self.film.start(now)              # the film, muted, until the next person
         # (A face no longer starts anything: people reading the poster in
         # front of the camera mustn't interrupt the film. NEXT PERSON does.)

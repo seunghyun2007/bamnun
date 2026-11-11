@@ -1,7 +1,9 @@
 ﻿# Booth guard: visitors can use only the game and the RealVNC window.
 #
 # While it runs:
-# - Euro Truck Simulator 2 and RealVNC work as usual (Alt+Tab between them too).
+# - Euro Truck Simulator 2 and RealVNC work as usual (Alt+Tab between them too),
+#   and so does the product film (booth_film.ps1, started here, played from
+#   the staff remote).
 # - Anything else that comes to the front (Start menu, taskbar, Explorer, a
 #   browser, Task Manager...) is covered by a full-screen lock with a big
 #   "Back to the game" button and a staff PIN box.
@@ -48,6 +50,7 @@ public static class GuardNative {
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
@@ -67,6 +70,12 @@ public static class GuardNative {
     public static string ClassOf(IntPtr h) {
         var sb = new StringBuilder(256);
         GetClassName(h, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
+    public static string TitleOf(IntPtr h) {
+        var sb = new StringBuilder(256);
+        GetWindowText(h, sb, sb.Capacity);
         return sb.ToString();
     }
 
@@ -284,6 +293,8 @@ public class BoothGuard : ApplicationContext {
         proc = GuardNative.ProcOf(h);
         if (GuardNative.PidOf(h) == myPid) return true;
         if (Array.IndexOf(Allowed, proc) >= 0) return true;
+        // The product film over the game (booth_film.ps1), played from the remote.
+        if (proc == "powershell" && GuardNative.TitleOf(h) == "Bamnun film") return true;
         if (proc == "explorer" && Array.IndexOf(Switcher, GuardNative.ClassOf(h)) >= 0) return true;
         return false;
     }
@@ -380,6 +391,13 @@ $layout = Join-Path $PSScriptRoot 'booth_layout.ps1'
 if (-not $DryRun -and (Test-Path $layout)) {
     Start-Process powershell -WindowStyle Hidden -Wait -ArgumentList @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$layout`"")
+}
+
+# The product film player (the remote's ▶ 영상 재생 plays it over the game).
+$film = Join-Path $PSScriptRoot 'booth_film.ps1'
+if (-not $DryRun -and (Test-Path $film)) {
+    Start-Process powershell -WindowStyle Hidden -ArgumentList @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', "`"$film`"")
 }
 
 [GuardNative]::SetProcessDPIAware() | Out-Null

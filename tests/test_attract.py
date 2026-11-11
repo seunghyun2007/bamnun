@@ -31,6 +31,18 @@ def test_screens_draw_at_dashboard_size_with_or_without_a_korean_font():
     assert s.standby(0.0, cam).shape == (DASH_H, DASH_W, 3)
 
 
+class FakeFilm:
+    def __init__(self):
+        self.playing, self.sound = False, False
+
+    def start(self, now, sound=False):
+        self.playing, self.sound = True, sound
+        return True
+
+    def stop(self):
+        self.playing = False
+
+
 def stub():
     events = []
     m = SimpleNamespace(
@@ -50,7 +62,8 @@ def stub():
     m._fit_since = None
     m._seat_empty = False
     m._guide_t0 = m._guide_done_at = None
-    m._next_visitor = lambda now: Monitor._next_visitor(m, now)
+    m.film = FakeFilm()
+    m._next_visitor = lambda now, t: Monitor._next_visitor(m, now, t)
     m._next = lambda now, t: Monitor._next(m, now, t)
     m._page_s = lambda: Monitor._page_s(m)
     m._update_learn_more = lambda now, face: Monitor._update_learn_more(m, now, face)
@@ -60,29 +73,25 @@ def stub():
     return m, events
 
 
-def test_an_empty_seat_then_a_face_starts_the_next_visitors_guide():
+def test_an_empty_seat_plays_the_film_and_a_face_starts_nothing():
     m, events = stub()
     Monitor._update_mode(m, 0.0, False)
     Monitor._update_mode(m, 29.0, False)
-    assert not m._seat_empty
-    Monitor._update_mode(m, 30.5, False)          # nobody for 30 s: forgotten, dashboard stays
+    assert not m._seat_empty and not m.film.playing
+    Monitor._update_mode(m, 30.5, False)          # nobody for 30 s: forgotten, the film loops
     assert m.mode == "live" and m._seat_empty and "seat_empty" in events
-    Monitor._update_mode(m, 40.0, True)          # someone sits down ...
-    Monitor._update_mode(m, 42.0, True)
-    assert m.mode == "live"
-    Monitor._update_mode(m, 43.5, True)          # ... 3 s later their guide starts
-    assert m.mode == "briefing" and m._brief_step == 0 and not m._seat_empty
+    assert m.film.playing and not m.film.sound
+    for t in (40.0, 42.0, 50.0, 60.0):           # someone reading the poster in front of it
+        Monitor._update_mode(m, t, True)
+    assert m.mode == "live" and m._seat_empty and m.film.playing and not m.calibrations
 
-def test_space_runs_the_briefing_then_starts_calibrating():
+
+def test_space_is_next_person_straight_to_calibration():
     m, _ = stub()
-    m.mode = "standby"
+    m._seat_empty = True
+    m.film.start(0.0)
     Monitor._next(m, 1.0, 1.0)
-    assert m.mode == "briefing" and m._brief_step == 0
-    for i in range(1, len(STEPS)):
-        Monitor._next(m, 1.0 + i, 1.0 + i)
-        assert m._brief_step == i
-    Monitor._next(m, 10.0, 10.0)                 # the last page
-    assert m.mode == "live" and m.calibrations == [10.0]
+    assert m.mode == "live" and m.calibrations == [1.0] and not m._seat_empty
 
 
 def test_the_guide_starts_calibrating_by_itself():
@@ -181,11 +190,11 @@ def test_the_popup_and_a_scannable_qr_code_draw():
     assert cv2.QRCodeDetector().detectAndDecode(screen)[0] == url
 
 
-def test_next_person_starts_the_briefing_over_with_a_fresh_popup():
+def test_next_person_calibrates_at_once_with_a_fresh_start():
     m, events = stub()
     m._driven_s, m._learn_shown, m._popup_at = 80.0, True, 50.0
-    Monitor._next_visitor(m, 100.0)
-    assert m.mode == "briefing" and m._brief_step == 0 and m._last_alert == "reset"
+    Monitor._next_visitor(m, 100.0, 7.0)
+    assert m.mode == "live" and m.calibrations == [7.0] and m._last_alert == "reset"
     assert (m._driven_s, m._learn_shown, m._popup_at) == (0.0, False, None)
     assert "next_visitor" in events
 
@@ -414,8 +423,11 @@ def test_live_hints_explain_an_alert_when_it_happens_then_offer_the_qr():
 
 def test_nothing_goes_off_unless_a_visitor_is_driving():
     m = SimpleNamespace(mode="live", _seat_empty=False, _quiet_until=0.0,
-                        features=SimpleNamespace(calibrating=False))
+                        features=SimpleNamespace(calibrating=False), film=FakeFilm())
     assert Monitor._alerts_allowed(m, 10.0)               # someone driving
+    m.film.playing = True                                 # the film is on
+    assert not Monitor._alerts_allowed(m, 10.0)
+    m.film.playing = False
     m._seat_empty = True                                  # waiting for the next visitor
     assert not Monitor._alerts_allowed(m, 10.0)
     m._seat_empty = False
@@ -427,3 +439,36 @@ def test_nothing_goes_off_unless_a_visitor_is_driving():
     m.features.calibrating = False
     m._quiet_until = 15.0                                 # just back from a screen
     assert not Monitor._alerts_allowed(m, 10.0) and Monitor._alerts_allowed(m, 15.0)
+
+
+def test_the_film_loops_muted_and_ends_with_sound(tmp_path):
+    import cv2
+    import numpy as np
+    from bamnun.film import Film
+
+    (tmp_path / "assets" / "booth").mkdir(parents=True)
+    out = cv2.VideoWriter(str(tmp_path / "assets" / "booth" / "film.mp4"),
+                          cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (64, 36))
+    for i in range(10):                                   # 1 s at 10 fps
+        out.write(np.full((36, 64, 3), i * 20, np.uint8))
+    out.release()
+    f = Film(tmp_path)
+    assert f.start(0.0) and f.playing
+    frame, ended = f.frame(0.55)
+    assert frame is not None and not ended
+    frame, ended = f.frame(1.5)                            # past the end: loops
+    assert frame is not None and not ended and f.playing
+    assert f.start(0.0, sound=True)                        # no wav here: just the picture
+    _, ended = f.frame(2.0)
+    assert ended
+    f.stop()
+    assert not f.playing and not Film(tmp_path / "none").start(0.0)
+
+
+def test_calibration_and_the_film_draw_at_the_window_size(tmp_path):
+    import numpy as np
+    s = Screens(tmp_path)
+    cam = np.zeros((480, 640), np.uint8)
+    assert s.calibrating_full(0.0, 0.4, "no_face", (1280, 800), cam, (0.5, 0.5, 0.3)).shape == (800, 1280, 3)
+    assert s.film(np.zeros((720, 1280, 3), np.uint8), (1280, 800)).shape == (800, 1280, 3)
+    assert s.film(None, (640, 400)).shape == (400, 640, 3)

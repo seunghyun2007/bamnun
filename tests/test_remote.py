@@ -37,7 +37,8 @@ def test_polling_keeps_known_commands_in_order(tmp_path, monkeypatch):
 def test_each_command_does_its_thing():
     done = []
     m = SimpleNamespace(
-        remote=SimpleNamespace(take=lambda: ["stage3", "next", "calibrate", "photos_off", "vol_up", "voice", "stage0"]),
+        remote=SimpleNamespace(take=lambda: ["stage3", "next", "calibrate", "photos_off", "vol_up", "voice", "stage0",
+                                         "video", "video_stop", "video"]),
         logger=SimpleNamespace(log_event=lambda *a: None),
         mode="briefing", _seat_empty=True, _stage_play=(3, 0.0, 9.0), _last_alert=None,
         policy=SimpleNamespace(reset=lambda t: done.append("reset") or "reset"),
@@ -45,7 +46,10 @@ def test_each_command_does_its_thing():
         volume=SimpleNamespace(change=lambda d: done.append(("vol", d))),
     )
     m._play_stage = lambda n, now, t: done.append(("stage", n))
-    m._next_visitor = lambda now: done.append("next")
+    m._next_visitor = lambda now, t: done.append("next") or setattr(m, "_seat_empty", False)
+    m.features = SimpleNamespace(calibrating=False)
+    m.film = SimpleNamespace(start=lambda now, sound=False: done.append(("film", sound)),
+                             stop=lambda: done.append("film_stop"))
     m._start_calibration = lambda t: done.append("calibrate")
     m._voice = lambda k, t: None
     m._set_voice_lang = lambda lang: done.append(("voice", lang))
@@ -53,4 +57,5 @@ def test_each_command_does_its_thing():
     assert ("stage", 3) in done and "next" in done and "calibrate" in done and "reset" in done
     assert m.visit.photos_off and m.mode == "live" and not m._seat_empty
     assert any(d[0] == "vol" and d[1] > 0 for d in done if isinstance(d, tuple))
-    assert set(COMMANDS) >= {"stage0", "next", "calibrate"}
+    assert ("film", True) in done and "film_stop" in done
+    assert set(COMMANDS) >= {"stage0", "next", "calibrate", "video", "video_stop"}

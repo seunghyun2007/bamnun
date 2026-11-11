@@ -6,7 +6,7 @@
 
 create table if not exists public.booth_commands (
   id bigserial primary key,
-  cmd text not null check (cmd ~ '^(stage[0-4]|next|calibrate|photos_off|photos_on|vol_up|vol_down|voice)$'),
+  cmd text not null check (cmd ~ '^(stage[0-4]|next|calibrate|photos_off|photos_on|vol_up|vol_down|voice|video|video_stop)$'),
   created_at timestamptz not null default now(),
   done_at timestamptz
 );

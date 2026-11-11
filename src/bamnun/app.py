@@ -68,7 +68,7 @@ QUIET_AFTER_SCREEN_S = 8.0
 TOUR_STEP_S = 6.0           # an untouched tour step moves on after this
 GUIDE_ALERT_S = 7.0         # an alert's hint ("1단계: 파란 불빛") stays this long
 GUIDE_DONE_S = 6.0          # "잘했어요" after the first alert ends, then the QR offer
-AUTO_BRIEF_S = 3.0          # someone at the wheel this long on standby: the briefing starts
+AUTO_BRIEF_S = 3.0          # (unused: a face no longer starts anything)
 BRIEF_PAGE_S = 7.0          # each briefing page turns by itself after this ...
 BRIEF_CENTER_MAX_S = 14.0   # ... the centring page after this at most,
 BRIEF_FIT_S = 2.0           # or once the face has fit the oval this long  # no alerts this long after leaving a booth screen   # an untouched briefing page closes after this
@@ -273,6 +273,11 @@ class Monitor:
         from .remote import Remote
         self.remote = Remote(self.root)
         self.remote.start()
+        # The product film (film.py): loops muted while nobody is driving;
+        # the remote plays it with sound.
+        from .film import Film
+        self.film = Film(self.root)
+        self.film.start(time.monotonic())
         self._popup_at: Optional[float] = None
         self._qr_at = 0.0
         self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
@@ -573,6 +578,9 @@ class Monitor:
             return
         if event != cv2.EVENT_LBUTTONUP:
             return
+        if self.film.playing:                     # a click on the film: back to the dashboard
+            self._clicks.append("film_stop")
+            return
         if self.mode == "qr":                     # the stage cards, or back
             try:
                 _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
@@ -615,6 +623,7 @@ class Monitor:
         drowsy anyway.
         """
         self._last_alert = self.policy.reset(t)
+        self.film.stop()
         self.features.calibrator.reset()
         self.features.start_calibration(t)
         self._cal_run = True
@@ -672,12 +681,11 @@ class Monitor:
             self.visit.finish()                   # their drive, sent one last time
             self.visit.reset()
             self.logger.log_event("seat_empty", {"after_s": self._standby_after_s})
-            console.print("[dim]nobody at the wheel: the next face starts the guide[/]")
-        elif self.mode in ("live", "standby") and self._seat_empty and face \
-                and self._face_since is not None and now - self._face_since >= AUTO_BRIEF_S \
-                and not self.features.calibrating:
-            self._seat_empty = False              # someone sat down: their guide starts
-            self._next_visitor(now)
+            console.print("[dim]nobody at the wheel: the film until NEXT PERSON[/]")
+            if not self.film.playing:
+                self.film.start(now)              # the film, muted, until the next person
+        # (A face no longer starts anything: people reading the poster in
+        # front of the camera mustn't interrupt the film. NEXT PERSON does.)
         elif self.mode == "briefing":
             from .attract import STEPS
             pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
@@ -716,16 +724,21 @@ class Monitor:
                                            or now - self._popup_at >= self._learn_hide_s):
             self._popup_at = None
 
-    def _next_visitor(self, now: float) -> None:
-        """Start over for the next person: lights off, their own pop-up later,
-        and the briefing from its first page (which ends in calibration)."""
+    def _next_visitor(self, now: float, t: float) -> None:
+        """Start over for the next person: the film off, lights off, their own
+        code, and straight into calibration (the camera full screen)."""
         self._last_alert = self.policy.reset(now)
         self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
         self._tip_shown, self._tip_at = False, None
-        self.visit.begin()                        # their own code: the QR at the bottom
-        self.mode, self._brief_step, self._brief_at = "briefing", 0, now
+        self._guide_t0 = self._guide_done_at = None
+        self._seat_empty = False
+        self._no_face_since = None
+        self.visit.begin()                        # their own code: the QR later
+        self.mode = "live"
+        self._start_calibration(t)                # (stops the film)
+        self._voice("calibrate_voice", t)
         self.logger.log_event("next_visitor", {})
-        console.print("[cyan]next visitor: briefing from the start[/]")
+        console.print("[cyan]next visitor: calibration[/]")
 
     def _set_voice_lang(self, lang: str) -> None:
         lang = "en" if lang == "en" else "ko"
@@ -811,6 +824,7 @@ class Monitor:
         their guide or calibration, on a booth screen, or in the first
         seconds back from one. The staff remote and stage cards still work."""
         return (self.mode == "live" and not self._seat_empty and not self.features.calibrating
+                and not self.film.playing
                 and now >= self._quiet_until)
 
     def _remote_commands(self, now: float, t: float) -> None:
@@ -827,8 +841,18 @@ class Monitor:
                     if AudioActuator.busy():
                         AudioActuator._playing.terminate()
             elif c == "next":
-                self._seat_empty = False
-                self._next_visitor(now)
+                self._next_visitor(now, t)
+            elif c == "video":                        # the film from the start, with sound
+                self._last_alert = self.policy.reset(now)
+                with AudioActuator._play_lock:
+                    if AudioActuator.busy():
+                        AudioActuator._playing.terminate()
+                if self.features.calibrating:
+                    self.features.cancel_calibration()
+                    self._cal_run = False
+                self.film.start(now, sound=True)
+            elif c == "video_stop":
+                self.film.stop()
             elif c == "calibrate":
                 if self.mode != "live":
                     self.mode = "live"
@@ -898,9 +922,9 @@ class Monitor:
             else:
                 self.mode = "live"
             return
-        if self.mode != "briefing":
-            self.mode, self._brief_step = "briefing", 0
-            self.logger.log_event("briefing", {})
+        if self.mode != "briefing":                   # NEXT PERSON: calibration
+            self._next_visitor(now, t)
+            return
         elif self._brief_step < len(STEPS) - 1:
             self._brief_step += 1
         else:                                         # the last page: calibrate now
@@ -1124,7 +1148,34 @@ class Monitor:
                 self._last_window = now
                 from .viz import draw_overlay
                 dash = self.dashboard
-                if self.mode not in ("live", "tour") or (calibrating and dash is not None):
+                film_on = self.film.playing
+                if film_on:
+                    ffr, ended = self.film.frame(now)
+                    if ended:                         # the film with sound is over
+                        self.film.stop()
+                        if self._seat_empty:
+                            self.film.start(now)      # back to the muted loop
+                            ffr, _ = self.film.frame(now)
+                        else:
+                            film_on = False
+                if film_on:
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    canvas = self._screens.film(ffr, win_size)
+                elif calibrating:                     # the camera full screen
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    cam, face = self._camera_view(frame.image, lms)
+                    canvas = self._screens.calibrating_full(now, progress,
+                                                            self.features.calibrator.hint or "",
+                                                            win_size, cam, face)
+                elif self.mode not in ("live", "tour") or (calibrating and dash is not None):
                     if self._screens is None:
                         from .attract import Screens
                         self._screens = Screens(self.root)
@@ -1273,7 +1324,9 @@ class Monitor:
                         continue
                     if dash is not None and btn not in ("vol_down", "vol_up"):
                         dash.menu_open = False        # an item done, or a click beside it
-                    if btn == "next":
+                    if btn == "film_stop":
+                        self.film.stop()
+                    elif btn == "next":
                         go_next = True
                     elif btn == "learn_more":
                         self._open_qr(now)
@@ -1312,8 +1365,8 @@ class Monitor:
                     self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
                 if key == ord("m") and self.mode != "qr":  # straight to the learn-more screen
                     self._open_qr(now)
-                if key == ord("n"):                       # next person: the briefing again
-                    self._next_visitor(now)
+                if key == ord("n"):                       # next person: calibration
+                    self._next_visitor(now, frame.timestamp)
                 if key == 27 and self.mode != "live":     # Esc: skip to the dashboard
                     self.mode = "live"
                 if key == ord("q"):

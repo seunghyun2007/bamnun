@@ -536,6 +536,77 @@ class Screens:
             canvas[y0:y1, xs:] = strip
         return canvas
 
+    def _overlay_text(self, canvas: np.ndarray, f: _Frame, key, lines, y0: float,
+                      y1: float) -> None:
+        """Text lines laid over the picture between design rows y0 and y1,
+        on a darkened band (the band and its text cached)."""
+        top, bot = max(0, f.y(y0)), min(f.h, f.y(y1))
+        k = ("overlay", key, f.w, f.h)
+        if k not in self._cache:
+            band, _ = self._text(np.zeros((f.h, f.w, 3), np.uint8), f, lines,
+                                 cx=DASH_W / 2, max_w=DASH_W - 80)
+            band = band[top:bot].copy()
+            self._cache[k] = (band, band.max(axis=2) > 30)
+        band, mask = self._cache[k]
+        region = canvas[top:bot]
+        region[:] = (region * 0.35).astype(np.uint8)
+        region[mask] = band[mask]
+
+    def calibrating_full(self, t: float, progress: float, hint: str = "",
+                         size: tuple[int, int] = (DASH_W, DASH_H),
+                         camera: Optional[np.ndarray] = None,
+                         face: Optional[tuple[float, float, float]] = None) -> np.ndarray:
+        """Calibration with the camera filling the screen: the face oval
+        (green when it fits), one instruction at the top, the progress bar
+        and any hint at the bottom."""
+        import cv2
+
+        f = _Frame(size)
+        canvas = np.zeros((f.h, f.w, 3), np.uint8)
+        if camera is not None:
+            cam = cv2.cvtColor(camera, cv2.COLOR_GRAY2BGR) if camera.ndim == 2 else camera
+            ch, cw = cam.shape[:2]
+            s = min(f.w / cw, f.h / ch)
+            w, h = int(cw * s), int(ch * s)
+            view = cv2.resize(cam, (w, h), interpolation=cv2.INTER_AREA)
+            good = face_fit(face) == "good"
+            axes = (int(w * FIT_RX), int(h * FIT_RY))
+            col = _GOOD if good else (255, 255, 255)
+            cv2.ellipse(view, (w // 2, h // 2), axes, 0, 0, 360, (0, 0, 0), max(3, f.n(9)), cv2.LINE_AA)
+            cv2.ellipse(view, (w // 2, h // 2), axes, 0, 0, 360, col, max(2, f.n(5)), cv2.LINE_AA)
+            x, y = (f.w - w) // 2, (f.h - h) // 2
+            canvas[y:y + h, x:x + w] = view
+        self._overlay_text(canvas, f, "cal_title",
+                           [("얼굴을 타원에 맞추고 게임 화면을 보세요", "bold", 40, _WHITE, 22),
+                            ("Face in the oval, look at the game, blink normally", "regular", 24, _GREY, 76)],
+                           -100, 118)
+        words = HINTS.get(hint)
+        if words:
+            self._overlay_text(canvas, f, ("cal_hint", hint),
+                               [(words[0], "bold", 30, _WHITE, 612), (words[1], "regular", 22, _GREY, 654)],
+                               600, 690)
+        bx0, bx1, by = f.x(160), f.x(DASH_W - 160), f.y(698)
+        cv2.rectangle(canvas, (bx0, by), (bx1, by + f.n(10)), (60, 60, 60), -1)
+        cv2.rectangle(canvas, (bx0, by), (int(bx0 + (bx1 - bx0) * max(0.0, min(1.0, progress))),
+                                          by + f.n(10)), _WHITE, -1)
+        return canvas
+
+    def film(self, frame: Optional[np.ndarray], size: tuple[int, int],
+             sound: bool = False) -> np.ndarray:
+        """A film frame fitted to the window, black around it."""
+        import cv2
+
+        w, h = size
+        canvas = np.zeros((h, w, 3), np.uint8)
+        if frame is not None:
+            fh, fw = frame.shape[:2]
+            s = min(w / fw, h / fh)
+            vw, vh = max(1, int(fw * s)), max(1, int(fh * s))
+            view = cv2.resize(frame, (vw, vh), interpolation=cv2.INTER_AREA if s < 1 else cv2.INTER_LINEAR)
+            x, y = (w - vw) // 2, (h - vh) // 2
+            canvas[y:y + vh, x:x + vw] = view
+        return canvas
+
     def _draw_center(self, canvas: np.ndarray, f: _Frame, t: float,
                      camera: Optional[np.ndarray], face: Optional[tuple[float, float, float]]) -> None:
         """The centring page's left panel: the live camera with an oval to fit

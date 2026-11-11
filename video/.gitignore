@@ -1,6 +1,8 @@
 node_modules/
 .venv/
 frames/
+frames_ko/
+built_ko.html
 stills/
 check/
 built.html

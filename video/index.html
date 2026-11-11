@@ -40,6 +40,11 @@
   #subs > div { display: inline-block; padding: 14px 34px 16px; border-radius: 22px; background: rgba(20,18,24,.88); max-width: 1700px; }
   #subs .ko { font-size: 44px; font-weight: 650; letter-spacing: -.3px; line-height: 1.2; }
   #subs .en { font-size: 26px; margin-top: 6px; }
+  /* SUBS=ko: Korean only, 1.5x larger, for a crowded booth and older viewers (two balanced lines at most) */
+  body.kosub #subs { bottom: 20px; }
+  body.kosub #subs > div { padding: 12px 40px 14px; border-radius: 26px; background: rgba(20,18,24,.92); max-width: 1760px; }
+  body.kosub #subs .ko { font-size: 66px; font-weight: 750; letter-spacing: -.8px; line-height: 1.18; text-wrap: balance; }
+  body.kosub #subs .en { display: none; }
 </style>
 </head>
 <body>

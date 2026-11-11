@@ -146,6 +146,7 @@ public static class FilmNative {
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
     public static void Force(IntPtr h) {
         if (h == IntPtr.Zero) return;
         if (IsIconic(h)) ShowWindow(h, 9);
@@ -199,6 +200,8 @@ function Play-Film {
     $win.Topmost = $true
     $win.Activate() | Out-Null
     [FilmNative]::Force((New-Object System.Windows.Interop.WindowInteropHelper($win)).Handle)
+    [System.Windows.Input.Keyboard]::Focus($win) | Out-Null
+    [void][FilmNative]::GetAsyncKeyState(0x1B)   # forget an Esc pressed before the film
     $media.Position = [TimeSpan]::Zero
     $media.Play()
     $script:playing = $true
@@ -208,7 +211,8 @@ function Play-Film {
 $media.Add_MediaEnded({ Back-ToGame })
 $media.Add_MediaFailed({ param($s, $e) Log ('film failed: ' + $e.ErrorException.Message); Back-ToGame })
 $win.Add_MouseLeftButtonUp({ Back-ToGame })
-$win.Add_KeyDown({ param($s, $e) if ($e.Key -eq 'Escape') { Back-ToGame } })
+$win.Focusable = $true
+$win.Add_PreviewKeyDown({ param($s, $e) if ($e.Key -eq 'Escape') { $e.Handled = $true; Back-ToGame } })
 $win.Add_Closing({ param($s, $e) $e.Cancel = $true; Back-ToGame })   # Alt+F4 only hides it
 
 # --- the loop: act on the remote's commands --------------------------------------
@@ -216,6 +220,9 @@ $lastErr = ''
 $timer = New-Object System.Windows.Threading.DispatcherTimer
 $timer.Interval = [TimeSpan]::FromMilliseconds(200)
 $timer.Add_Tick({
+    # Esc is read straight from the keyboard: the Alt tap that brings the film
+    # to the front puts the WPF window in menu mode, which eats the next Esc.
+    if ($script:playing -and ([FilmNative]::GetAsyncKeyState(0x1B) -band 0x8001)) { Log 'Esc'; Back-ToGame }
     while ($sync.Cmds.Count -gt 0) {
         $c = $sync.Cmds[0]; $sync.Cmds.RemoveAt(0)
         Log ('remote: ' + $c)

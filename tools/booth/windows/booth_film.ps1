@@ -42,23 +42,58 @@ function Say($msg) {
 }
 
 # --- first start: settings and film from the Pi --------------------------------
-# (Continue: in Windows PowerShell a line ssh prints on stderr would otherwise stop the script.)
-$ErrorActionPreference = 'Continue'
+# ssh/scp run with a time limit: Tailscale SSH sometimes asks for a sign-in
+# check in the browser first, and then just waits (BatchMode doesn't stop it).
+# That link is logged and shown, so staff can open it and start this again.
+function Invoke-Pi($exe, [string]$argLine, [int]$seconds) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    $psi.Arguments = $argLine
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.RedirectStandardInput = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $p.StandardInput.Close()
+    $out = $p.StandardOutput.ReadToEndAsync()
+    $err = $p.StandardError.ReadToEndAsync()
+    $done = $p.WaitForExit($seconds * 1000)
+    if (-not $done) { try { $p.Kill() } catch {}; $p.WaitForExit(2000) | Out-Null }
+    [void]$out.Wait(2000); [void]$err.Wait(2000)
+    $errText = if ($err.IsCompleted) { $err.Result } else { '' }
+    $outText = if ($out.IsCompleted) { $out.Result } else { '' }
+    $code = if ($done) { $p.ExitCode } else { -1 }
+    @{ Ok = ($done -and $code -eq 0); Out = $outText; Err = $errText; TimedOut = (-not $done) }
+}
+
+function Fail-Pi($what, $r) {
+    $link = [regex]::Match($r.Err, 'https://login\.tailscale\.com/\S+').Value
+    if ($link) {
+        Log "$what failed: Tailscale SSH wants a sign-in check: $link"
+        try { Set-Clipboard -Value $link } catch {}
+        Say ("The Pi's Tailscale SSH asks for a sign-in check first.`n`nOpen this link in a browser (it is copied), sign in, then start this again:`n`n" + $link)
+    } else {
+        $why = if ($r.TimedOut) { 'timed out' } else { ($r.Err.Trim() -split "`n")[-1] }
+        Log "$what failed: $why"
+        Say "Couldn't reach the Pi (ssh inpi): $why`n`nTurn the Pi on and check Tailscale, then start this again."
+    }
+    exit 1
+}
+
 if ($Setup -or -not (Test-Path $cfgFile)) {
     Log 'fetching settings from the Pi'
-    $lines = & ssh -o BatchMode=yes -o ConnectTimeout=15 inpi "grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|STAFF_CODE)=' ~/bamnun/frontend/.env" 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $lines) {
-        Log 'ssh inpi failed'
-        Say "Couldn't reach the Pi (ssh inpi). Turn the Pi on and check Tailscale, then start this again."
-        exit 1
-    }
-    Set-Content -Path $cfgFile -Value $lines -Encoding UTF8
+    $r = Invoke-Pi 'ssh' "-o BatchMode=yes -o ConnectTimeout=15 inpi `"grep -E '^(SUPABASE_URL|SUPABASE_ANON_KEY|STAFF_CODE)=' ~/bamnun/frontend/.env`"" 40
+    if (-not $r.Ok -or -not $r.Out.Trim()) { Fail-Pi 'ssh inpi' $r }
+    Set-Content -Path $cfgFile -Value ($r.Out.Trim() -split "`r?`n") -Encoding UTF8
 }
 if ($Setup -or -not (Test-Path $film)) {
     Log 'fetching the film from the Pi'
-    & scp -o BatchMode=yes -o ConnectTimeout=15 'inpi:bamnun/assets/booth/film_pc.mp4' "$film" 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $film)) {
-        Log 'scp failed; asking for the file'
+    $r = Invoke-Pi 'scp' "-o BatchMode=yes -o ConnectTimeout=15 inpi:bamnun/assets/booth/film_pc.mp4 `"$film`"" 300
+    if (-not $r.Ok) { Remove-Item $film -Force -ErrorAction SilentlyContinue }   # no half-copied film
+    if (-not $r.Ok -and [regex]::IsMatch($r.Err, 'login\.tailscale\.com')) { Fail-Pi 'scp' $r }
+    if (-not $r.Ok -or -not (Test-Path $film)) {
+        Log ('scp failed (' + ($r.Err.Trim() -split "`n")[-1] + '); asking for the file')
         $dlg = New-Object System.Windows.Forms.OpenFileDialog
         $dlg.Title = 'Choose the Bamnun film (mp4, with sound)'
         $dlg.Filter = 'Video (*.mp4)|*.mp4'

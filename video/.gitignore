@@ -7,3 +7,13 @@ built.html
 *.mp4
 audio/*.wav
 package-lock.json
+
+# real photos with faces: kept on this Mac only (the repo is public)
+assets/booth.jpg
+assets/booth_wide.jpg
+assets/device_real.jpg
+
+# v2 working files (review frames and sheets show the private photos)
+review/
+contact_sheet_v2.jpg
+render.log

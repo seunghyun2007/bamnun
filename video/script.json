@@ -28,13 +28,14 @@
  },
  {
   "id": "s06",
-  "ko": "이 신호들을 모아 지금 얼마나 졸린지 점수로 알려 줘요.",
-  "en": "Together, they become a live drowsiness score."
+  "ko": "이 신호들을 모아, 지금 얼마나 졸린지 1부터 9까지 점수로 알려 줘요.",
+  "en": "Together they become a live drowsiness score, from 1 to 9.",
+  "say": "이 신호들을 모아, 지금 얼마나 졸린지 일부터 구까지 점수로 알려 줘요."
  },
  {
   "id": "s07",
-  "ko": "졸음이 느껴지면, 네 단계로 깨워요.",
-  "en": "When drowsiness builds, I wake you in four steps."
+  "ko": "졸음이 쌓이면, 필요한 만큼만, 네 단계로 깨워요.",
+  "en": "When drowsiness builds, I wake you in four steps, only as far as needed."
  },
  {
   "id": "s08",
@@ -43,13 +44,13 @@
  },
  {
   "id": "s09",
-  "ko": "다음은 시원한 민트 향.",
+  "ko": "다음은 시원한 민트 미스트.",
   "en": "Then a cool mint mist."
  },
  {
   "id": "s10",
-  "ko": "그래도 졸리면 제가 직접 말을 걸고,",
-  "en": "Still sleepy? I'll talk to you,"
+  "ko": "그래도 졸리면 차임이 울리고, 제가 직접 말을 걸어요.",
+  "en": "Still sleepy? A chime rings, and I talk to you."
  },
  {
   "id": "s11",
@@ -68,9 +69,9 @@
  },
  {
   "id": "s14",
-  "ko": "지금 부스에서 직접 체험해 보세요. QR 코드로 내 운전 기록도 받을 수 있어요.",
-  "en": "Try it here at the booth, and scan the QR code to take your drive home.",
-  "say": "지금 부스에서 직접 체험해 보세요. 큐알 코드로 내 운전 기록도 받을 수 있어요."
+  "ko": "지금 부스에서 트럭을 직접 운전해 보세요. QR 코드로 내 운전 기록도 가져갈 수 있어요.",
+  "en": "Drive the truck here at the booth, and scan the QR code to take your drive home.",
+  "say": "지금 부스에서 트럭을 직접 운전해 보세요. 큐알 코드로 내 운전 기록도 가져갈 수 있어요."
  },
  {
   "id": "s15",

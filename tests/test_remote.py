@@ -38,7 +38,7 @@ def test_each_command_does_its_thing():
     done = []
     m = SimpleNamespace(
         remote=SimpleNamespace(take=lambda: ["stage3", "next", "calibrate", "photos_off", "vol_up", "voice", "stage0",
-                                         "video", "video_stop", "video"]),
+                                         "video", "video_stop", "video", "air"]),
         logger=SimpleNamespace(log_event=lambda *a: None),
         mode="briefing", _seat_empty=True, _stage_play=(3, 0.0, 9.0), _last_alert=None,
         policy=SimpleNamespace(reset=lambda t: done.append("reset") or "reset"),
@@ -53,9 +53,29 @@ def test_each_command_does_its_thing():
     m._start_calibration = lambda t: done.append("calibrate")
     m._voice = lambda k, t: None
     m._set_voice_lang = lambda lang: done.append(("voice", lang))
+    m.air = SimpleNamespace(actuator="open_window")
+    m._say_now = lambda name, t, why: done.append(("say", name))
     Monitor._remote_commands(m, 1.0, 1.0)
     assert ("stage", 3) in done and "next" in done and "calibrate" in done and "reset" in done
     assert m.visit.photos_off and m.mode == "live" and not m._seat_empty
     assert any(d[0] == "vol" and d[1] > 0 for d in done if isinstance(d, tuple))
     assert ("film", True) in done and "film_stop" in done
-    assert set(COMMANDS) >= {"stage0", "next", "calibrate", "video", "video_stop"}
+    assert ("say", "open_window") in done
+    assert set(COMMANDS) >= {"stage0", "next", "calibrate", "video", "video_stop", "air"}
+
+
+def test_the_air_button_speaks_every_press_despite_the_refractory_period():
+    from bamnun.alerts import Actuator
+    fired = []
+
+    class Line(Actuator):
+        def _do_fire(self, t, **kw):
+            fired.append(t)
+            return "said"
+
+    act = Line("open_window", {"refractory_s": 300.0})
+    m = SimpleNamespace(policy=SimpleNamespace(actuators={"open_window": act}, history=[]),
+                        logger=SimpleNamespace(log_event=lambda *a: None))
+    Monitor._say_now(m, "open_window", 10.0, "remote_air")
+    Monitor._say_now(m, "open_window", 12.0, "remote_air")
+    assert fired == [10.0, 12.0] and len(m.policy.history) == 2

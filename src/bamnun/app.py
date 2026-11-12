@@ -422,6 +422,18 @@ class Monitor:
         for why in decision.suppressed:
             console.print(f"     [yellow]suppressed[/] {why}")
 
+    def _say_now(self, name: str, t: float, why: str) -> None:
+        """A staff button's spoken line: every press, whatever the actuator's
+        refractory period (meant for the automatic prompt) or the settings."""
+        act = self.policy.actuators.get(name)
+        if act is None:
+            return
+        act._last_fired = None
+        a = act.fire(t, why)
+        if a is not None:
+            self.policy.history.append(a)
+            self.logger.log_event("prompt", a)
+
     def _voice(self, name: str, t: float) -> None:
         """Play an optional spoken cue outside the alert ladder."""
         a = self.policy.prompt(name, t)
@@ -858,6 +870,8 @@ class Monitor:
                 self.film.start(now, sound=True)
             elif c == "video_stop":
                 self.film.stop()
+            elif c == "air":                          # "the air is stale, open a window"
+                self._say_now(self.air.actuator, t, "remote_air")
             elif c == "calibrate":
                 if self.mode != "live":
                     self.mode = "live"

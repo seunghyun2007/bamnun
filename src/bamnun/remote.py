@@ -29,7 +29,7 @@ log = logging.getLogger("bamnun.remote")
 
 POLL_S = 1.0
 COMMANDS = ("stage0", "stage1", "stage2", "stage3", "stage4", "next", "calibrate",
-            "photos_off", "photos_on", "vol_up", "vol_down", "voice", "video", "video_stop")
+            "photos_off", "photos_on", "vol_up", "vol_down", "voice", "video", "video_stop", "air")
 
 
 class Remote:

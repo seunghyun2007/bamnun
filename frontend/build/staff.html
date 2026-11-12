@@ -79,6 +79,7 @@
   <button data-c="vol_down"><b>볼륨 −</b><span>Quieter</span></button>
   <button data-c="vol_up"><b>볼륨 +</b><span>Louder</span></button>
   <button data-c="voice" class="wide"><b>목소리 한국어 ↔ English</b><span>Ollie's voice language</span></button>
+  <button data-c="air" class="wide"><b>환기 안내: 창문을 열어 주세요</b><span>"The air is stale, open a window"</span></button>
 </div>
 
 <div id="status"></div>
@@ -123,13 +124,15 @@
       for (let i = 0; i < 12; i++) {                      // the Pi checks once a second
         await new Promise((r) => setTimeout(r, 500));
         if (await rpc("command_done", { k, i: id })) {
-          say("✓ 밤눈이 받았어요 · " + label);
+          say((b.dataset.c.startsWith("video") ? "✓ 게임 PC가 받았어요 · " : "✓ 밤눈이 받았어요 · ") + label);
           b.classList.remove("sent"); b.classList.add("ok");
           setTimeout(() => b.classList.remove("ok"), 1500);
           return;
         }
       }
-      say("밤눈이 응답하지 않아요: 파이의 인터넷과 앱을 확인하세요");
+      say(b.dataset.c.startsWith("video")
+        ? "게임 PC가 응답하지 않아요: PC가 켜져 있고 로그인되어 있는지 확인하세요"
+        : "밤눈이 응답하지 않아요: 파이의 인터넷과 앱을 확인하세요");
     } catch (e) {
       say("보내지 못했어요: 휴대폰의 인터넷을 확인하세요");
     }

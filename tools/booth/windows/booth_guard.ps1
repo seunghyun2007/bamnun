@@ -222,6 +222,25 @@ public class LockForm : Form {
 public class BoothGuard : ApplicationContext {
     // Programs visitors may use. Process names, lower case.
     static readonly string[] Allowed = { "eurotrucks2", "rvncconnect", "vncviewer" };
+    // The film player (booth_film.ps1): started again if it isn't running,
+    // e.g. after it crashed, so the remote's film button keeps working.
+    public static string FilmScript = "";
+    DateTime filmCheckAt = DateTime.Now.AddSeconds(20);
+
+    void KeepFilmPlayer() {
+        if (DateTime.Now < filmCheckAt) return;
+        filmCheckAt = DateTime.Now.AddSeconds(30);
+        if (FilmScript == "" || !File.Exists(FilmScript)) return;
+        System.Threading.Mutex m;
+        if (System.Threading.Mutex.TryOpenExisting("Local\\BamnunBoothFilm", out m)) { m.Dispose(); return; }
+        try {
+            var psi = new ProcessStartInfo("powershell",
+                "-NoProfile -ExecutionPolicy Bypass -STA -File \"" + FilmScript + "\"");
+            psi.WindowStyle = ProcessWindowStyle.Hidden;
+            psi.UseShellExecute = true;
+            Process.Start(psi);
+        } catch { }
+    }
     // Explorer's Alt+Tab / task switcher, so staff can still switch game <-> VNC.
     static readonly string[] Switcher = { "XamlExplorerHostIslandWindow", "MultitaskingViewFrame", "ForegroundStaging", "TaskSwitcherWnd" };
     // Shell windows that must not be minimised when going back to the game.
@@ -300,6 +319,7 @@ public class BoothGuard : ApplicationContext {
     }
 
     void Tick(object s, EventArgs e) {
+        if (!dryRun) KeepFilmPlayer();
         if (Paused) {
             int left = (int)Math.Ceiling((pausedUntil - DateTime.Now).TotalMinutes);
             tray.Text = "Booth guard: unlocked (" + left + " min left)";
@@ -400,6 +420,7 @@ if (-not $DryRun -and (Test-Path $film)) {
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', "`"$film`"")
 }
 
+[BoothGuard]::FilmScript = $film
 [GuardNative]::SetProcessDPIAware() | Out-Null
 [System.Windows.Forms.Application]::EnableVisualStyles()
 

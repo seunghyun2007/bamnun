@@ -2,7 +2,8 @@
 # screen on this PC's game monitor, with sound; "■ 영상 정지", the end of the
 # film, a click or Esc goes back to the game.
 #
-# Runs in the background (Booth guard starts it; or run it by hand). It asks
+# Runs in the background (from sign-in after -Autostart, Booth guard starts
+# it too; or run it by hand). It asks
 # Supabase once a second for the remote's film commands (take_film_commands;
 # the Pi leaves those for this PC).
 #
@@ -15,11 +16,43 @@
 #   booth_film.ps1           start (does nothing if it's already running)
 #   booth_film.ps1 -Setup    fetch the settings and the film again, then start
 #   booth_film.ps1 -Test     play the film once now (no remote needed)
+#   booth_film.ps1 -Autostart   start this film player at sign-in, and take
+#                               Booth guard out of sign-in (Startup folder);
+#                               the guard still works from its shortcut
 
 param(
     [switch]$Setup,
-    [switch]$Test
+    [switch]$Test,
+    [switch]$Autostart
 )
+
+if ($Autostart) {
+    $startup = [Environment]::GetFolderPath('Startup')
+    $shell = New-Object -ComObject WScript.Shell
+    # Booth guard out of sign-in (a shortcut or script in the Startup folder).
+    Get-ChildItem -Path $startup -File -ErrorAction SilentlyContinue | ForEach-Object {
+        $what = $_.Name
+        if ($_.Extension -eq '.lnk') {
+            $l = $shell.CreateShortcut($_.FullName); $what += ' ' + $l.TargetPath + ' ' + $l.Arguments
+        }
+        if ($what -match 'booth_guard|Booth guard|BoothGuard') {
+            Remove-Item $_.FullName -Force
+            Write-Host ('removed from sign-in: ' + $_.Name)
+        }
+    }
+    # Any scheduled task that starts the guard: listed, not changed.
+    Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object {
+        ($_.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -match 'booth_guard'
+    } | ForEach-Object { Write-Host ('a scheduled task also starts the guard: ' + $_.TaskName + ' (Task Scheduler: disable it)') }
+    # This film player into sign-in, hidden.
+    $lnk = $shell.CreateShortcut((Join-Path $startup 'Bamnun film.lnk'))
+    $lnk.TargetPath = 'powershell.exe'
+    $lnk.Arguments = '-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "' + $PSCommandPath + '"'
+    $lnk.WindowStyle = 7
+    $lnk.Save()
+    Write-Host 'the film player now starts at sign-in'
+    exit 0
+}
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Windows.Forms

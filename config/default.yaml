@@ -411,7 +411,7 @@ ui:
     sleepy_tip_after_s: 20     # first, Ollie suggests trying to be sleepy (card + voice) ...
     sleepy_tip_hide_s: 15      # ... gone after this, or as soon as an alert answers it
     after_s: 60
-    qr_after_s: 40             # the visitor's QR shows after this much driving, once their drive is uploaded
+    qr_after_s: 0              # the visitor's QR shows as soon as their drive is uploaded (about 2 s after calibration; was 40 s of driving)
     hide_after_s: 40
     qr_close_s: 60
 

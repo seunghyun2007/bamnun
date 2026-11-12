@@ -218,7 +218,7 @@ phone.addEventListener("click",e=>{
   const owl=e.target.closest(".olw");
   if(owl&&!e.target.closest("a,button")){owl.classList.remove("poke");void owl.offsetWidth;owl.classList.add("poke");SFX.play("hoot");return;}
   const lang=e.target.closest("[data-lang]");
-  if(lang){ const changed=lang.dataset.lang!==LANG; setLang(lang.dataset.lang); SFX.play("select"); if(!lang.dataset.go){ if(changed) go(cur,{instant:true,keepScroll:true}); return; } }
+  if(lang){ const changed=lang.dataset.lang!==LANG; setLang(lang.dataset.lang); try{localStorage.setItem("bn-lang-chosen","1")}catch(e){} SFX.play("select"); if(!lang.dataset.go){ if(changed) go(cur,{instant:true,keepScroll:true}); return; } }
   const a=e.target.closest("[data-go]");
   if(a){
     e.preventDefault();
@@ -243,10 +243,11 @@ setTimeout(()=>{
   if(A&&A.pendingReturn())first="Account";
   else if(!start&&A&&A.user()&&S&&S.onboarded())first="Home";
   // The public website (GitHub Pages, opened from the booth's QR code) has no
-  // Pi behind it: straight into the demo drive, in the phone's language.
+  // Pi behind it: straight into the demo drive, in Korean (English only if
+  // the visitor picks it here; the exhibition audience is Korean).
   else if(/\.github\.io$/i.test(location.hostname)&&(!start||start==="Main"||start==="Welcome")){
     let saved=null;try{saved=localStorage.getItem("bn-lang")}catch(e){}
-    if(!saved)setLang(/^ko/i.test(navigator.language||"")?"ko":"en");
+    try{if(!localStorage.getItem("bn-lang-chosen"))setLang("ko")}catch(e){setLang("ko")}
     try{localStorage.setItem("bn-showcase","1")}catch(e){}
     first="Home";
   }

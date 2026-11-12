@@ -9,7 +9,7 @@
 <x-dc>
 <helmet>
 <style>
-body{margin:0}a{color:#F4EFE6}button{font:inherit;color:inherit;cursor:pointer}
+body{margin:0}a{color:#F2EEE8}button{font:inherit;color:inherit;cursor:pointer}
 .cb-card{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:24px;transition:transform .38s cubic-bezier(.22,1,.36,1),opacity .3s}
 .cb-card.in{animation:cbIn .42s cubic-bezier(.22,1,.36,1) both}
 .cb-card.out{transform:translateX(-110%);opacity:0}
@@ -18,36 +18,36 @@ body{margin:0}a{color:#F4EFE6}button{font:inherit;color:inherit;cursor:pointer}
 .cb-check{position:absolute;inset:0;display:grid;place-items:center;opacity:0;transform:scale(.4);transition:all .35s cubic-bezier(.3,1.6,.5,1)}
 .cb-card.ok .cb-check{opacity:1;transform:none}
 .cb-card.ok .cb-ringwrap svg{opacity:.25}
-.cb-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:7px 14px;border-radius:99px;background:#FFB547;color:#241A26;font-weight:800;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .2s}
+.cb-hint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);padding:7px 14px;border-radius:99px;background:#F2B66D;color:#15131A;font-weight:700;font-size:14px;white-space:nowrap;opacity:0;transition:opacity .2s}
 .cb-hint.on{opacity:1}
 .cb-dots{display:flex;gap:6px;justify-content:center}
 .cb-dots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);transition:all .3s}
-.cb-dots i.done{background:#C4B5FD}
-.cb-dots i.now{background:#F4EFE6;width:20px;border-radius:9px}
-.cb-ans{flex:1;padding:15px;border:0;border-radius:999px;font-weight:800;font-size:16px}
+.cb-dots i.done{background:#E8D7AE}
+.cb-dots i.now{background:#F2EEE8;width:20px;border-radius:9px}
+.cb-ans{flex:1;padding:15px;border:0;border-radius:999px;font-weight:700;font-size:16px}
 .cb-row{display:flex;justify-content:space-between;gap:10px;padding:9px 0;font-size:14.5px}
 .cb-row+.cb-row{border-top:1px solid rgba(255,255,255,.08)}
-.cb-row span{color:#B3A6B4}
+.cb-row span{color:#9A93A0}
 </style>
 </helmet>
-<div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:52px 16px 26px;box-sizing:border-box;background:radial-gradient(110% 55% at 50% 0%,rgba(168,132,232,0.32) 0%,rgba(168,132,232,0) 62%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:52px 16px 26px;box-sizing:border-box;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif">
   <div style="display:flex;align-items:center;gap:12px;height:44px">
-    <a href="Voice.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <a href="Voice.dc.html" aria-label="Back" style="width:40px;height:40px;border-radius:50%;background:#1F1C24;border:0;display:grid;place-items:center;color:#F2EEE8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
     <div id="cbDots" class="cb-dots" style="flex:1"></div>
     <span style="width:40px"></span>
   </div>
-  <div id="cmBox" style="position:relative;margin-top:10px;width:100%;aspect-ratio:16/9;border-radius:20px;overflow:hidden;background:#2B2530;flex-shrink:0">
+  <div id="cmBox" style="position:relative;margin-top:10px;width:100%;aspect-ratio:16/9;border-radius:20px;overflow:hidden;background:#24212A;flex-shrink:0">
     <img data-live="video" alt="Live view from your Bamnun camera" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none">
-    <div data-live="cam-off" style="position:absolute;inset:0;display:grid;place-items:center;color:#B3A6B4;font-weight:700;font-size:14px"><span data-live="cam-off-text">Not connected</span></div>
+    <div data-live="cam-off" style="position:absolute;inset:0;display:grid;place-items:center;color:#9A93A0;font-weight:700;font-size:14px"><span data-live="cam-off-text">Not connected</span></div>
     <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
-      <ellipse id="cbOval" cx="80" cy="44" rx="20" ry="27" fill="none" stroke="#C4B5FD" stroke-width="1" stroke-dasharray="3 2.5" opacity=".9"></ellipse>
+      <ellipse id="cbOval" cx="80" cy="44" rx="20" ry="27" fill="none" stroke="#E8D7AE" stroke-width="1" stroke-dasharray="3 2.5" opacity=".9"></ellipse>
     </svg>
     <span id="cbHint" class="cb-hint" role="status"></span>
   </div>
   <div id="cbStage" style="position:relative;flex:1;margin-top:12px;overflow:hidden;min-height:250px"></div>
   <div style="display:flex;flex-direction:column;align-items:center;gap:4px;margin-top:10px">
-    <button type="button" id="cGo" style="min-width:200px;padding:16px 30px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)">Start</button>
-    <a id="cLater" href="Plan.dc.html" style="color:#B3A6B4;font-weight:600;font-size:14.5px;padding:6px 10px;text-decoration:none">Do this later</a>
+    <button type="button" id="cGo" style="min-width:200px;padding:16px 30px;border:0;border-radius:999px;background:#F2EEE8;color:#15131A;font-weight:700;font-size:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)">Start</button>
+    <a id="cLater" href="Plan.dc.html" style="color:#9A93A0;font-weight:600;font-size:14.5px;padding:6px 10px;text-decoration:none">Do this later</a>
   </div>
 </div>
 </x-dc>

@@ -304,3 +304,51 @@ def test_calibration_banner_short_circuits_before_the_state_panel():
                        ui_cfg=UI, calibrating=0.5, cal_stats=CAL_OK)
     # No red alert border, no bottom banner: calibration outranks both.
     assert out[-20:, :, 2].max() < 150
+
+
+def test_dashboard_draws_the_camera_beside_its_panels():
+    pytest.importorskip("cv2")
+    import numpy as np
+
+    from bamnun.features import FeatureFrame
+    from bamnun.state import DriverState
+    from bamnun.viz import DASH_H, DASH_W, Dashboard, DashboardData, fit_to_window
+
+    ff = FeatureFrame(t=10.0)
+    ff.face_found, ff.pose_valid = True, True
+    state = DriverState(t=10.0, score=0.5, level=2, level_name="drowsy", calibrated=True,
+                        components={"perclos": 0.6, "heavy_lids": 0.4})
+    data = DashboardData(now=10.0, score_history=[(9.0, 0.4), (10.0, 0.5)], stage=2,
+                         stage_name="scent", co2_connected=False)
+    dash = Dashboard()
+    assert dash.due(10.0)
+    dash.refresh(ff, state, data)
+    out = dash.compose(np.zeros((864, 1536, 3), np.uint8))
+    assert out.shape == (DASH_H, DASH_W, 3)
+    assert fit_to_window(out, 1920, 1080).shape == (1080, 1920, 3)
+
+
+def test_a_click_on_a_dashboard_button_is_found_through_the_window_scaling():
+    from bamnun.viz import BUTTONS, DASH_H, DASH_W, button_at, window_to_canvas
+
+    x, y, w, h = BUTTONS["calibrate"]
+    cx, cy = x + w // 2, y + h // 2
+    assert button_at(cx, cy) == "calibrate"
+    # The same spot in a full-HD window (scaled 1.5x, no letterbox).
+    assert button_at(*window_to_canvas(int(cx * 1.5), int(cy * 1.5), 1920, 1080)) == "calibrate"
+    # In a taller window the canvas is letterboxed: offset first, then scaled.
+    win_w, win_h = 1280, 900
+    oy = (win_h - DASH_H) // 2
+    assert button_at(*window_to_canvas(cx, cy + oy, win_w, win_h)) == "calibrate"
+    assert button_at(5, 5) is None and DASH_W == 1280
+
+
+def test_the_volume_buttons_are_clickable_and_do_not_overlap_the_others():
+    from bamnun.viz import BUTTONS, button_at
+
+    for name, (x, y, w, h) in BUTTONS.items():
+        assert button_at(x + w // 2, y + h // 2) == name
+    rects = list(BUTTONS.values())
+    for i, (ax, ay, aw, ah) in enumerate(rects):        # no two buttons overlap
+        for bx, by, bw, bh in rects[i + 1:]:
+            assert ax + aw < bx or bx + bw < ax or ay + ah < by or by + bh < ay

@@ -86,7 +86,7 @@ The phone sends `hello` with its clock time and language on connect (the Pi has 
 - **Two voice languages: English and Korean.** Each line exists as a recorded clip in both, in `assets/voice/en/` and `assets/voice/ko/`.
   - The voice language is chosen on the voice screen (section 6) and defaults to the app language.
   - It can differ from the app language. For example, the app can be in English while Ollie speaks Korean.
-- **The clips are recorded by the team**, using `tools/record_prompts.py` extended with `--lang en|ko`, through the device's own mic. The repo already argues that a familiar human voice wakes people better than a synthetic one. Because the clips are fixed recordings, Ollie never says the driver's name out loud; the name appears on screen and in notifications.
+- **The clips are generated offline** with `tools/make_voice.py` (Supertonic, voice M1, the same voice in both languages, so Ollie is one character). The team can still record any line with `tools/record_prompts.py --lang en|ko`, which replaces the generated clip; the repo argues that a familiar human voice wakes people better than a synthetic one, which is worth testing. Because the clips are fixed recordings, Ollie never says the driver's name out loud; the name appears on screen and in notifications.
 - **The phone** shows a notification for every alert, with an owl hoot sound, in the app language.
   - Android: `owl_hoot.wav` in `res/raw`, on its own notification channel.
   - iOS: there are no channels. `owl_hoot.wav` is bundled in the app and set on each notification. It must be under 30 s, and the ring/silent switch mutes it.

@@ -8,27 +8,27 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
-<style>body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}button{font:inherit;color:inherit;cursor:pointer}</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Pretendard:wght@400;500;600;700&amp;display=swap">
+<style>body{margin:0}a{color:#F2EEE8}a:hover{color:#E8D7AE}button{font:inherit;color:inherit;cursor:pointer}</style>
 </helmet>
-<div style="width:390px;height:1240px;box-sizing:border-box;position:relative;overflow:hidden;background:radial-gradient(120% 55% at 0% 0%,rgba(168,132,232,0.41) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 50% at 100% 12%,rgba(236,140,172,0.30) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 60% at 40% 105%,rgba(244,164,128,0.27) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;padding:58px 16px 0">
+<div style="width:390px;height:1240px;box-sizing:border-box;position:relative;overflow:hidden;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif;padding:58px 16px 0">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:0 6px">
-    <h1 style="margin:0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:36px;line-height:1">Insights</h1>
-    <span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4;background:rgba(255,255,255,.11);padding:4px 8px;border-radius:99px" id="iBadge" hidden>Demo</span>
+    <h1 style="margin:0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:30px;line-height:1.2;letter-spacing:-.01em">Insights</h1>
+    <span style="font-size:12px;font-weight:500;color:#9A93A0" id="iBadge" hidden>Demo</span>
   </div>
-  <div style="display:flex;gap:4px;margin-top:16px;padding:4px;border-radius:14px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
-    <button type="button" data-r="week" style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:14px">This week</button>
-    <button type="button" data-r="month" style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:transparent;color:#B3A6B4;font-weight:700;font-size:14px">This month</button>
+  <div style="display:flex;gap:4px;margin-top:20px;padding:4px;border-radius:14px;background:#1F1C24">
+    <button type="button" data-r="week" style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:#2E2A33;color:#F2EEE8;font-weight:600;font-size:14px">This week</button>
+    <button type="button" data-r="month" style="flex-grow:1;padding:9px;border:0;border-radius:10px;background:transparent;color:#9A93A0;font-weight:600;font-size:14px">This month</button>
   </div>
   <div id="iBody" style="display:flex;flex-direction:column;gap:12px;margin-top:12px"></div>
 
   <nav style="position:absolute;left:16px;right:16px;bottom:26px;display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;gap:4px;padding:6px;border-radius:99px;background:rgba(46,34,50,.72);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);box-shadow:0 10px 30px rgba(0,0,0,.55)">
-      <a href="Home.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
-      <a href="Trips.dc.html" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#B3A6B4;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"></path></svg>Trips</a>
-      <a href="Insights.dc.html" aria-current="page" style="width:66px;height:52px;border-radius:99px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:#F4EFE6;color:#241A26;text-decoration:none;font-size:10.5px;font-weight:700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-8"></path></svg>Insights</a>
+    <div style="display:flex;gap:2px;padding:5px;border-radius:22px;background:#1F1C24;box-shadow:0 8px 24px rgba(0,0,0,.45)">
+      <a href="Home.dc.html" style="width:66px;height:50px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;font-size:11px;font-weight:600;color:#9A93A0"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+      <a href="Trips.dc.html" style="width:66px;height:50px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;font-size:11px;font-weight:600;color:#9A93A0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.5"></circle><circle cx="18" cy="6" r="2.5"></circle><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"></path></svg>Trips</a>
+      <a href="Insights.dc.html" aria-current="page" style="width:66px;height:50px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;font-size:11px;font-weight:600;background:#2E2A33;color:#F2EEE8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 20V12M12 20V5M19 20v-8"></path></svg>Insights</a>
     </div>
-    <a href="Route.dc.html" aria-label="Start trip" style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#C4B5FD,#F9A8D4);color:#241A26;display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 0 6px rgba(196,181,253,.2)"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"></path></svg></a>
+    <a href="Route.dc.html" aria-label="Start trip" style="width:60px;height:60px;border-radius:50%;background:#E8D7AE;color:#15131A;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.45)"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10.2-6.5a1 1 0 0 0 0-1.7L9.5 4.6A1 1 0 0 0 8 5.5z"></path></svg></a>
   </nav>
 </div>
 </x-dc>

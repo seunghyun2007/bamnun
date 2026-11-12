@@ -54,6 +54,7 @@ class FrameSource(ABC):
 
     def __init__(self) -> None:
         self._index = 0
+        self.rotate_180 = False
 
     @abstractmethod
     def _grab(self) -> Optional[np.ndarray]:
@@ -70,6 +71,10 @@ class FrameSource(ABC):
         img = self._grab()
         if img is None:
             return None
+        if self.rotate_180:
+            import cv2
+
+            img = cv2.rotate(img, cv2.ROTATE_180)
         frame = Frame(image=img, timestamp=time.monotonic(), index=self._index)
         self._index += 1
         return frame
@@ -148,6 +153,7 @@ class PiCameraSource(FrameSource):
         time.sleep(0.4)  # let the pipeline settle before the first read
 
         self._size = size
+        self.rotate_180 = bool(pc.get("rotate_180", False))
         self._gray = bool(cfg.get("grayscale_input", False))
         self._flip = bool(cfg.get("flip_horizontal", False))
         self._last_seq = -1

@@ -8,68 +8,68 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Figtree:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=Pretendard:wght@400;500;600;700&amp;display=swap">
 <style>
-body{margin:0}a{color:#F4EFE6}a:hover{color:#C4B5FD}
+body{margin:0}a{color:#F2EEE8}a:hover{color:#E8D7AE}
 .cm-scan{animation:cmScan 2.4s linear infinite}
 .cm-dot{animation:cmDot 1.2s ease-in-out infinite}
 @keyframes cmScan{from{transform:translateY(-60px)}to{transform:translateY(420px)}}
 @keyframes cmDot{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </helmet>
-<div style="width:390px;min-height:844px;box-sizing:border-box;position:relative;overflow:clip;background:radial-gradient(100% 50% at 100% 0%,rgba(168,132,232,0.38) 0%,rgba(168,132,232,0) 62%),radial-gradient(90% 55% at 0% 45%,rgba(236,140,172,0.23) 0%,rgba(236,140,172,0) 60%),radial-gradient(110% 55% at 70% 105%,rgba(244,164,128,0.24) 0%,rgba(244,164,128,0) 65%),#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 16px 0;padding:56px 16px 40px">
+<div style="width:390px;min-height:844px;box-sizing:border-box;position:relative;overflow:clip;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif;display:flex;flex-direction:column;padding:56px 16px 0;padding:56px 16px 40px">
   <div style="display:flex;align-items:center;gap:14px;height:44px;margin-bottom:12px;padding:0 6px">
-    <a href="Home.dc.html" aria-label="Back to home" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);display:grid;place-items:center;color:#F4EFE6"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
-    <h1 style="margin:0;flex-grow:1;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:80%;font-size:24px">Camera</h1>
-    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-size:12.5px;font-weight:700"><i class="cm-dot" data-live="live-dot" style="width:8px;height:8px;border-radius:50%;background:#F48FB1"></i><span data-live="live">Live</span></span>
+    <a href="Home.dc.html" aria-label="Back to home" style="width:40px;height:40px;border-radius:50%;background:#1F1C24;border:0;display:grid;place-items:center;color:#F2EEE8"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <h1 style="margin:0;flex-grow:1;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:24px">Camera</h1>
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;background:#1F1C24;border:0;font-size:12.5px;font-weight:700"><i class="cm-dot" data-live="live-dot" style="width:8px;height:8px;border-radius:50%;background:#F2B66D"></i><span data-live="live">Live</span></span>
   </div>
-  <div id="cmBox" style="position:relative;margin-top:14px;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#2B2530">
+  <div id="cmBox" style="position:relative;margin-top:14px;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#24212A">
     <img data-live="video" alt="Live view from your Bamnun camera" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:none">
-    <div data-live="cam-off" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#B3A6B4;text-align:center;padding:16px">
+    <div data-live="cam-off" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#9A93A0;text-align:center;padding:16px">
       <b data-live="cam-off-text" style="font-size:16px;color:#E6DEE8">Not connected</b>
-      <button type="button" id="cmRetry" style="padding:9px 16px;border:0;border-radius:99px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:14px">Retry</button>
+      <button type="button" id="cmRetry" style="padding:9px 16px;border:0;border-radius:99px;background:#F2EEE8;color:#15131A;font-weight:700;font-size:14px">Retry</button>
     </div>
-    <span data-live="state-chip" style="position:absolute;padding:5px 10px;border-radius:99px;font-size:12.5px;font-weight:800;z-index:2;top:10px;left:10px;background:rgba(255,255,255,.16);color:#F4EFE6">–</span>
-    <span data-live="fps" style="position:absolute;padding:5px 10px;border-radius:99px;font-size:12.5px;font-weight:800;z-index:2;bottom:10px;left:10px;background:rgba(23,17,26,.65);color:#F4EFE6;font-weight:700">–</span>
-    <button type="button" id="cmExpand" aria-label="Full screen" style="position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;border:0;border-radius:50%;background:rgba(23,17,26,.65);color:#F4EFE6;display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg></button>
+    <span data-live="state-chip" style="position:absolute;padding:5px 10px;border-radius:99px;font-size:12.5px;font-weight:700;z-index:2;top:10px;left:10px;background:rgba(255,255,255,.16);color:#F2EEE8">–</span>
+    <span data-live="fps" style="position:absolute;padding:5px 10px;border-radius:99px;font-size:12.5px;font-weight:700;z-index:2;bottom:10px;left:10px;background:rgba(21,19,26,.65);color:#F2EEE8;font-weight:700">–</span>
+    <button type="button" id="cmExpand" aria-label="Full screen" style="position:absolute;top:8px;right:8px;z-index:2;width:36px;height:36px;border:0;border-radius:50%;background:rgba(21,19,26,.65);color:#F2EEE8;display:grid;place-items:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg></button>
   </div>
 
-  <section style="margin-top:12px;border-radius:20px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);padding:14px 16px">
+  <section style="margin-top:12px;border-radius:20px;background:#1F1C24;border:0;padding:14px 16px">
     <div style="display:flex;align-items:center;gap:14px">
       <div style="flex-shrink:0;text-align:center;min-width:64px">
-        <b data-live="score" style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800;font-size:40px;line-height:1">–</b>
-        <span style="font-size:11.5px;color:#B3A6B4">/ 100</span>
+        <b data-live="score" style="display:block;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:40px;line-height:1">–</b>
+        <span style="font-size:11.5px;color:#9A93A0">/ 100</span>
       </div>
       <div style="flex:1;min-width:0">
-        <span style="display:block;font-size:12px;color:#B3A6B4;font-weight:600">Drowsiness</span>
+        <span style="display:block;font-size:12px;color:#9A93A0;font-weight:600">Drowsiness</span>
         <b data-live="score-label" style="display:block;font-size:18px;margin-top:2px">–</b>
         <div style="position:relative;height:10px;margin-top:8px;border-radius:9px;background:rgba(255,255,255,.1);overflow:hidden">
-          <div data-live="score-bar" style="height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,#C4B5FD,#F9A8D4,#F48FB1);transition:width .3s"></div>
-          <i style="position:absolute;top:0;bottom:0;left:25%;width:2px;background:rgba(23,17,26,.7)"></i>
-          <i style="position:absolute;top:0;bottom:0;left:45%;width:2px;background:rgba(23,17,26,.7)"></i>
-          <i style="position:absolute;top:0;bottom:0;left:65%;width:2px;background:rgba(23,17,26,.7)"></i>
-          <i style="position:absolute;top:0;bottom:0;left:82%;width:2px;background:rgba(23,17,26,.7)"></i>
+          <div data-live="score-bar" style="height:100%;width:0;border-radius:9px;background:#E8D7AE;transition:width .3s"></div>
+          <i style="position:absolute;top:0;bottom:0;left:25%;width:2px;background:rgba(21,19,26,.7)"></i>
+          <i style="position:absolute;top:0;bottom:0;left:45%;width:2px;background:rgba(21,19,26,.7)"></i>
+          <i style="position:absolute;top:0;bottom:0;left:65%;width:2px;background:rgba(21,19,26,.7)"></i>
+          <i style="position:absolute;top:0;bottom:0;left:82%;width:2px;background:rgba(21,19,26,.7)"></i>
         </div>
-        <span data-live="score-stage" style="display:block;margin-top:6px;font-size:12.5px;color:#B3A6B4">–</span>
+        <span data-live="score-stage" style="display:block;margin-top:6px;font-size:12.5px;color:#9A93A0">–</span>
       </div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:13px">
-      <span style="color:#B3A6B4">Time-of-day risk <small style="opacity:.8">(not in the score)</small></span><b data-live="time-risk">–</b>
+      <span style="color:#9A93A0">Time-of-day risk <small style="opacity:.8">(not in the score)</small></span><b data-live="time-risk">–</b>
     </div>
-    <button type="button" id="cmSignals" aria-expanded="false" style="margin-top:12px;width:100%;padding:10px;border:0;border-radius:12px;background:rgba(255,255,255,.08);color:#F4EFE6;font-weight:700;font-size:13.5px">Show signals</button>
+    <button type="button" id="cmSignals" aria-expanded="false" style="margin-top:12px;width:100%;padding:10px;border:0;border-radius:12px;background:rgba(255,255,255,.08);color:#F2EEE8;font-weight:700;font-size:13.5px">Show signals</button>
     <div id="cmSignalList" data-live="signals" hidden style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
   </section>
 
   <div style="margin-top:12px"><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px">
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800" data-live="perclos">1.9%</b><span style="font-size:12px;color:#B3A6B4">Eyes closed, last min</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800" data-live="blinks">15</b><span style="font-size:12px;color:#B3A6B4">Blinks / min</span></div>
-    <div style="background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-size:24px;font-weight:800" data-live="last-blink">0.18 s</b><span style="font-size:12px;color:#B3A6B4">Last blink</span></div>
+    <div style="background:#1F1C24;border:0;border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:Pretendard,system-ui,sans-serif;font-size:24px;font-weight:700" data-live="perclos">1.9%</b><span style="font-size:12px;color:#9A93A0">Eyes closed, last min</span></div>
+    <div style="background:#1F1C24;border:0;border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:Pretendard,system-ui,sans-serif;font-size:24px;font-weight:700" data-live="blinks">15</b><span style="font-size:12px;color:#9A93A0">Blinks / min</span></div>
+    <div style="background:#1F1C24;border:0;border-radius:16px;padding:12px 10px;text-align:center"><b style="display:block;font-family:Pretendard,system-ui,sans-serif;font-size:24px;font-weight:700" data-live="last-blink">0.18 s</b><span style="font-size:12px;color:#9A93A0">Last blink</span></div>
   </div></div>
-  <div style="margin-top:12px"><div style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#A99BF0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v4M12 17v4M3 12h4M17 12h4"></path></svg>
-    <span style="flex-grow:1;font-size:14px;line-height:1.35"><b data-live="road" style="display:block">Looking at the road</b><span data-live="road-note" style="color:#B3A6B4">Head 2° left · inside the safe zone</span></span>
+  <div style="margin-top:12px"><div style="display:flex;align-items:center;gap:12px;margin-top:8px;padding:14px 16px;border-radius:18px;background:#1F1C24;border:0">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A93A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 3v4M12 17v4M3 12h4M17 12h4"></path></svg>
+    <span style="flex-grow:1;font-size:14px;line-height:1.35"><b data-live="road" style="display:block">Looking at the road</b><span data-live="road-note" style="color:#9A93A0">Head 2° left · inside the safe zone</span></span>
   </div></div>
-  <div style="margin-top:16px;display:flex;justify-content:center"><a href="Calibrate.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:15px 26px;box-sizing:border-box;border-radius:999px;background:rgba(255,255,255,.11);color:#F4EFE6;font-weight:700;font-size:15px;text-decoration:none">Recalibrate my eyes</a></div>
+  <div style="margin-top:16px;display:flex;justify-content:center"><a href="Calibrate.dc.html" style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:15px 26px;box-sizing:border-box;border-radius:999px;background:rgba(255,255,255,.11);color:#F2EEE8;font-weight:700;font-size:15px;text-decoration:none">Recalibrate my eyes</a></div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>

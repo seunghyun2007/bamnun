@@ -212,6 +212,11 @@ class Conditions:
         self.min_iod_frac = _cfg(cfg, "min_iod_frac", 0.045)
         self.max_yaw = _cfg(cfg, "reliable_yaw_deg", 30.0)
         self.max_pitch = _cfg(cfg, "reliable_pitch_deg", 30.0)
+        # The angle to the camera itself, not to the calibrated neutral: with
+        # the device off to one side, a driver looking at the road is already
+        # 40 degrees round, and a small turn away hides the far eye behind the
+        # nose and flattens the near one, which reads as closed.
+        self.max_camera_yaw = _cfg(cfg, "reliable_camera_yaw_deg", 55.0)
         self._jaw: Deque[tuple[float, float]] = deque()
         self._yawn_since: Optional[float] = None
         self._expr_until = -1e9
@@ -465,6 +470,9 @@ class NodDetector:
         self.recover_s = _cfg(cfg, "nod_recovery_window_s", 2.5)
         self.lost_window = _cfg(cfg, "head_drop_lost_window_s", 0.6)
         self.lost_speed = _cfg(cfg, "head_drop_min_speed_deg_s", 8.0)
+        # Off where the camera can be blocked: a face that vanishes is unseen,
+        # not a sleeper (see head_drop_when_lost in config/default.yaml).
+        self.drop_when_lost = bool((cfg or {}).get("head_drop_when_lost", True))
         self.window = _cfg(cfg, "nod_window_s", 120.0)
         self.events: Deque[Nod] = deque()
         self._hist: Deque[tuple[float, float, Optional[float]]] = deque()
@@ -534,6 +542,8 @@ class NodDetector:
 
     def lost(self, t: float) -> bool:
         """The face just vanished. True if it went down with the head."""
+        if not self.drop_when_lost:
+            return False
         if self.head_drop_since is not None:
             return True
         if not self._hist:

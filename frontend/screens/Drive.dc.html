@@ -9,30 +9,30 @@
 <x-dc>
 <helmet>
 <style>
-body{margin:0}button{font:inherit;color:inherit;cursor:pointer}input::placeholder{color:#8d7f8f}
-.mp-page{position:absolute;inset:0;overflow:hidden;background:#17111A;color:#F4EFE6;font-family:Figtree,Arial,sans-serif}
+body{margin:0}button{font:inherit;color:inherit;cursor:pointer}input::placeholder{color:#9A93A0}
+.mp-page{position:absolute;inset:0;overflow:hidden;background:#15131A;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif}
 .mp-map{position:absolute;inset:0}
-.mp-msg{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:#B3A6B4;font-size:14.5px;line-height:1.45;z-index:3;background:#17111A}
-.mp-glass{background:rgba(28,20,31,.92);border:1px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);box-shadow:0 12px 34px rgba(0,0,0,.45)}
+.mp-msg{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;color:#9A93A0;font-size:14.5px;line-height:1.45;z-index:3;background:#15131A}
+.mp-glass{background:rgba(31,28,36,.92);border:1px solid rgba(255,255,255,.1);box-shadow:0 12px 34px rgba(0,0,0,.45)}
 .mp-top{position:absolute;left:10px;right:10px;top:14px;z-index:4;border-radius:22px;padding:10px}
-.mp-back{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#F4EFE6;flex-shrink:0;text-decoration:none}
-.mp-in{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.1);color:#F4EFE6;font:600 15px Figtree,Arial,sans-serif;outline:none}
-.mp-in:focus{border-color:#C4B5FD}
-.mp-pinbtn{width:40px;height:40px;flex-shrink:0;border-radius:12px;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#C4B5FD}
-.mp-pinbtn[aria-pressed=true]{background:#C4B5FD;color:#241A26}
+.mp-back{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#F2EEE8;flex-shrink:0;text-decoration:none}
+.mp-in{flex:1;min-width:0;padding:11px 12px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.1);color:#F2EEE8;font:600 15px Pretendard,Arial,sans-serif;outline:none}
+.mp-in:focus{border-color:#E8D7AE}
+.mp-pinbtn{width:40px;height:40px;flex-shrink:0;border-radius:12px;border:0;background:rgba(255,255,255,.1);display:grid;place-items:center;color:#E8D7AE}
+.mp-pinbtn[aria-pressed=true]{background:#E8D7AE;color:#15131A}
 .mp-list{position:absolute;left:10px;right:10px;z-index:4;border-radius:18px;overflow:hidden;max-height:330px;overflow-y:auto}
-.mp-row{display:flex;align-items:center;gap:12px;padding:11px 14px;width:100%;border:0;background:transparent;text-align:left;color:#F4EFE6}
+.mp-row{display:flex;align-items:center;gap:12px;padding:11px 14px;width:100%;border:0;background:transparent;text-align:left;color:#F2EEE8}
 .mp-row+.mp-row{border-top:1px solid rgba(255,255,255,.08)}
 .mp-sheet{position:absolute;left:0;right:0;bottom:0;z-index:4;border-radius:26px 26px 0 0;padding:10px 16px 26px;max-height:62%;overflow-y:auto}
 .mp-grab{width:40px;height:5px;border-radius:9px;background:rgba(255,255,255,.22);margin:0 auto 10px}
-.mp-cta{width:100%;padding:16px;border:0;border-radius:999px;background:#F4EFE6;color:#241A26;font-weight:800;font-size:16px}
+.mp-cta{width:100%;padding:16px;border:0;border-radius:999px;background:#F2EEE8;color:#15131A;font-weight:700;font-size:16px}
 .mp-cta[disabled]{opacity:.4}
-.mp-fab{position:absolute;right:12px;z-index:4;width:46px;height:46px;border-radius:50%;border:0;display:grid;place-items:center;color:#F4EFE6}
+.mp-fab{position:absolute;right:12px;z-index:4;width:46px;height:46px;border-radius:50%;border:0;display:grid;place-items:center;color:#F2EEE8}
 .mp-cross{position:absolute;left:50%;top:50%;z-index:3;width:44px;height:58px;margin:-58px 0 0 -22px;pointer-events:none;display:none;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));transition:transform .15s}
 .mp-cross.lift{transform:translateY(-10px)}
 .mp-cross::after{content:"";position:absolute;left:50%;bottom:-4px;width:10px;height:4px;margin-left:-5px;border-radius:50%;background:rgba(0,0,0,.45)}
-.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.mp-pin.pick{background:#C4B5FD}
+.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F2EEE8;color:#15131A;font:700 12px Pretendard,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.mp-pin.pick{background:#E8D7AE}
 .mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
 .mp-row b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 </style>
@@ -43,24 +43,24 @@ body{margin:0}button{font:inherit;color:inherit;cursor:pointer}input::placeholde
   <div class="mp-top mp-glass" style="display:flex;gap:10px;align-items:center">
     <a href="Home.dc.html" aria-label="Back" class="mp-back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
     <div style="flex:1;min-width:0">
-      <span style="display:block;font-size:12px;color:#B3A6B4;font-weight:600" id="dFrom"></span>
-      <b id="dTo" style="display:block;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></b>
+      <span style="display:block;font-size:12px;color:#9A93A0;font-weight:600" id="dFrom"></span>
+      <b id="dTo" style="display:block;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></b>
     </div>
-    <span id="dLive" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 9px;border-radius:99px;background:rgba(255,255,255,.1)"><i id="dDot" style="width:8px;height:8px;border-radius:50%;background:#B3A6B4"></i><span id="dLiveTxt">GPS</span></span>
+    <span id="dLive" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 9px;border-radius:99px;background:rgba(255,255,255,.1)"><i id="dDot" style="width:8px;height:8px;border-radius:50%;background:#9A93A0"></i><span id="dLiveTxt">GPS</span></span>
   </div>
   <button type="button" class="mp-fab mp-glass" id="dFollow" aria-label="Follow my position" style="bottom:230px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></button>
   <div class="mp-sheet mp-glass" style="max-height:none">
     <div class="mp-grab"></div>
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
-      <div><span style="display:block;font-size:12px;color:#B3A6B4">Left</span><b id="dLeft" style="font-size:22px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800">–</b></div>
-      <div><span style="display:block;font-size:12px;color:#B3A6B4">Time</span><b id="dTime" style="font-size:22px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800">–</b></div>
-      <div><span style="display:block;font-size:12px;color:#B3A6B4">Arrive</span><b id="dEta" style="font-size:22px;font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800">–</b></div>
+      <div><span style="display:block;font-size:12px;color:#9A93A0">Left</span><b id="dLeft" style="font-size:22px;font-family:Pretendard,system-ui,sans-serif;font-weight:700">–</b></div>
+      <div><span style="display:block;font-size:12px;color:#9A93A0">Time</span><b id="dTime" style="font-size:22px;font-family:Pretendard,system-ui,sans-serif;font-weight:700">–</b></div>
+      <div><span style="display:block;font-size:12px;color:#9A93A0">Arrive</span><b id="dEta" style="font-size:22px;font-family:Pretendard,system-ui,sans-serif;font-weight:700">–</b></div>
     </div>
     <div id="dNext" style="margin-top:12px"></div>
-    <p id="dNote" style="margin:10px 0 0;font-size:13px;color:#B3A6B4;min-height:18px"></p>
+    <p id="dNote" style="margin:10px 0 0;font-size:13px;color:#9A93A0;min-height:18px"></p>
     <div style="display:flex;gap:8px;margin-top:10px">
-      <button type="button" id="dReroute" hidden style="flex:1;padding:14px;border:0;border-radius:999px;background:#C4B5FD;color:#241A26;font-weight:800;font-size:15px">Re-route from here</button>
-      <button type="button" id="dEnd" style="flex:1;padding:14px;border:0;border-radius:999px;background:rgba(244,143,177,.25);color:#F4EFE6;font-weight:800;font-size:15px">End trip</button>
+      <button type="button" id="dReroute" hidden style="flex:1;padding:14px;border:0;border-radius:999px;background:#E8D7AE;color:#15131A;font-weight:700;font-size:15px">Re-route from here</button>
+      <button type="button" id="dEnd" style="flex:1;padding:14px;border:0;border-radius:999px;background:rgba(242,182,109,.25);color:#F2EEE8;font-weight:700;font-size:15px">End trip</button>
     </div>
   </div>
 </div>

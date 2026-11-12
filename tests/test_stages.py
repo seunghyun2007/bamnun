@@ -310,7 +310,7 @@ def test_co2_threshold_drops_once_the_driver_is_drowsy():
 
 
 def test_an_empty_seat_is_nudged_less_often_than_a_glance():
-    pol = EscalationPolicy(_quiet_policy_cfg())
+    pol = EscalationPolicy({**_quiet_policy_cfg(), "face_lost_alerts": True})   # a real cab
     est = StateEstimator(load_config()["state"])
     fired = []
     t = 0.0
@@ -320,3 +320,16 @@ def test_an_empty_seat_is_nudged_less_often_than_a_glance():
         t += 0.5
     assert len(fired) == 2, fired               # once after the grace, once 45 s on
     assert fired[1] - fired[0] >= 45.0
+
+
+def test_at_the_booth_an_unseen_face_sets_off_nothing():
+    """2026-11-07: an arm in front of the camera, or a look at the laptop's
+    game, read as "driver not visible" and chimed up to stage 3."""
+    pol = EscalationPolicy({**_quiet_policy_cfg(), "face_lost_alerts": False})
+    est = StateEstimator(load_config()["state"])
+    fired, t = [], 0.0
+    while t < 60.0:
+        d = pol.update(est.update(FeatureFrame(t=t, face_found=False), calibrated=True))
+        fired += d.fired
+        t += 0.5
+    assert fired == [] and pol.stage == 0

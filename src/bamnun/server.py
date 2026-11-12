@@ -13,6 +13,8 @@ Serves (docs/SPEC.md, sections 0 and 1):
                        SQLite on the Pi (store.py).
 * ``POST /api/calibration/start|cancel|answer``, ``GET /api/calibration``
 * ``POST /api/say/{line}``, ``POST /api/test/{part}``, ``GET /api/lines``
+* ``POST /api/showcase/stage/{1-4}``  the booth demo: play one wake-up stage
+                       on the device, one phone at a time (409 while busy).
 * ``GET /api/trips``, ``/api/trips/{id}``, ``/api/trips/current``,
   ``/api/insights``; ``POST /api/trips/start|end``,
   ``PUT /api/trips/current/route``
@@ -35,12 +37,14 @@ import asyncio
 import logging
 import socket
 import threading
+import time
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import (HTMLResponse, JSONResponse, PlainTextResponse, Response,
+                               StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -88,9 +92,48 @@ CAL_STEPS_ASKED = ("speaker", "chime", "light", "mist")
 TEST_PARTS = ("speaker", "chime", "blue_light", "mist", "alarm")
 OUTCOMES = ("ok", "contacted", "called", "dismissed")
 
+# Product control (the booth demo): one wake-up stage played on the real
+# device, as (commands, seconds the device stays taken). One phone at a time:
+# while a stage plays, every other request gets 409 and how long to wait.
+# The booth's four wake-up stages, as device commands (control.py).
+from .control import SHOWCASE_STAGES  # noqa: E402
+
+
+# -- booth mode: phones stay on the booth's Wi-Fi ---------------------------- #
+#
+# At a demo booth the Pi runs an open hotspot whose DNS answers every name
+# with the Pi (tools/booth/setup_booth.sh), and port 80 is sent here. Every
+# phone checks for internet the moment it joins, by fetching a known page; a
+# wrong answer makes it pop up a sign-in sheet, and on an iPhone that sheet
+# only shows once the Camera app is left. So the booth gives the expected
+# answer: the phone stays on the Wi-Fi quietly, and the poster's second QR
+# code opens the app in the real browser. Only with --booth.
+
+CAPTIVE_SUCCESS: dict[str, tuple[int, str]] = {
+    # Apple
+    "/hotspot-detect.html": (200, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"),
+    "/library/test/success.html": (200, "<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>"),
+    # Android and ChromeOS
+    "/generate_204": (204, ""),
+    "/gen_204": (204, ""),
+    # Windows
+    "/connecttest.txt": (200, "Microsoft Connect Test"),
+    "/ncsi.txt": (200, "Microsoft NCSI"),
+    # Firefox
+    "/success.txt": (200, "success\n"),
+    "/canonical.html": (200, '<meta http-equiv="refresh" content="0;url=https://support.mozilla.org/kb/captive-portal"/>'),
+}
+
+
+def add_captive_portal(app: FastAPI) -> None:
+    for path, (code, body) in CAPTIVE_SUCCESS.items():
+        def probe(code: int = code, body: str = body) -> Any:
+            return Response(status_code=204) if code == 204 else HTMLResponse(body)
+        app.add_api_route(path, probe, methods=["GET"], include_in_schema=False)
+
 
 def create_app(hub: Hub, www: Optional[Path] = None,
-               store: Optional[Store] = None) -> FastAPI:
+               store: Optional[Store] = None, booth: bool = False) -> FastAPI:
     app = FastAPI(title="Bamnun", version=__version__)
     # The Capacitor app runs at http://localhost or capacitor://localhost,
     # which are different origins from the Pi. Nothing here is secret, and
@@ -168,6 +211,26 @@ def create_app(hub: Hub, www: Optional[Path] = None,
             raise HTTPException(404, f"part must be one of {TEST_PARTS}")
         hub.command({"cmd": "test", "part": part})
         return {"queued": part}
+
+    showcase = {"until": 0.0, "stage": 0}
+    showcase_lock = threading.Lock()
+
+    @app.post("/api/showcase/stage/{stage}", status_code=202)
+    def showcase_stage(stage: int) -> Any:
+        if stage not in SHOWCASE_STAGES:
+            raise HTTPException(404, "stage must be 1 to 4")
+        cmds, hold_s = SHOWCASE_STAGES[stage]
+        with showcase_lock:
+            now = time.monotonic()
+            if now < showcase["until"]:
+                left = round(showcase["until"] - now, 1)
+                return JSONResponse({"busy": True, "stage": showcase["stage"], "retry_in": left},
+                                    status_code=409)
+            showcase.update(until=now + hold_s, stage=stage)
+        for cmd in cmds:
+            hub.command(cmd)
+        hub.emit({"type": "showcase", "stage": stage, "hold_s": hold_s})
+        return {"playing": stage, "hold_s": hold_s}
 
     @app.post("/api/calibration/start", status_code=202)
     def cal_start() -> dict[str, Any]:
@@ -326,6 +389,9 @@ def create_app(hub: Hub, www: Optional[Path] = None,
         finally:
             reading.cancel()
 
+    if booth:
+        add_captive_portal(app)
+
     www = Path(www) if www is not None else default_www()
     if (www / "index.html").exists():
         app.mount("/", StaticFiles(directory=www, html=True), name="app")
@@ -347,10 +413,11 @@ class ServerThread:
     """
 
     def __init__(self, hub: Hub, host: str = "0.0.0.0", port: int = 8000,
-                 www: Optional[Path] = None, store: Optional[Store] = None) -> None:
+                 www: Optional[Path] = None, store: Optional[Store] = None,
+                 booth: bool = False) -> None:
         import uvicorn
 
-        config = uvicorn.Config(create_app(hub, www, store), host=host, port=port,
+        config = uvicorn.Config(create_app(hub, www, store, booth), host=host, port=port,
                                 log_level="warning", access_log=False)
         self._server = uvicorn.Server(config)
         self.host, self.port = host, port

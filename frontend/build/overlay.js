@@ -52,20 +52,20 @@
     const name = BN_NAME();
     const el = document.createElement("div");
     el.setAttribute("role", "alertdialog"); el.setAttribute("aria-live", "assertive");
-    el.style.cssText = "position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;padding:64px 24px 40px;text-align:center;color:#F4EFE6;font-family:Figtree,Arial,sans-serif;background:radial-gradient(120% 60% at 50% 0%,rgba(244,143,177,.55),rgba(244,143,177,0) 70%),#2A1018;animation:scIn .3s ease both";
+    el.style.cssText = "position:absolute;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;padding:64px 24px 40px;text-align:center;color:#F2EEE8;font-family:Pretendard,Arial,sans-serif;background:#2A1018;animation:scIn .3s ease both";
     el.innerHTML = `
-      ${demo ? `<span style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.16);padding:5px 10px;border-radius:99px">${esc(T(practice ? "Practice" : "Demo"))}</span>` : ""}
+      ${demo ? `<span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(255,255,255,.16);padding:5px 10px;border-radius:99px">${esc(T(practice ? "Practice" : "Demo"))}</span>` : ""}
       <img src="${IMG.wake}" alt="" style="width:130px;margin-top:14px">
-      <h1 style="margin:10px 0 0;font-family:'Bricolage Grotesque',Arial,sans-serif;font-weight:800;font-stretch:75%;font-size:46px;line-height:1">${esc(T("Are you OK?"))}</h1>
+      <h1 style="margin:10px 0 0;font-family:Pretendard,system-ui,sans-serif;font-weight:700;font-size:46px;line-height:1">${esc(T("Are you OK?"))}</h1>
       <p data-em="sub" style="margin:12px 0 0;font-size:16.5px;line-height:1.4;max-width:30ch"></p>
       <div style="position:relative;width:132px;height:132px;margin-top:22px">
-        <svg viewBox="0 0 132 132" width="132" height="132" style="transform:rotate(-90deg)"><circle cx="66" cy="66" r="58" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="10"/><circle data-em="ring" cx="66" cy="66" r="58" fill="none" stroke="#F48FB1" stroke-width="10" stroke-linecap="round" stroke-dasharray="364 364" style="transition:stroke-dasharray 1s linear"/></svg>
-        <b data-em="n" style="position:absolute;inset:0;display:grid;place-items:center;font-family:'Bricolage Grotesque',Arial,sans-serif;font-size:48px;font-weight:800"></b>
+        <svg viewBox="0 0 132 132" width="132" height="132" style="transform:rotate(-90deg)"><circle cx="66" cy="66" r="58" fill="none" stroke="rgba(255,255,255,.15)" stroke-width="10"/><circle data-em="ring" cx="66" cy="66" r="58" fill="none" stroke="#F2B66D" stroke-width="10" stroke-linecap="round" stroke-dasharray="364 364" style="transition:stroke-dasharray 1s linear"/></svg>
+        <b data-em="n" style="position:absolute;inset:0;display:grid;place-items:center;font-family:Pretendard,system-ui,sans-serif;font-size:48px;font-weight:700"></b>
       </div>
       <div data-em="log" style="margin-top:16px;width:100%;display:flex;flex-direction:column;gap:8px"></div>
       <div style="margin-top:auto;width:100%;display:flex;flex-direction:column;gap:10px">
-        <button type="button" data-em="ok" style="width:100%;padding:22px;border:0;border-radius:24px;background:#7BD88F;color:#241A26;font-weight:800;font-size:22px;box-shadow:0 12px 30px rgba(0,0,0,.45)">${esc(T("I'm OK"))}</button>
-        <button type="button" data-em="now" style="padding:12px;border:0;background:transparent;color:#F4EFE6;font-weight:700;font-size:15px;text-decoration:underline">${esc(T(contact ? "Contact now" : "Close"))}</button>
+        <button type="button" data-em="ok" style="width:100%;padding:22px;border:0;border-radius:24px;background:#E8D7AE;color:#15131A;font-weight:700;font-size:22px;box-shadow:0 12px 30px rgba(0,0,0,.45)">${esc(T("I'm OK"))}</button>
+        <button type="button" data-em="now" style="padding:12px;border:0;background:transparent;color:#F2EEE8;font-weight:700;font-size:15px;text-decoration:underline">${esc(T(contact ? "Contact now" : "Close"))}</button>
       </div>`;
     phone.appendChild(el);
     const $ = (k) => el.querySelector('[data-em="' + k + '"]');
@@ -115,7 +115,7 @@
   function toast(text, img) {
     if (!toastEl) {
       toastEl = document.createElement("div");
-      toastEl.style.cssText = "position:absolute;left:14px;right:14px;top:14px;z-index:55;display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:18px;background:#F4EFE6;color:#241A26;font-weight:700;font-size:14px;line-height:1.3;box-shadow:0 12px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .3s;transform:translateY(-120%);opacity:0;pointer-events:none";
+      toastEl.style.cssText = "position:absolute;left:14px;right:14px;top:14px;z-index:55;display:flex;gap:10px;align-items:center;padding:10px 14px;border-radius:18px;background:#F2EEE8;color:#15131A;font-weight:700;font-size:14px;line-height:1.3;box-shadow:0 12px 30px rgba(0,0,0,.5);transition:transform .35s cubic-bezier(.22,1,.36,1),opacity .3s;transform:translateY(-120%);opacity:0;pointer-events:none";
       phone.appendChild(toastEl);
     }
     toastEl.innerHTML = `<img src="${img || IMG.hello}" alt="" style="width:34px;flex-shrink:0"><span>${esc(text)}</span>`;
@@ -140,7 +140,13 @@
   BN_API.on("trip", (m) => { if (m.event === "ended") toast(T("Trip saved. See it in Trips."), IMG.celebrate); });
   // The device knew the driver's name before this phone did: show it.
   BN_API.on("name_changed", () => { const s = screen(); if (["Home", "Settings", "Plan"].includes(s)) BN_GO(s, { instant: true, keepScroll: true }); });
-  BN_API.on("emergency", (m) => { show(m); notify(T("Ollie"), T("Are you OK?")); });
+  // Nobody is driving during setup, so a device emergency waits for the app
+  // screens. Settings' practice run calls show() directly and isn't affected.
+  const DRIVING = ["Home", "Camera", "Trips", "Insights", "Settings", "Route", "Drive"];
+  BN_API.on("emergency", (m) => {
+    if (!DRIVING.includes(screen())) return;
+    show(m); notify(T("Ollie"), T("Are you OK?"));
+  });
 
   window.BN_EMERGENCY = { show };
 })();

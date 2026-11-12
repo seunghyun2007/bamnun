@@ -5,7 +5,10 @@
     python -m bamnun.app --source video --device runs/clip.mp4 --fast
     python -m bamnun.app --serve                    # plus the app and live data on :8000
 
-Keys in the window: c recalibrate, s snapshot, a toggle actuators, q quit.
+Keys in the window: p photos on/off for this visitor, v voice Korean/English, n next person (the briefing again), m the QR code and stage cards, c recalibrate, s snapshot, a toggle actuators, l dashboard or
+camera-only layout, f full screen, - and = speaker volume, space the visitor
+briefing, Esc skip the standby or briefing screen, q quit. The dashboard also has Calibrate, Full screen and volume
+buttons to click; on the standby and briefing screens a click is space.
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ from rich.console import Console
 from rich.logging import RichHandler
 
 from .air import CabinAir
-from .alerts import _HAVE_GPIO, AlertDecision, AudioActuator, EscalationPolicy
+from .alerts import (_HAVE_GPIO, AlertDecision, AtomizerActuator, AudioActuator,
+                     EscalationPolicy, LightActuator)
 from . import demo as demo_mode
 from .capture import Illuminator, open_source
 from .control import Controller, FeatureCalibration
@@ -38,6 +42,10 @@ from .state import DriverState, StateEstimator
 from .store import Store
 from .video import VideoEncoder
 from .telemetry import Hub, alert_event, build_snapshot
+from .thermal import PiHealth
+from .viz import (DASH_H, DASH_W, Dashboard, DashboardData, button_at, column_compose, draw_face_mesh,
+                  is_tall, window_to_dash,
+                  fit_to_window, window_to_canvas)
 
 # Console output must never stop detection. A Windows console in a legacy
 # code page can't print Korean (Ollie's lines, a driver's name), and an
@@ -52,6 +60,77 @@ console = Console()
 
 # The camera loop runs at 25-30 fps; the app only needs a fraction of that.
 PUBLISH_PERIOD_S = 0.1
+# The dashboard's score chart: one sample every half second, the last 2 min.
+SCORE_SAMPLE_S = 0.5
+SOUND_LIGHT_S = 3.0      # the dashboard's SOUND light stays lit this long after a sound
+CAL_NOTICE_S = 20.0      # how long a failed calibration's message stays on the dashboard
+QUIET_AFTER_SCREEN_S = 8.0
+TOUR_STEP_S = 6.0           # an untouched tour step moves on after this
+GUIDE_ALERT_S = 7.0         # an alert's hint ("1단계: 파란 불빛") stays this long
+GUIDE_DONE_S = 6.0          # "잘했어요" after the first alert ends, then the QR offer
+AUTO_BRIEF_S = 3.0          # (unused: a face no longer starts anything)
+BRIEF_PAGE_S = 7.0          # each briefing page turns by itself after this ...
+BRIEF_CENTER_MAX_S = 14.0   # ... the centring page after this at most,
+BRIEF_FIT_S = 2.0           # or once the face has fit the oval this long  # no alerts this long after leaving a booth screen   # an untouched briefing page closes after this
+VOLUME_STEP = 10
+
+# The calibrator's live hints, as a person reads them.
+CAL_HINTS = {"no_face": "Can't see your face", "closer": "Move a little closer",
+             "farther": "Move back a little", "dark": "Too dark: more light, please",
+             "bright": "Too bright", "face_camera": "Turn a little towards the camera",
+             "still": "Hold still"}
+
+
+class SpeakerVolume:
+    """The device speaker's volume, through ALSA's mixer (amixer).
+
+    The card is the USB speaker the device plays through (ui.speaker_mixer).
+    It's set to start_percent (80) at every start; changes are saved with
+    alsactl, in the background so the camera loop never waits on them.
+    """
+
+    def __init__(self, cfg: Optional[dict]) -> None:
+        cfg = cfg or {}
+        self.card = str(cfg.get("card", "UACDemoV10"))
+        self.control = str(cfg.get("control", "PCM"))
+        self.percent: Optional[int] = self._read()
+        # Every start begins at the same level; the buttons change it from there.
+        start = cfg.get("start_percent", 80)
+        if self.percent is not None and start is not None:
+            self.change(int(start) - self.percent)
+
+    def _read(self) -> Optional[int]:
+        import re
+        import subprocess
+
+        try:
+            out = subprocess.run(["amixer", "-c", self.card, "sget", self.control],
+                                 capture_output=True, text=True, timeout=2).stdout
+        except (OSError, subprocess.SubprocessError):
+            return None
+        m = re.search(r"\[(\d+)%\]", out)
+        return int(m.group(1)) if m else None
+
+    def change(self, step: int) -> None:
+        import subprocess
+        import threading
+
+        if self.percent is None:
+            return
+        self.percent = max(0, min(100, self.percent + step))
+        pct = self.percent
+
+        def apply() -> None:
+            try:
+                subprocess.run(["amixer", "-q", "-c", self.card, "sset", self.control, f"{pct}%"],
+                               timeout=3)
+                subprocess.run(["sudo", "-n", "alsactl", "store", self.card],
+                               capture_output=True, timeout=5)
+            except (OSError, subprocess.SubprocessError) as exc:
+                log.warning("speaker volume: %s", exc)
+
+        threading.Thread(target=apply, name="bamnun-volume", daemon=True).start()
+        console.print(f"speaker volume {pct}%")
 HEALTH_PERIOD_S = 1.0
 log = logging.getLogger("bamnun")
 
@@ -76,6 +155,9 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help="serve the phone app and live data (needs fastapi, uvicorn)")
     p.add_argument("--host", default="0.0.0.0", help="--serve: address to listen on")
     p.add_argument("--port", type=int, default=8000, help="--serve: port")
+    p.add_argument("--booth", action="store_true",
+                   help="demo booth: --serve, quiet ladder, and phones kept on the booth "
+                        "Wi-Fi (tools/booth/setup_booth.sh)")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -146,6 +228,85 @@ class Monitor:
         self._last_video = -1e9
         self._last_window = -1e9
         self._window_period = 1.0 / max(1.0, float(self.cfg["ui"].get("window_max_fps", 15)))
+        # The presenting layout: the camera beside large panels of what the
+        # detector sees (viz.Dashboard). l switches to the camera alone.
+        ui = self.cfg["ui"]
+        self._dash_refresh_s = float(ui.get("dashboard_refresh_s", 0.2))
+        layout = "dashboard" if args.booth else ui.get("layout", "overlay")
+        self.dashboard = Dashboard(self._dash_refresh_s) if layout == "dashboard" else None
+        self._score_history: deque = deque(maxlen=int(120.0 / SCORE_SAMPLE_S))
+        self._co2_history: deque = deque(maxlen=120)     # 10 min at the sensor's 5 s
+        self._co2_recorded_at: Optional[float] = None
+        self._last_score_t = -1e9
+        self.volume = SpeakerVolume(ui.get("speaker_mixer"))
+        self._max_cal_attempts = int(self.cfg["calibration"].get("max_attempts", 3))
+        # Booth screens (attract.py): standby after a while with nobody at the
+        # wheel, and the briefing a visitor starts with space or a click.
+        self.mode = "live"                       # live | standby | briefing | qr | tour
+        self._standby_after_s = float(ui.get("standby_after_s", 30.0))
+        self._no_face_since: Optional[float] = None
+        self._face_since: Optional[float] = None
+        self._brief_step = 0
+        self._brief_at = 0.0
+        self._screens = None
+        # "Learn more": once a visitor has driven a while, a pop-up on the
+        # dashboard offers the website's QR code (a full screen, "qr" mode).
+        lm = ui.get("learn_more") or {}
+        self._learn_url = str(lm.get("url") or "")
+        self._learn_after_s = float(lm.get("after_s", 60.0))
+        self._qr_after_s = float(lm.get("qr_after_s", 40.0))   # the QR replaces the data after this much driving
+        # Before it, the tip to try being sleepy (left out of the briefing:
+        # too much at once before someone has even driven).
+        self._tip_after_s = float(lm.get("sleepy_tip_after_s", 20.0))
+        self._tip_hide_s = float(lm.get("sleepy_tip_hide_s", 15.0))
+        self._tip_at: Optional[float] = None
+        self._tip_shown = False
+        self._learn_hide_s = float(lm.get("hide_after_s", 40.0))
+        self._qr_close_s = float(lm.get("qr_close_s", 60.0))
+        self._driven_s = 0.0
+        # The visitor's own drive and photos, for their phone (visit.py):
+        # recorded from the end of calibration, sent only on their yes.
+        from .visit import Visit
+        self.visit = Visit(self.root, self._learn_url or "https://seunghyun2007.github.io/bamnun/")
+        self._learn_shown = False
+        # The booth remote (remote.py): a staff phone's commands, via Supabase.
+        from .remote import Remote
+        self.remote = Remote(self.root)
+        self.remote.start()
+        # The product film (film.py): loops muted while nobody is driving;
+        # the remote plays it with sound.
+        # Off by default: over RealVNC + spacedesk it stutters, so the booth
+        # PC plays it over the game instead (tools/booth/windows/booth_film.ps1,
+        # the remote's film buttons). film.on_pi: true brings it back here.
+        from .film import Film
+        self.film = Film(self.root)
+        self._film_on_pi = bool((self.cfg.get("film") or {}).get("on_pi", False))
+        if self._film_on_pi:
+            self.film.start(time.monotonic())
+        self._popup_at: Optional[float] = None
+        self._qr_at = 0.0
+        self._stage_play = (0, 0.0, 0.0)          # stage, started, until (monotonic)
+        self._mouse: Optional[tuple[int, int]] = None
+        # The guided tour of the dashboard (attract.TOUR): after each
+        # calibration from the briefing, and from the GUIDE button or g.
+        self._tour_after_cal = bool(ui.get("tour_after_calibration", True))
+        self._tour_step, self._tour_at = 0, 0.0
+        self._fit_since: Optional[float] = None   # the face fit the oval since (centring page)
+        # No standby screen: the dashboard stays up. A seat empty for a while
+        # means the next face is a new visitor, and their guide starts.
+        self._seat_empty = True
+        self._guide_t0: Optional[float] = None    # the live hints after calibration
+        self._guide_stage = (0, 0.0)              # the alert being explained, since
+        self._guide_had_alert = False
+        self._guide_done_at: Optional[float] = None
+        self._quiet_until = 0.0                   # no alerts until then (just back from a screen)
+        self._seen_mode = "live"
+        self._mode_t: Optional[float] = None
+        self._cal_notice: Optional[tuple[str, float]] = None
+        # The Pi's temperature and power (thermal.py): shown on the dashboard,
+        # and a warning bar on every screen when it runs hot.
+        self.health = PiHealth(self.cfg.get("thermal"))
+        self._health_level = "ok"
         self._last_health = -1e9
         self._published_stage = 0
         self._publish_failed = False
@@ -162,7 +323,11 @@ class Monitor:
         self.controller = Controller(
             self.hub, self.store, self.policy, estimator=self.estimator,
             calibration=FeatureCalibration(self.features, on_commit=self._save_calibration),
-            trip_cfg=self.cfg.get("trips"))
+            trip_cfg=self.cfg.get("trips"), quiet=self.args.booth)
+
+        # Ollie speaks Korean from every start (ui.voice_lang); the VOICE
+        # button or v switches to English and back.
+        self._set_voice_lang(str(ui.get("voice_lang", "ko")))
 
         # Calibration is per driver (SPEC.md, 15): runs/drivers/<name>/.
         # --calibration names a file explicitly and pins it.
@@ -257,6 +422,18 @@ class Monitor:
         for why in decision.suppressed:
             console.print(f"     [yellow]suppressed[/] {why}")
 
+    def _say_now(self, name: str, t: float, why: str) -> None:
+        """A staff button's spoken line: every press, whatever the actuator's
+        refractory period (meant for the automatic prompt) or the settings."""
+        act = self.policy.actuators.get(name)
+        if act is None:
+            return
+        act._last_fired = None
+        a = act.fire(t, why)
+        if a is not None:
+            self.policy.history.append(a)
+            self.logger.log_event("prompt", a)
+
     def _voice(self, name: str, t: float) -> None:
         """Play an optional spoken cue outside the alert ladder."""
         a = self.policy.prompt(name, t)
@@ -269,7 +446,7 @@ class Monitor:
             self._air_seen_at = air.updated_at
             self.logger.log_event("co2", {"t": t, "ppm": air.ppm,
                                           "temp_c": air.temp_c, "rh": air.rh})
-        if air.should_prompt(level):
+        if self._alerts_allowed(time.monotonic()) and air.should_prompt(level):
             console.print(f"[bold yellow]CO2 {air.ppm:.0f} ppm[/]: open the window")
             a = self.policy.prompt(air.actuator, t, "co2")
             self.logger.log_event("co2_prompt", {"t": t, "ppm": air.ppm, "level": level,
@@ -290,7 +467,7 @@ class Monitor:
             return
         try:
             self.server = ServerThread(self.hub, self.args.host, self.args.port,
-                                       store=self.store).start()
+                                       store=self.store, booth=self.args.booth).start()
         except Exception as exc:  # noqa: BLE001
             log.warning("could not start the server: %s", exc)
             return
@@ -398,15 +575,436 @@ class Monitor:
     def _control(self, t: float, ff: FeatureFrame) -> None:
         """Phone commands, guided calibration, trips, reminders, emergency."""
         face = bool(ff.face_found)
+        live = self._alerts_allowed(time.monotonic())   # no "are you OK?" unless someone's driving
         self.controller.tick(
             t, face=face, calibrated=bool(self.features.calibration.complete),
-            eye_closed=bool(ff.eye_closed) if face and not self.features.calibrating else None,
-            microsleep=bool(ff.microsleep_now), ear_raw=ff.ear_raw if face else None,
+            eye_closed=bool(ff.eye_closed) if face and live and not self.features.calibrating else None,
+            microsleep=bool(ff.microsleep_now) and live, ear_raw=ff.ear_raw if face else None,
             co2_ppm=self.air.ppm)
 
     def _publish_video(self, now: float, image, lms, ff: FeatureFrame) -> None:
         """Hand the frame to the encoder thread, only while someone watches."""
         self.video.offer(image, lms, ff.shut_now or ff.microsleep_now)
+
+    def _on_mouse(self, event: int, x: int, y: int, _flags: int, _param) -> None:
+        """A click on a dashboard button; acted on in the camera loop."""
+        import cv2
+
+        if event == cv2.EVENT_MOUSEMOVE:
+            self._mouse = (x, y)                  # for the hover highlight
+            return
+        if event != cv2.EVENT_LBUTTONUP:
+            return
+        if self.film.playing:                     # a click on the film: back to the dashboard
+            self._clicks.append("film_stop")
+            return
+        if self.mode == "qr":                     # the stage cards, or back
+            try:
+                _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+            except Exception:  # noqa: BLE001
+                return
+            from .attract import learn_hit, tall_slide_size, tall_to_slide
+            size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+            if is_tall(*size):
+                x, y = tall_to_slide(x, y, size)
+                size = tall_slide_size(size)
+            hit = learn_hit(x, y, size, asking=self.visit.state == "ask")
+            if hit:
+                self._clicks.append(hit)
+            return
+        if self.mode != "live":
+            self._clicks.append("next")
+            return
+        if self.dashboard is None or self.features.calibrating:
+            return
+        try:
+            _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+        except Exception:  # noqa: BLE001
+            return
+        cx, cy = window_to_dash(x, y, win_w, win_h)
+        name = None
+        # (No pop-ups to click any more.)
+        menu = bool(getattr(self.dashboard, "menu_open", False))
+        name = name or button_at(cx, cy, menu)
+        if menu and not name:
+            name = "menu_close"                   # a click beside the menu closes it
+        if name:
+            self._clicks.append(name)
+
+    def _start_calibration(self, t: float) -> None:
+        """Calibrate now (c key, the button, or start-up with none on file).
+
+        The wake-up lights go off first: the blue light shines into the
+        camera's view and darkens its exposure, which failed every
+        calibration after the first as "too dark". Nobody calibrating is
+        drowsy anyway.
+        """
+        self._last_alert = self.policy.reset(t)
+        self.film.stop()
+        self.features.calibrator.reset()
+        self.features.start_calibration(t)
+        self._cal_run = True
+        self._cal_announced = False
+        self._cal_notice = None
+
+    def _give_up_calibration(self, t: float) -> None:
+        """Stop after a few failed tries if there is a calibration to keep.
+
+        A calibration restarts by itself when it fails, which left the
+        dashboard calibrating forever. With an earlier one on file, keep it
+        and say why the new one didn't work; the button tries again.
+        """
+        cal = self.features.calibrator
+        if (cal.attempts >= self._max_cal_attempts and self.features.calibration.complete
+                and self.features.calibrating):
+            self.features.cancel_calibration()
+            self._cal_run = False
+            why = cal.last_failure or "the measurement wasn't steady"
+            self._cal_notice = (f"Kept the last calibration. {why}", time.monotonic() + CAL_NOTICE_S)
+            console.print(f"[yellow]calibration stopped after {cal.attempts} tries[/]: {why}")
+            self.logger.log_event("calibration_gave_up", {"attempts": cal.attempts, "reason": why})
+
+    def _check_health(self, now: float) -> None:
+        self.health.update(now)
+        level = self.health.level
+        if level != self._health_level:
+            self._health_level = level
+            c = self.health.celsius
+            console.print(f"[{'green' if level == 'ok' else 'bold red'}]Pi {level}[/]"
+                          + (f" ({c:.0f} C)" if c is not None else ""))
+            self.logger.log_event("pi_health", {"level": level, "celsius": c,
+                                                "throttled": self.health.throttled,
+                                                "under_voltage": self.health.under_voltage})
+
+    def _update_mode(self, now: float, face: bool) -> None:
+        """Standby after standby_after_s with no face. It stays up when someone
+        sits down, so they can read it and press space; Esc skips it."""
+        if face:
+            self._no_face_since = None
+            if self._face_since is None:
+                self._face_since = now
+        else:
+            self._face_since = None
+            if self._no_face_since is None:
+                self._no_face_since = now
+        if self.mode == "live" and not self._seat_empty and self._standby_after_s > 0 \
+                and self._no_face_since is not None and now - self._no_face_since >= self._standby_after_s:
+            # Nobody at the wheel: the dashboard stays, the visitor is forgotten.
+            self._seat_empty = True
+            self._last_alert = self.policy.reset(now)     # lights off; nobody to wake
+            self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
+            self._tip_shown, self._tip_at = False, None
+            self._guide_t0 = self._guide_done_at = None
+            self.visit.finish()                   # their drive, sent one last time
+            self.visit.reset()
+            self.logger.log_event("seat_empty", {"after_s": self._standby_after_s})
+            console.print("[dim]nobody at the wheel: the film until NEXT PERSON[/]")
+            if self._film_on_pi and not self.film.playing:
+                self.film.start(now)              # the film, muted, until the next person
+        # (A face no longer starts anything: people reading the poster in
+        # front of the camera mustn't interrupt the film. NEXT PERSON does.)
+        elif self.mode == "briefing":
+            from .attract import STEPS
+            pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
+            fitted = (pic == "center" and self._fit_since is not None
+                      and now - self._fit_since >= BRIEF_FIT_S and now - self._brief_at >= 3.0)
+            if fitted or now - self._brief_at >= self._page_s():
+                self._next(now, now)              # the page turns by itself
+        elif self.mode == "qr" and now - self._qr_at >= self._qr_close_s:
+            self.mode = "live"
+        elif self.mode == "tour" and now - self._tour_at >= TOUR_STEP_S:
+            self._next(now, now)                  # nobody clicking: move on by itself
+        self._update_learn_more(now, face)
+
+    def _update_learn_more(self, now: float, face: bool) -> None:
+        """Count the time a visitor drives (face seen, on the dashboard, not
+        calibrating); after learn_more.after_s, pop the offer up once."""
+        dt = 0.0 if self._mode_t is None else min(1.0, max(0.0, now - self._mode_t))
+        self._mode_t = now
+        if self.mode == "live" and face and not self.features.calibrating and not self._seat_empty:
+            self._driven_s += dt
+        if (not self._tip_shown and self.mode == "live" and self._tip_after_s > 0
+                and self._driven_s >= self._tip_after_s and self._popup_at is None
+                and face and getattr(self.policy, "stage", 0) == 0):   # not over an alert
+            self._tip_shown, self._tip_at = True, now
+            self._voice("sleepy_voice", now)
+            self.logger.log_event("sleepy_tip", {"driven_s": round(self._driven_s, 1)})
+        if self._tip_at is not None and (self.mode != "live" or now - self._tip_at >= self._tip_hide_s
+                                         or getattr(self.policy, "stage", 0) > 0):
+            self._tip_at = None                   # done, or they did it: an alert is up
+        done = (self._guide_done_at is not None and now - self._guide_done_at >= GUIDE_DONE_S)
+        if (self._learn_url and not self._learn_shown and self.mode == "live"
+                and self._tip_at is None and (self._driven_s >= self._learn_after_s or done)):
+            self._learn_shown, self._popup_at = True, now
+            self.logger.log_event("learn_more_popup", {"driven_s": round(self._driven_s, 1)})
+        if self._popup_at is not None and (self.mode != "live"
+                                           or now - self._popup_at >= self._learn_hide_s):
+            self._popup_at = None
+
+    def _next_visitor(self, now: float, t: float) -> None:
+        """Start over for the next person: the film off, lights off, their own
+        code, and straight into calibration (the camera full screen)."""
+        self._last_alert = self.policy.reset(now)
+        self._driven_s, self._learn_shown, self._popup_at = 0.0, False, None
+        self._tip_shown, self._tip_at = False, None
+        self._guide_t0 = self._guide_done_at = None
+        self._seat_empty = False
+        self._no_face_since = None
+        self.visit.begin()                        # their own code: the QR later
+        self.mode = "live"
+        self._start_calibration(t)                # (stops the film)
+        self._voice("calibrate_voice", t)
+        self.logger.log_event("next_visitor", {})
+        console.print("[cyan]next visitor: calibration[/]")
+
+    def _set_voice_lang(self, lang: str) -> None:
+        lang = "en" if lang == "en" else "ko"
+        self.controller.profile = {**self.controller.profile, "voice_lang": lang}
+        AudioActuator.lang = lang
+        if self.dashboard is not None:
+            self.dashboard.voice = lang
+        console.print(f"[cyan]Ollie's voice: {'Korean' if lang == 'ko' else 'English'}[/]")
+
+    def _visit_view(self) -> dict:
+        v = self.visit
+        return {"state": "done" if v.code else "none", "photo": v.photo_img, "key": v.code,
+                "link": v.link() if v.code else None}
+
+    def _mode_changed(self, now: float, t: float) -> None:
+        """Into the QR screen: the ladder stops (lights off). Back from any
+        booth screen: a fresh start, so what the eyes did meanwhile (reading
+        the cards, looking at the screen) can't set off an alarm."""
+        if self.mode == self._seen_mode:
+            return
+        was, self._seen_mode = self._seen_mode, self.mode
+        if self.mode == "qr":
+            self._last_alert = self.policy.reset(now)
+        if self.mode == "live" and was in ("qr", "briefing", "standby", "tour"):
+            self._last_alert = self.policy.reset(now)
+            self.features._reset_live()
+            self._quiet_until = now + QUIET_AFTER_SCREEN_S
+
+    def _play_stage(self, n: int, now: float, t: float) -> None:
+        """A stage card on the learn-more screen: play it on the real device,
+        one at a time, the same as a phone's Product control."""
+        from .control import SHOWCASE_STAGES
+
+        if n not in SHOWCASE_STAGES or now < self._stage_play[2]:
+            return
+        cmds, hold_s = SHOWCASE_STAGES[n]
+        for cmd in cmds:
+            self.controller.handle(cmd, t, True)
+        self._stage_play = (n, now, now + hold_s)
+        self._qr_at = now                          # someone's here: stay open
+        self.logger.log_event("qr_stage", {"stage": n})
+        console.print(f"[magenta]stage {n} played from the learn-more screen[/]")
+
+    def _record_visit(self, now: float, image, lms, ff: FeatureFrame, state: DriverState) -> None:
+        from .attract import face_box, face_fit
+        ok = lms is not None and lms.ok
+        pts = lms.points if ok else None
+        self.visit.frame(now, image, pts,
+                         fit_good=ok and face_fit(face_box(pts, image.shape)) == "good",
+                         eyes_open=ok and not ff.eye_closed, score=state.score,
+                         stage=self.policy.stage, microsleeps=ff.microsleep_count, face=ok)
+
+    def _camera_view(self, image, lms):
+        """The camera with the face mesh, and where the face is (for the oval)."""
+        import cv2
+        from .attract import face_box, face_fit
+
+        cam = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR) if image.ndim == 2 else image.copy()
+        face = None
+        if lms is not None and lms.ok:
+            draw_face_mesh(cam, lms.points)
+            face = face_box(lms.points, image.shape)
+        now = time.monotonic()
+        if face_fit(face) == "good":
+            if self._fit_since is None:
+                self._fit_since = now
+        else:
+            self._fit_since = None
+        return cam, face
+
+    def _page_s(self) -> float:
+        from .attract import STEPS
+        pic = STEPS[min(self._brief_step, len(STEPS) - 1)][0]
+        return BRIEF_CENTER_MAX_S if pic == "center" else BRIEF_PAGE_S
+
+    def _page_progress(self, now: float) -> float:
+        return min(1.0, max(0.0, (now - self._brief_at) / self._page_s()))
+
+    def _alerts_allowed(self, now: float) -> bool:
+        """Whether anything may go off on its own (wake-up stages, the
+        distraction chime, voice prompts, "are you OK?"). Only while a
+        visitor is driving: never while waiting for one (seat empty), during
+        their guide or calibration, on a booth screen, or in the first
+        seconds back from one. The staff remote and stage cards still work."""
+        return (self.mode == "live" and not self._seat_empty and not self.features.calibrating
+                and not self.film.playing
+                and now >= self._quiet_until)
+
+    def _remote_commands(self, now: float, t: float) -> None:
+        """Commands from the staff phone (remote.py), on any screen."""
+        for c in self.remote.take():
+            self.logger.log_event("remote", {"cmd": c})
+            console.print(f"[magenta]remote: {c}[/]")
+            if c.startswith("stage") and c != "stage0":
+                self._play_stage(int(c[5:]), now, t)
+            elif c == "stage0":                       # everything off, now
+                self._last_alert = self.policy.reset(now)
+                self._stage_play = (0, 0.0, 0.0)
+                with AudioActuator._play_lock:
+                    if AudioActuator.busy():
+                        AudioActuator._playing.terminate()
+            elif c == "next":
+                self._next_visitor(now, t)
+            elif c == "video":                        # the film from the start, with sound
+                self._last_alert = self.policy.reset(now)
+                with AudioActuator._play_lock:
+                    if AudioActuator.busy():
+                        AudioActuator._playing.terminate()
+                if self.features.calibrating:
+                    self.features.cancel_calibration()
+                    self._cal_run = False
+                self.film.start(now, sound=True)
+            elif c == "video_stop":
+                self.film.stop()
+            elif c == "air":                          # "the air is stale, open a window"
+                self._say_now(self.air.actuator, t, "remote_air")
+            elif c == "calibrate":
+                if self.mode != "live":
+                    self.mode = "live"
+                self._start_calibration(t)
+                self._voice("calibrate_voice", t)
+            elif c in ("photos_off", "photos_on"):
+                self.visit.photos_off = c == "photos_off"
+            elif c == "vol_up":
+                self.volume.change(VOLUME_STEP)
+            elif c == "vol_down":
+                self.volume.change(-VOLUME_STEP)
+            elif c == "voice":
+                self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
+
+    def _start_guide(self, now: float) -> None:
+        self._guide_t0, self._guide_done_at = now, None
+        self._guide_had_alert, self._guide_stage = False, (0, 0.0)
+        self.logger.log_event("guide", {})
+
+    def _guide_now(self, now: float):
+        """The hint to show now: (words, outlined part) or None. An alert is
+        explained the moment it happens; before that, a short intro."""
+        from .attract import (DONE_WORDS, GUIDE_INTRO, GUIDE_INTRO_END, RESPONSE_RECT,
+                              stage_words)
+        if self._guide_t0 is None or self.mode != "live":
+            return None
+        stage = int(getattr(self.policy, "stage", 0))
+        shown, since = self._guide_stage
+        if stage > shown:
+            self._guide_stage = (stage, now)
+            self._guide_had_alert = True
+        elif stage == 0 and shown:
+            self._guide_stage = (0, now)
+            if self._guide_done_at is None:
+                self._guide_done_at = now
+        shown, since = self._guide_stage
+        if shown and now - since < GUIDE_ALERT_S:
+            return stage_words(shown), RESPONSE_RECT
+        if self._guide_done_at is not None and now - self._guide_done_at < GUIDE_DONE_S:
+            return DONE_WORDS, None
+        el = now - self._guide_t0
+        if el < GUIDE_INTRO_END and not self._guide_had_alert:
+            step = [g for g in GUIDE_INTRO if el >= g[0]][-1]
+            return step[1], step[2]
+        return None
+
+    def _start_tour(self, now: float) -> None:
+        self.mode, self._tour_step, self._tour_at = "tour", 0, now
+        self._popup_at = self._tip_at = None
+        self.logger.log_event("tour", {})
+
+    def _open_qr(self, now: float) -> None:
+        self.mode, self._qr_at, self._popup_at = "qr", now, None
+        self.logger.log_event("learn_more_qr", {})
+
+    def _next(self, now: float, t: float) -> None:
+        """Space or a click: start the briefing, or turn its page."""
+        from .attract import STEPS
+
+        if self.mode == "qr":                         # the QR screen: back to the dashboard
+            self.mode = "live"
+            return
+        if self.mode == "tour":                       # the guided tour: next part, or done
+            from .attract import TOUR
+            if self._tour_step < len(TOUR) - 1:
+                self._tour_step, self._tour_at = self._tour_step + 1, now
+            else:
+                self.mode = "live"
+            return
+        if self.mode != "briefing":                   # NEXT PERSON: calibration
+            self._next_visitor(now, t)
+            return
+        elif self._brief_step < len(STEPS) - 1:
+            self._brief_step += 1
+        else:                                         # the last page: calibrate now
+            self.mode = "live"
+            self._start_calibration(t)
+            self._voice("calibrate_voice", t)
+        self._brief_at = now
+
+    def _record_history(self, t: float, state: DriverState, calibrating: bool) -> None:
+        """Samples for the dashboard's charts."""
+        if not calibrating and t - self._last_score_t >= SCORE_SAMPLE_S:
+            self._last_score_t = t
+            self._score_history.append((t, float(state.score)))
+        air = self.air
+        if air.ppm is not None and air.updated_at != self._co2_recorded_at:
+            self._co2_recorded_at = air.updated_at
+            self._co2_history.append((t, float(air.ppm)))
+
+    def _dashboard_data(self, t: float, session_s: float, fps: float, progress: float,
+                        alerts_on: bool) -> DashboardData:
+        acts = list(self.policy.actuators.values())
+        sound_on = any(isinstance(a, AudioActuator) and a._last_fired is not None
+                       and time.monotonic() - a._last_fired < SOUND_LIGHT_S for a in acts)
+        mist_on = any(isinstance(a, AtomizerActuator) and a._last_fired is not None
+                      and time.monotonic() - a._last_fired < max(a.duration, 1.0) for a in acts)
+        stages = self.policy.stages
+        stage = self.policy.stage
+        air = self.air
+        last = self._last_alert
+        last_words = ""
+        if last is not None and last.fired:
+            names = ", ".join(a.actuator for a in last.fired)
+            last_words = f"{last.stage_name}: {names}"
+        return DashboardData(
+            now=t, fps=fps, session_s=session_s, calibrating=progress,
+            score_history=self._score_history, co2_history=self._co2_history,
+            co2_connected=air.enabled, co2_ppm=air.ppm,
+            co2_age_s=(time.monotonic() - air.updated_at
+                       if air.updated_at is not None else None),
+            temp_c=air.temp_c, rh=air.rh,
+            co2_elevated_ppm=air.drowsy_prompt_ppm, co2_high_ppm=air.prompt_ppm,
+            score_ticks=[float(lv["min_score"]) for lv in self.cfg["state"].get("levels", [])
+                         if lv.get("min_score")],
+            ir_on=self.illuminator.is_on,
+            blue_on=any(isinstance(a, LightActuator) and a.is_on for a in acts),
+            mist_on=mist_on, sound_on=sound_on,
+            alerts_on=alerts_on and bool(self.cfg["alerts"].get("enabled", True)),
+            stage=stage,
+            stage_name=str(stages[min(stage, len(stages) - 1)].get("name", "")),
+            last_alert=last_words,
+            plan=self._plan,
+            calibration_hint=(CAL_HINTS.get(self.features.calibrator.hint or "", "")
+                              if progress >= 0.0 else ""),
+            notice=(self._cal_notice[0] if self._cal_notice
+                    and time.monotonic() < self._cal_notice[1] else ""),
+            volume=self.volume.percent,
+            pi_celsius=self.health.celsius,
+            pi_warm=self.health.level != "ok",
+            note=("booth: nothing fires by itself; stages play from the app"
+                  if self.args.booth else demo_mode.HELP if self.demo else ""),
+        )
 
     # ----------------------------------------------------------------- #
 
@@ -415,11 +1013,20 @@ class Monitor:
         signal.signal(signal.SIGTERM, self.stop)
 
         cv2 = None
+        fullscreen = bool(self.args.booth or self.cfg["ui"].get("fullscreen", False))
+        self._clicks: deque = deque(maxlen=4)
         if self.show_window:
             try:
                 import cv2 as _cv2
                 cv2 = _cv2
-                cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL)
+                # No Qt toolbar, and fit_to_window keeps the dashboard's
+                # shape, so nothing is left for Qt to letterbox in grey.
+                cv2.namedWindow("bamnun", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_NORMAL
+                                | cv2.WINDOW_FREERATIO)
+                cv2.setMouseCallback("bamnun", self._on_mouse)
+                if fullscreen:   # the booth's big screen shows only this
+                    cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
+                                          cv2.WINDOW_FULLSCREEN)
             except Exception as exc:  # noqa: BLE001
                 log.warning("no GUI available (%s); running headless", exc)
                 self.show_window = False
@@ -429,18 +1036,18 @@ class Monitor:
         if not self.features.calibration.complete:
             first = self.source.read()
             if first is not None:
-                self.features.start_calibration(first.timestamp)
-                self._cal_run = True
+                self._start_calibration(first.timestamp)
                 self._voice("calibrate_voice", first.timestamp)
 
         t_start = None
         last = time.monotonic()
         alerts_on = True
         self.illuminator.on()
-        if self.args.serve:
+        if self.args.serve or self.args.booth:
             self.start_server()
 
-        console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  q quit")
+        console.print("[bold]running[/]  keys: c calibrate  s snapshot  a alerts  "
+                      "l layout  f full screen  q quit")
         if self.demo:
             console.print(f"[bold magenta]{demo_mode.HELP}[/]")
             if not self.show_window:
@@ -486,6 +1093,8 @@ class Monitor:
                     if self._cal_run:
                         self._cal_run = False
                         self._voice("calibrated_voice", frame.timestamp)
+                        self.visit.start(time.monotonic())
+                        # (No hints on screen: the team explains in person.)
                 state = self.estimator.update(
                     ff, calibrated=self.features.calibration.complete
                 )
@@ -494,13 +1103,17 @@ class Monitor:
                     self._plan = self.planner.plan(frame.timestamp)
                     self._last_plan_t = frame.timestamp
                     plan = self._plan
-                    if plan.valid and (plan.recommend_rest_now or (
+                    if self._alerts_allowed(time.monotonic()) and plan.valid and (plan.recommend_rest_now or (
                             plan.rest_at_s is not None and plan.rest_at_s < 600.0)):
                         self._voice("rest_voice", frame.timestamp)
                 self._check_air(frame.timestamp, state.level if state.calibrated else 0)
 
                 hold = self.controller.holds_ladder(frame.timestamp)
-                decision = self.policy.update(state) if alerts_on and not hold else None
+                # Nothing interrupts the booth's own screens (QR, briefing,
+                # standby), nor the first seconds back from one.
+                quiet = not self._alerts_allowed(time.monotonic())
+                decision = (self.policy.update(state)
+                            if alerts_on and not hold and not quiet else None)
                 if decision is not None:
                     self._note_stage(decision)
                 if decision is not None and (decision.fired or decision.changed):
@@ -515,12 +1128,23 @@ class Monitor:
                                                       "t": ff.t,
                                                       "duration_s": ff.ongoing_closure_s})
                 self.logger.log_frame(ff, state)
+                if self.visit.active and self.mode == "live":
+                    self._guarded(self._record_visit, time.monotonic(), frame.image, lms, ff, state)
 
+            if calibrating or not self._alerts_allowed(time.monotonic()) \
+                    or not alerts_on:
+                self._guarded(self.policy.tick, frame.timestamp)   # a light's hold still ends
             if self.demo:
                 for action in self.tour.due(time.monotonic()):
                     self._demo_action(action, frame.timestamp)
 
             self._guarded(self._control, frame.timestamp, ff)
+            self._guarded(self._record_history, frame.timestamp, state, calibrating)
+            self._guarded(self._give_up_calibration, frame.timestamp)
+            self._guarded(self._update_mode, time.monotonic(), bool(ff.face_found))
+            self._guarded(self._mode_changed, time.monotonic(), frame.timestamp)
+            self._guarded(self._remote_commands, time.monotonic(), frame.timestamp)
+            self._guarded(self._check_health, time.monotonic())
 
             now = time.monotonic()
             self._fps.append(1.0 / max(now - last, 1e-6))
@@ -542,32 +1166,245 @@ class Monitor:
             if draw_window:
                 self._last_window = now
                 from .viz import draw_overlay
-                canvas = draw_overlay(
-                    frame.image, lms, ff, state, plan=self._plan,
-                    alert=self._last_alert, ui_cfg=self.cfg["ui"], fps=fps,
-                    calibrating=progress if calibrating else -1.0,
-                    cal_stats=(self.features.calibrator.stats(frame.timestamp)
-                               if calibrating else None),
-                )
-                if self.demo:
-                    h = canvas.shape[0]
-                    label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
-                    cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
-                    cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                                (230, 120, 230), 1, cv2.LINE_AA)
-                scale = float(self.cfg["ui"].get("window_scale", 1.0))
-                if scale != 1.0:
-                    canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
+                dash = self.dashboard
+                film_on = self.film.playing
+                if film_on:
+                    ffr, ended = self.film.frame(now)
+                    if ended:                         # the film with sound is over
+                        self.film.stop()
+                        if self._seat_empty:
+                            self.film.start(now)      # back to the muted loop
+                            ffr, _ = self.film.frame(now)
+                        else:
+                            film_on = False
+                if film_on:
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    canvas = self._screens.film(ffr, win_size)
+                elif calibrating:                     # the camera full screen
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    cam, face = self._camera_view(frame.image, lms)
+                    canvas = self._screens.calibrating_full(now, progress,
+                                                            self.features.calibrator.hint or "",
+                                                            win_size, cam, face)
+                elif self.mode not in ("live", "tour") or (calibrating and dash is not None):
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    # Drawn at the window's own size: stretched, the text went soft.
+                    # In a tall window (a laptop's side panel, the game left of
+                    # it) a slide is drawn landscape and its halves stacked.
+                    from .attract import stack_tall, tall_slide_size
+                    _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                    win_size = (win_w, win_h) if win_w > 0 and win_h > 0 else (DASH_W, DASH_H)
+                    tall = is_tall(*win_size)
+                    self._screens.game_left = tall
+                    size = tall_slide_size(win_size) if tall else win_size
+                    if self.mode == "standby":
+                        cam = frame.image
+                        cam = cv2.cvtColor(cam, cv2.COLOR_GRAY2BGR) if cam.ndim == 2 else cam.copy()
+                        if lms is not None and lms.ok:
+                            draw_face_mesh(cam, lms.points)
+                        canvas = self._screens.standby(now, cam, size)
+                    elif self.mode == "briefing":
+                        cam, face = self._camera_view(frame.image, lms)
+                        canvas = self._screens.briefing(self._brief_step, now, size, cam, face,
+                                                        page=self._page_progress(now))
+                    elif self.mode == "qr":
+                        n, start, until = self._stage_play
+                        on = n if now < until else 0
+                        hover = None
+                        if self._mouse is not None:
+                            from .attract import learn_hit, tall_to_slide
+                            mx, my = tall_to_slide(*self._mouse, win_size) if tall else self._mouse
+                            hover = learn_hit(mx, my, size, asking=self.visit.state == "ask")
+                        canvas = self._screens.learn_more(
+                            now, self._learn_url, size, playing=on,
+                            progress=(now - start) / max(0.1, until - start) if on else 0.0,
+                            hover=hover, visit=self._visit_view())
+                    else:      # calibrating: look at the game screen
+                        cam, face = self._camera_view(frame.image, lms)
+                        canvas = self._screens.calibrating(now, progress,
+                                                           self.features.calibrator.hint or "", size,
+                                                           cam, face)
+                    if tall:
+                        canvas = stack_tall(canvas, win_size)
+                else:
+                    canvas = draw_overlay(
+                        frame.image, lms, ff, state,
+                        plan=None if dash else self._plan,
+                        alert=None if dash else self._last_alert,
+                        # The dashboard's panels say it all; keep the camera clean.
+                        ui_cfg={**self.cfg["ui"], "draw_gauges": False} if dash else self.cfg["ui"],
+                        fps=fps,
+                        calibrating=progress if calibrating else -1.0,
+                        cal_stats=(self.features.calibrator.stats(frame.timestamp)
+                                   if calibrating and not dash else None),
+                    )
+                    if dash is not None:
+                        if dash.due(frame.timestamp):
+                            dash.refresh(ff, state, self._dashboard_data(
+                                frame.timestamp, frame.timestamp - t_start, fps,
+                                progress if calibrating else -1.0, alerts_on))
+                        _x, _y, win_w, win_h = cv2.getWindowImageRect("bamnun")
+                        tall = is_tall(win_w, win_h)
+                        hover = None
+                        if self._mouse is not None:
+                            mx, my = window_to_dash(*self._mouse, win_w, win_h)
+                            hover = button_at(mx, my, dash.menu_open)
+                        dash.hover = hover
+                        dash.voice = AudioActuator.lang
+                        dash.photos = not self.visit.photos_off
+                        from .attract import Screens
+                        from .viz import QR_SLOT, data_panel, panel_size
+                        if self._screens is None:
+                            self._screens = Screens(self.root)
+                        qr_url = self.visit.link() if self.visit.code else self._learn_url
+                        # The QR only once it works (the drive is on the server),
+                        # the visitor has driven a bit, and no alert is showing.
+                        qr_on = (bool(self.visit.code) and self.visit.ready and not self._seat_empty
+                                 and self._driven_s >= self._qr_after_s
+                                 and int(getattr(self.policy, "stage", 0)) == 0)
+                        dash.qr_card = (self._screens.qr_card(qr_url, True, QR_SLOT[2:])
+                                        if qr_on and not tall else None)
+                        canvas = dash.compose(canvas)
+                        if not tall:
+                            canvas = fit_to_window(canvas, win_w, win_h)
+                        guide = None              # no pop-ups over the camera
+                        if self.mode == "tour":
+                            if self._screens is None:
+                                from .attract import Screens
+                                self._screens = Screens(self.root)
+                            self._screens.tour_overlay(canvas, self._tour_step, now, now - self._tour_at)
+                        elif guide is not None and (guide[1] is not None and guide[1][0] == 848
+                                                    and guide[1][1] == 478 or self._tip_at is None):
+                            # a live hint: an alert's always, the intro unless the tip is up
+                            from .attract import Screens, outline
+                            if self._screens is None:
+                                self._screens = Screens(self.root)
+                            if guide[1] is not None:
+                                outline(canvas, guide[1], now)
+                            self._screens.learn_popup(canvas, 1.0, now, None, guide[0])
+                        elif False and self._popup_at is not None:     # (pop-ups retired)
+                            if self._screens is None:
+                                from .attract import Screens
+                                self._screens = Screens(self.root)
+                            self._screens.learn_popup(canvas, now - self._popup_at, now, hover)
+                        elif False and self._tip_at is not None:
+                            if self._screens is None:
+                                from .attract import Screens
+                                self._screens = Screens(self.root)
+                            self._screens.learn_popup(canvas, now - self._tip_at, now, hover, "sleepy")
+                        if tall:                       # cut and stacked for the side panel
+                            psize = panel_size(win_w, win_h)
+                            if self._seat_empty:
+                                panel = self._screens.standby_panel(now, psize)
+                            elif qr_on:
+                                panel = self._screens.qr_panel(qr_url, psize)
+                            else:
+                                panel = data_panel(canvas, psize)
+                            canvas = fit_to_window(column_compose(canvas, panel, win_w, win_h),
+                                                   win_w, win_h)
+                    if self.demo and dash is None:
+                        h = canvas.shape[0]
+                        label = demo_mode.HELP + ("   [tour running]" if self.tour.running else "")
+                        cv2.rectangle(canvas, (0, h - 86), (canvas.shape[1], h - 58), (14, 14, 14), -1)
+                        cv2.putText(canvas, label, (12, h - 66), cv2.FONT_HERSHEY_SIMPLEX, 0.55,
+                                    (230, 120, 230), 1, cv2.LINE_AA)
+                    scale = float(self.cfg["ui"].get("window_scale", 1.0))
+                    if scale != 1.0 and dash is None:
+                        canvas = cv2.resize(canvas, None, fx=scale, fy=scale)
+                if self.health.level != "ok":
+                    from .attract import health_banner
+                    if self._screens is None:
+                        from .attract import Screens
+                        self._screens = Screens(self.root)
+                    canvas = health_banner(self._screens, canvas, self.health.level,
+                                           self.health.celsius)
                 cv2.imshow("bamnun", canvas)
                 key = cv2.waitKey(1) & 0xFF
+                # Caps Lock or Shift sends the upper case; treat it the same.
+                if ord("A") <= key <= ord("Z"):
+                    key += 32
+                # A click on a dashboard button counts as its key: over Pi
+                # Connect, a key press doesn't always reach this window.
+                go_next = key == ord(" ")
+                while self._clicks:
+                    btn = self._clicks.popleft()
+                    if dash is not None and btn == "settings":
+                        dash.menu_open = not dash.menu_open
+                        continue
+                    if dash is not None and btn not in ("vol_down", "vol_up"):
+                        dash.menu_open = False        # an item done, or a click beside it
+                    if btn == "film_stop":
+                        self.film.stop()
+                    elif btn == "next":
+                        go_next = True
+                    elif btn == "learn_more":
+                        self._open_qr(now)
+                    elif btn == "learn_close":
+                        self._popup_at = None
+                    elif btn == "tip_close":
+                        self._tip_at = None
+                    elif btn == "next_visitor":
+                        key = ord("n")
+                    elif btn == "voice":
+                        key = ord("v")
+                    elif btn == "photos":
+                        key = ord("p")
+                    elif btn.startswith("stage") and self.mode == "qr":
+                        self._play_stage(int(btn[5:]), now, frame.timestamp)
+                    elif btn == "qr_back":
+                        self.mode = "live"
+                    elif btn == "visit_yes":
+                        self.visit.send()
+                        self._qr_at = now
+                        self.logger.log_event("visit", {"answer": "yes"})
+                    elif btn == "visit_no":
+                        self.visit.photos_off = True
+                        self._qr_at = now
+                        self.logger.log_event("visit", {"answer": "no"})
+                    key = {"calibrate": ord("c"), "fullscreen": ord("f"),
+                           "vol_down": ord("-"), "vol_up": ord("=")}.get(btn, key)
+                if go_next:
+                    self._next(now, frame.timestamp)
+                if self.mode == "qr" and key in (ord("1"), ord("2"), ord("3"), ord("4")):
+                    self._play_stage(key - ord("0"), now, frame.timestamp)
+                if key == ord("p"):                        # this visitor said no to photos
+                    self.visit.photos_off = not self.visit.photos_off
+                    console.print(f"[cyan]photos {'off' if self.visit.photos_off else 'on'} for this visitor[/]")
+                if key == ord("v"):                        # Ollie's voice: Korean <-> English
+                    self._set_voice_lang("en" if AudioActuator.lang == "ko" else "ko")
+                if key == ord("m") and self.mode != "qr":  # straight to the learn-more screen
+                    self._open_qr(now)
+                if key == ord("n"):                       # next person: calibration
+                    self._next_visitor(now, frame.timestamp)
+                if key == 27 and self.mode != "live":     # Esc: skip to the dashboard
+                    self.mode = "live"
                 if key == ord("q"):
                     break
+                if key == ord("l"):
+                    self.dashboard = None if dash else Dashboard(self._dash_refresh_s)
+                if key == ord("f"):
+                    fullscreen = not fullscreen
+                    cv2.setWindowProperty("bamnun", cv2.WND_PROP_FULLSCREEN,
+                                          cv2.WINDOW_FULLSCREEN if fullscreen
+                                          else cv2.WINDOW_NORMAL)
                 if key == ord("c"):
-                    self.features.start_calibration(frame.timestamp)
-                    self._cal_run = True
+                    self._start_calibration(frame.timestamp)
                     self._voice("calibrate_voice", frame.timestamp)
-                    self._cal_announced = False
                     console.print("[cyan]calibration restarted[/]")
+                if key in (ord("-"), ord("_")):
+                    self.volume.change(-VOLUME_STEP)
+                if key in (ord("="), ord("+")):
+                    self.volume.change(VOLUME_STEP)
                 if key == ord("s"):
                     out = self.logger.dir / f"snap_{int(time.time())}.png"
                     cv2.imwrite(str(out), canvas)
@@ -575,7 +1412,7 @@ class Monitor:
                 if key == ord("a"):
                     alerts_on = not alerts_on
                     console.print(f"actuators {'on' if alerts_on else 'off'}")
-                if self.demo and key != 0xFF and chr(key) in "01234dw":
+                if self.demo and self.mode != "qr" and key != 0xFF and chr(key) in "01234dw":
                     self.tour.stop()
                     self._demo_action(chr(key), frame.timestamp)
                 if self.demo and key == ord("t"):

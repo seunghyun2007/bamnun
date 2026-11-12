@@ -1,0 +1,81 @@
+"""The booth remote (remote.py) and what the app does with each command."""
+
+import io
+import json
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from bamnun.app import Monitor  # noqa: E402
+from bamnun.remote import COMMANDS, Remote  # noqa: E402
+
+
+def test_without_a_staff_code_the_remote_stays_off(tmp_path):
+    r = Remote(tmp_path)
+    assert not r.ready
+    r.start()                                          # does nothing, no thread
+    assert r._thread is None and r.take() == []
+
+
+def test_polling_keeps_known_commands_in_order(tmp_path, monkeypatch):
+    (tmp_path / "frontend").mkdir()
+    (tmp_path / "frontend" / ".env").write_text("SUPABASE_URL=https://x.supabase.co\nSUPABASE_ANON_KEY=a\nSTAFF_CODE=s\n")
+    r = Remote(tmp_path)
+    assert r.ready
+    rows = [{"id": 5, "cmd": "next"}, {"id": 3, "cmd": "stage2"}, {"id": 4, "cmd": "nonsense"}]
+
+    class Resp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=5: Resp(json.dumps(rows).encode()))
+    assert r.poll_once() == ["stage2", "next"]
+
+
+def test_each_command_does_its_thing():
+    done = []
+    m = SimpleNamespace(
+        remote=SimpleNamespace(take=lambda: ["stage3", "next", "calibrate", "photos_off", "vol_up", "voice", "stage0",
+                                         "video", "video_stop", "video", "air"]),
+        logger=SimpleNamespace(log_event=lambda *a: None),
+        mode="briefing", _seat_empty=True, _stage_play=(3, 0.0, 9.0), _last_alert=None,
+        policy=SimpleNamespace(reset=lambda t: done.append("reset") or "reset"),
+        visit=SimpleNamespace(photos_off=False),
+        volume=SimpleNamespace(change=lambda d: done.append(("vol", d))),
+    )
+    m._play_stage = lambda n, now, t: done.append(("stage", n))
+    m._next_visitor = lambda now, t: done.append("next") or setattr(m, "_seat_empty", False)
+    m.features = SimpleNamespace(calibrating=False)
+    m.film = SimpleNamespace(start=lambda now, sound=False: done.append(("film", sound)),
+                             stop=lambda: done.append("film_stop"))
+    m._start_calibration = lambda t: done.append("calibrate")
+    m._voice = lambda k, t: None
+    m._set_voice_lang = lambda lang: done.append(("voice", lang))
+    m.air = SimpleNamespace(actuator="open_window")
+    m._say_now = lambda name, t, why: done.append(("say", name))
+    Monitor._remote_commands(m, 1.0, 1.0)
+    assert ("stage", 3) in done and "next" in done and "calibrate" in done and "reset" in done
+    assert m.visit.photos_off and m.mode == "live" and not m._seat_empty
+    assert any(d[0] == "vol" and d[1] > 0 for d in done if isinstance(d, tuple))
+    assert ("film", True) in done and "film_stop" in done
+    assert ("say", "open_window") in done
+    assert set(COMMANDS) >= {"stage0", "next", "calibrate", "video", "video_stop", "air"}
+
+
+def test_the_air_button_speaks_every_press_despite_the_refractory_period():
+    from bamnun.alerts import Actuator
+    fired = []
+
+    class Line(Actuator):
+        def _do_fire(self, t, **kw):
+            fired.append(t)
+            return "said"
+
+    act = Line("open_window", {"refractory_s": 300.0})
+    m = SimpleNamespace(policy=SimpleNamespace(actuators={"open_window": act}, history=[]),
+                        logger=SimpleNamespace(log_event=lambda *a: None))
+    Monitor._say_now(m, "open_window", 10.0, "remote_air")
+    Monitor._say_now(m, "open_window", 12.0, "remote_air")
+    assert fired == [10.0, 12.0] and len(m.policy.history) == 2

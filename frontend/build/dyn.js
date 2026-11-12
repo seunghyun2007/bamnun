@@ -6,10 +6,10 @@
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const T = (s, v) => BN_T(s, v);
 const API = () => window.BN_API;
-const GLASS = 'background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)';
-const HEAD_FONT = "font-family:'Bricolage Grotesque',Arial,sans-serif;font-stretch:80%;font-weight:800";
-const TICK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#241A26" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
-const CROSS = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#241A26" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>';
+const GLASS = 'background:#1F1C24;border:0';
+const HEAD_FONT = "font-family:Pretendard,system-ui,sans-serif;font-weight:700;letter-spacing:-.01em";
+const TICK = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#15131A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+const CROSS = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="#15131A" stroke-width="2.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>';
 const SPEAKER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
 
 const VEHICLES = { long_haul: 'Long-haul truck', delivery: 'Delivery truck', bus: 'Bus or coach', taxi: 'Taxi or van', car: 'My own car' };
@@ -53,19 +53,40 @@ function tripTitle(trip) {
   const h = new Date(trip.started_at * 1000).getHours();
   return T(h >= 21 || h < 5 ? 'Night drive' : h < 12 ? 'Morning drive' : h < 17 ? 'Afternoon drive' : 'Evening drive');
 }
+// "새벽 2시 40분, 칠곡휴게소 지나서 두 번 졸았어요": what happened on a trip,
+// in one sentence. The numbers under it only support it.
+function koClock(d) {
+  const h = d.getHours(), m = d.getMinutes();
+  const part = h === 0 || h >= 18 ? '밤' : h < 6 ? '새벽' : h < 12 ? '오전' : '오후';
+  const h12 = h % 12 || 12;
+  return part + ' ' + h12 + '시' + (m ? ' ' + m + '분' : '');
+}
+function tripSentence(t) {
+  const s = t.summary || {}, eps = (s.episodes || []).slice().sort((a, b) => a.at - b.at), ko = BN_LANG() === 'ko';
+  const n = eps.length || s.alerts || 0;
+  if (!n) return ko ? '한 번도 졸지 않고 끝까지 운전했어요.' : 'No drowsiness the whole way.';
+  const count = ko ? (['', '한 번', '두 번', '세 번', '네 번', '다섯 번'][n] || n + '번') : (['', 'once', 'twice'][n] || n + ' times');
+  if (!eps.length) return ko ? '이번 운전에서 ' + count + ' 졸았어요.' : 'You got drowsy ' + count + ' on this drive.';
+  const first = new Date(eps[0].at * 1000), span = Math.max(1, (t.ended_at || t.started_at + (s.duration_s || 1)) - t.started_at);
+  const at = ko ? koClock(first) : first.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const f = (eps[0].at - t.started_at) / span;
+  const passed = ((t.route && t.route.stops) || []).filter((x) => x.f <= f).pop();
+  if (passed) return ko ? at + ', ' + passed.name + ' 지나서 ' + count + ' 졸았어요.' : 'At ' + at + ', after ' + passed.name + ', you got drowsy ' + count + '.';
+  return ko ? at + '부터 ' + count + ' 졸았어요.' : 'From ' + at + ', you got drowsy ' + count + '.';
+}
 const alertsText = (n) => (n === 0 ? T('No alerts') : n === 1 ? T('1 alert') : T('{n} alerts', { n }));
 const breaksText = (n) => (n === 0 ? T('No breaks') : n === 1 ? T('1 break') : T('{n} breaks', { n }));
 function paintSwitch(b, on) {
   b.setAttribute('aria-checked', String(on));
-  b.style.background = on ? '#C4B5FD' : 'rgba(255,255,255,.16)';
+  b.style.background = on ? '#E8D7AE' : '#2E2A33';
   b.firstElementChild.style.transform = 'translateX(' + (on ? 20 : 0) + 'px)';
 }
 function paintSeg(root, attr, val) {
   root.querySelectorAll('[data-' + attr + ']').forEach((b) => {
     const on = b.dataset[attr] === val;
     b.setAttribute('aria-pressed', String(on));
-    b.style.background = on ? '#F4EFE6' : 'transparent';
-    b.style.color = on ? '#241A26' : '#B3A6B4';
+    b.style.background = on ? '#2E2A33' : 'transparent';
+    b.style.color = on ? '#F2EEE8' : '#9A93A0';
   });
 }
 // Ollie's line as a speech bubble next to the owl, for a few seconds.
@@ -79,7 +100,7 @@ function bubble(el, text) {
 function emptyCard(title, sub, img) {
   return `<section style="${GLASS};border-radius:22px;padding:22px 18px;display:flex;gap:14px;align-items:center">
     <img src="${img || IMG.sleepy}" alt="" style="width:64px;flex-shrink:0">
-    <div><b style="display:block;font-size:16px">${esc(T(title))}</b><span style="display:block;margin-top:4px;font-size:13.5px;color:#B3A6B4;line-height:1.4">${esc(T(sub))}</span></div></section>`;
+    <div><b style="display:block;font-size:16px">${esc(T(title))}</b><span style="display:block;margin-top:4px;font-size:13.5px;color:#9A93A0;line-height:1.4">${esc(T(sub))}</span></div></section>`;
 }
 
 const DYN = {
@@ -87,7 +108,7 @@ const DYN = {
     const inp = root.querySelector('#inName'), next = root.querySelector('#nameNext');
     inp.value = API().profile().name || '';
     const clean = () => inp.value.trim().slice(0, 20);
-    const paint = () => { const ok = !!clean(); next.setAttribute('aria-disabled', String(!ok)); next.style.opacity = ok ? 1 : 0.4; inp.style.borderColor = ok ? '#C4B5FD' : 'rgba(255,255,255,.18)'; };
+    const paint = () => { const ok = !!clean(); next.setAttribute('aria-disabled', String(!ok)); next.style.opacity = ok ? 1 : 0.4; inp.style.borderColor = ok ? '#E8D7AE' : 'rgba(255,255,255,.18)'; };
     inp.addEventListener('input', paint);
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && clean()) next.click(); });
     next.addEventListener('click', (e) => {
@@ -105,9 +126,9 @@ const DYN = {
       btns.forEach((b) => {
         const on = b.dataset.veh === pick, mark = b.lastElementChild;
         b.setAttribute('aria-pressed', String(on));
-        b.style.background = on ? 'rgba(196,181,253,.16)' : 'rgba(255,255,255,.07)';
-        b.style.borderColor = on ? '#C4B5FD' : 'transparent';
-        mark.style.background = on ? '#C4B5FD' : 'rgba(255,255,255,.11)';
+        b.style.background = on ? 'rgba(232,215,174,.16)' : 'rgba(255,255,255,.07)';
+        b.style.borderColor = on ? '#E8D7AE' : 'transparent';
+        mark.style.background = on ? '#E8D7AE' : 'rgba(255,255,255,.11)';
         mark.style.display = 'grid'; mark.style.placeItems = 'center';
         mark.innerHTML = on ? TICK.replace(/12/g, '14') : '';
       });
@@ -127,8 +148,8 @@ const DYN = {
     const shift = () => shiftOf({ start, end });
     function draw() {
       const sh = shift();
-      $('#nDays').innerHTML = WEEKDAYS.map((n, i) => `<button type="button" data-d="${i}" aria-pressed="${days[i]}" aria-label="${esc(T(n))}" style="width:42px;height:42px;border-radius:50%;border:2px solid ${days[i] ? '#C4B5FD' : 'transparent'};background:${days[i] ? '#C4B5FD' : 'rgba(255,255,255,.07)'};color:${days[i] ? '#241A26' : '#B3A6B4'};font-weight:700;font-size:15px;padding:0;transition:all .2s">${esc(T(n).slice(0, BN_LANG() === 'ko' ? 1 : 1))}</button>`).join('');
-      $('#nPresets').innerHTML = Object.keys(P).map((k) => `<button type="button" data-p="${k}" aria-pressed="${sh === k}" style="padding:10px 4px;border-radius:14px;text-align:center;border:2px solid ${sh === k ? '#C4B5FD' : 'transparent'};background:${sh === k ? 'rgba(196,181,253,.16)' : 'rgba(255,255,255,.07)'};transition:all .2s"><b style="display:block;font-size:14px">${esc(T(P[k]))}</b><span style="display:block;font-size:11px;color:#B3A6B4;margin-top:2px;white-space:nowrap">${esc(range(k))}</span></button>`).join('');
+      $('#nDays').innerHTML = WEEKDAYS.map((n, i) => `<button type="button" data-d="${i}" aria-pressed="${days[i]}" aria-label="${esc(T(n))}" style="width:42px;height:42px;border-radius:50%;border:2px solid ${days[i] ? '#E8D7AE' : 'transparent'};background:${days[i] ? '#E8D7AE' : 'rgba(255,255,255,.07)'};color:${days[i] ? '#15131A' : '#9A93A0'};font-weight:700;font-size:15px;padding:0;transition:all .2s">${esc(T(n).slice(0, BN_LANG() === 'ko' ? 1 : 1))}</button>`).join('');
+      $('#nPresets').innerHTML = Object.keys(P).map((k) => `<button type="button" data-p="${k}" aria-pressed="${sh === k}" style="padding:10px 4px;border-radius:14px;text-align:center;border:2px solid ${sh === k ? '#E8D7AE' : 'transparent'};background:${sh === k ? 'rgba(232,215,174,.16)' : 'rgba(255,255,255,.07)'};transition:all .2s"><b style="display:block;font-size:14px">${esc(T(P[k]))}</b><span style="display:block;font-size:11px;color:#9A93A0;margin-top:2px;white-space:nowrap">${esc(range(k))}</span></button>`).join('');
       $('#nStart').textContent = clock(start); $('#nEnd').textContent = clock(end);
       const ok = days.some(Boolean), next = $('#nNext');
       next.style.opacity = ok ? 1 : 0.4; next.setAttribute('aria-disabled', String(!ok));
@@ -159,7 +180,7 @@ const DYN = {
     root.querySelectorAll('[data-tog]').forEach((b) => {
       const key = b.dataset.tog;
       const on = () => b.getAttribute('aria-checked') === 'true';
-      const paint = () => { b.style.background = on() ? '#C4B5FD' : 'rgba(255,255,255,.11)'; b.firstElementChild.style.transform = 'translateX(' + (on() ? 20 : 0) + 'px)'; };
+      const paint = () => { b.style.background = on() ? '#E8D7AE' : 'rgba(255,255,255,.11)'; b.firstElementChild.style.transform = 'translateX(' + (on() ? 20 : 0) + 'px)'; };
       b.setAttribute('aria-checked', String(s.ladder[key] !== false));
       b.addEventListener('click', () => { b.setAttribute('aria-checked', String(!on())); paint(); API().saveSettings({ ladder: { [key]: on() } }); });
       paint();
@@ -175,8 +196,8 @@ const DYN = {
     const btn = (k) => root.querySelector('[data-perm="' + k + '"]');
     function set(k, state) {
       const b = btn(k);
-      const look = { allowed: ['Allowed', '#F8C4A4', '#241A26'], ask: ['Allow', '#F4EFE6', '#241A26'], denied: ['Blocked', 'rgba(244,143,177,.3)', '#F4EFE6'],
-        app: ['In the app', 'rgba(255,255,255,.11)', '#B3A6B4'], na: ['Not needed', 'rgba(255,255,255,.11)', '#B3A6B4'] }[state];
+      const look = { allowed: ['Allowed', '#E8D7AE', '#15131A'], ask: ['Allow', '#F2EEE8', '#15131A'], denied: ['Blocked', 'rgba(242,182,109,.3)', '#F2EEE8'],
+        app: ['In the app', 'rgba(255,255,255,.11)', '#9A93A0'], na: ['Not needed', 'rgba(255,255,255,.11)', '#9A93A0'] }[state];
       b.textContent = T(look[0]); b.style.background = look[1]; b.style.color = look[2]; b.style.whiteSpace = 'nowrap';
       b.dataset.state = state;
     }
@@ -207,7 +228,7 @@ const DYN = {
     const valid = () => !ph.value.trim() || (digits().length >= 9 && digits().length <= 15);
     ph.addEventListener('input', () => { err.textContent = ''; ph.style.borderColor = 'transparent'; });
     root.querySelector('#ecNext').addEventListener('click', (e) => {
-      if (!valid()) { e.preventDefault(); e.stopPropagation(); err.textContent = T('That number looks too short.'); ph.style.borderColor = '#F49AC1'; SFX.play('off'); return; }
+      if (!valid()) { e.preventDefault(); e.stopPropagation(); err.textContent = T('That number looks too short.'); ph.style.borderColor = '#9A93A0'; SFX.play('off'); return; }
       const plus = ph.value.trim().startsWith('+') ? '+' : '';
       API().saveSettings({ emergency: { contact_name: nm.value.trim(), contact_phone: digits() ? plus + digits() : '' } });
     });
@@ -248,7 +269,7 @@ const DYN = {
           const st = (h.parts || {})[PARTS[i]] || 'missing', dot = c.firstElementChild;
           const good = st === 'ok' || st === 'simulated';
           if (!good) bad++; if (st === 'simulated') sim++;
-          dot.style.background = good ? '#F8C4A4' : '#F48FB1';
+          dot.style.background = good ? '#E8D7AE' : '#F2B66D';
           dot.innerHTML = good ? TICK : CROSS;
           c.title = good ? '' : T(FIX[PARTS[i]]);
           c.style.transitionDelay = (0.35 + i * 0.12) + 's';
@@ -279,10 +300,10 @@ const DYN = {
     const say = root.querySelector('#vSay'), note = root.querySelector('#vNote');
     const CARDS = [{ lang: 'ko', name: '한국어', sample: L.sample[1] }, { lang: 'en', name: 'English', sample: L.sample[0] }];
     function draw(glow) {
-      root.querySelector('#vCards').innerHTML = CARDS.map((c) => `<button type="button" data-vl="${c.lang}" aria-pressed="${pick === c.lang}" class="vc-card${glow === c.lang ? ' vc-glow' : ''}" style="background:${pick === c.lang ? 'rgba(196,181,253,.16)' : 'rgba(255,255,255,.07)'};border-color:${pick === c.lang ? '#C4B5FD' : 'transparent'}">
-        ${pick === c.lang ? '<span style="position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#C4B5FD;display:grid;place-items:center">' + TICK + '</span>' : ''}
+      root.querySelector('#vCards').innerHTML = CARDS.map((c) => `<button type="button" data-vl="${c.lang}" aria-pressed="${pick === c.lang}" class="vc-card${glow === c.lang ? ' vc-glow' : ''}" style="background:${pick === c.lang ? 'rgba(232,215,174,.16)' : 'rgba(255,255,255,.07)'};border-color:${pick === c.lang ? '#E8D7AE' : 'transparent'}">
+        ${pick === c.lang ? '<span style="position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;background:#E8D7AE;display:grid;place-items:center">' + TICK + '</span>' : ''}
         <b data-lang-keep style="${HEAD_FONT};font-size:26px;margin-top:6px">${c.name}</b>
-        <small data-lang-keep style="color:#B3A6B4;font-size:13px;text-align:center;line-height:1.35;min-height:36px">“${esc(c.sample)}”</small>
+        <small data-lang-keep style="color:#9A93A0;font-size:13px;text-align:center;line-height:1.35;min-height:36px">“${esc(c.sample)}”</small>
         <span data-play="${c.lang}" role="button" aria-label="${esc(T('Play'))}" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;background:rgba(255,255,255,.11);font-size:13px;font-weight:700">${SPEAKER}${esc(T('Play'))}</span></button>`).join('');
     }
     let glowT = null;
@@ -308,7 +329,33 @@ const DYN = {
     const p = API().profile(), h = new Date().getHours();
     const hello = h >= 5 && h < 12 ? 'Good morning,' : h >= 12 && h < 17 ? 'Good afternoon,' : h >= 17 && h < 22 ? 'Good evening,' : 'Good night,';
     root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+    // A booth visitor (visit.js): their photo from the booth as the profile.
+    const paintVisit = () => {
+      if (!root.isConnected) return;
+      root.querySelector('#hHello').innerHTML = esc(T(hello)) + '<br>' + esc(BN_NAME());
+      const ph = window.BN_VISIT && BN_VISIT.photo();
+      let av = root.querySelector('#hAvatar');
+      if (ph && !av) {
+        av = document.createElement('img');
+        av.id = 'hAvatar'; av.alt = '';
+        av.style.cssText = 'display:block;width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:12px';
+        root.querySelector('#hHello').before(av);
+      }
+      if (av && ph) av.src = ph;
+      load();
+    };
+    window.addEventListener('bn-visit', paintVisit);
+    if (window.BN_VISIT && BN_VISIT.photo()) setTimeout(paintVisit, 0);
     root.querySelector('#hShift').textContent = T(SHIFT_NAMES[shiftOf(p.work)]);
+    // Came from Product demo on the Welcome screen: offer the way back.
+    let showcase = false; try { showcase = localStorage.getItem('bn-showcase') === '1'; } catch (e) {}
+    if (showcase) {
+      const pill = 'display:inline-flex;align-items:center;gap:6px;padding:6px 0;font-size:13px;font-weight:500;text-decoration:none;color:#9A93A0';
+      const bar = document.createElement('div');
+      bar.style.cssText = 'position:absolute;top:12px;left:22px;right:22px;z-index:5;display:flex;justify-content:space-between';
+      bar.innerHTML = `<a href="#Welcome" data-go="Welcome" data-back style="${pill}">‹ ${esc(T('Start'))}</a><a href="#Stages" data-go="Stages" style="${pill}">${esc(T('Try the wake-up stages'))} ›</a>`;
+      root.querySelector('#hHead').appendChild(bar);
+    }
     const card = root.querySelector('#hTrip');
     async function load() {
       let trips = null;
@@ -320,15 +367,15 @@ const DYN = {
         card.style.background = 'none'; card.style.border = '0';
         return;
       }
-      const s = t.summary || {};
-      card.innerHTML = `<div style="display:flex;gap:12px;align-items:center;padding:16px 16px 6px">
-          <span style="position:relative;width:42px;height:42px;flex-shrink:0;border-radius:12px;background:rgba(255,255,255,.11);overflow:hidden"><img src="${IMG.driving}" alt="" style="position:absolute;width:64px;left:-11px;top:-6px"></span>
-          <div style="flex-grow:1"><b style="display:block;font-size:15px">${esc(tripTitle(t))}</b><span style="font-size:12.5px;color:#B3A6B4">${esc(when(t.started_at))}</span></div>
-          ${t.open ? `<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#241A26;background:#F48FB1;padding:4px 8px;border-radius:99px">${esc(T('Now'))}</span>` : API().demo ? `<span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#B3A6B4;background:rgba(255,255,255,.11);padding:4px 8px;border-radius:99px">${esc(T('Demo'))}</span>` : ''}
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:12px 16px 16px">
-          ${[['Time', dur(s.duration_s)], ['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Alerts', s.alerts || 0], ['Breaks', s.breaks || 0]].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:17px;white-space:nowrap">${esc(v)}</b></div>`).join('')}
-        </div>`;
+      const s = t.summary || {}, n = s.alerts || 0;
+      // One row: where and when, then how long and how it went.
+      const tag = t.open ? T('Now') : API().demo ? T('Demo') : '';
+      card.innerHTML = `<a href="#Trips" data-go="Trips" style="display:flex;gap:14px;align-items:center;padding:16px 18px;color:inherit;text-decoration:none">
+          <div style="flex-grow:1;min-width:0"><b style="display:block;font-size:15.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(tripTitle(t))}</b>
+            <span style="display:block;margin-top:3px;font-size:13px;color:#9A93A0">${esc(when(t.started_at))}${tag ? ' · ' + esc(tag) : ''}</span></div>
+          <div style="text-align:right;flex-shrink:0"><b style="display:block;font-size:15.5px;font-weight:600">${esc(dur(s.duration_s))}</b>
+            <span style="display:block;margin-top:3px;font-size:13px;color:${n ? '#E8D7AE' : '#9A93A0'}">${esc(alertsText(n))}</span></div>
+        </a>`;
     }
     API().on('trip', load, root);
     load();
@@ -343,19 +390,25 @@ const DYN = {
       if (!all) { $('#tList').innerHTML = emptyCard('Trips appear here', 'Connect your Bamnun to see your trips.', IMG.driving); return; }
       const since = range === 'all' ? 0 : Date.now() / 1000 - (range === 'week' ? 7 : 30) * 86400;
       const list = all.filter((t) => t.started_at >= since);
-      $('#tN').textContent = list.length;
-      $('#tTime').textContent = dur(list.reduce((a, t) => a + (t.summary.drive_s || 0), 0));
-      $('#tAlerts').textContent = list.reduce((a, t) => a + (t.summary.alerts || 0), 0);
+      const nT = list.length, nA = list.reduce((a, t) => a + (t.summary.alerts || 0), 0), dT = esc(dur(list.reduce((a, t) => a + (t.summary.drive_s || 0), 0)));
+      const B = (v) => `<b style="color:#F2EEE8;font-weight:600">${v}</b>`;
+      $('#tSum').innerHTML = BN_LANG() === 'ko' ? `운행 ${B(nT + '번')} · 운전 ${B(dT)} · 알림 ${B(nA + '번')}`
+        : `${B(nT)} ${nT === 1 ? 'trip' : 'trips'} · ${B(dT)} driving · ${B(nA)} ${nA === 1 ? 'alert' : 'alerts'}`;
       if (!list.length) { $('#tList').innerHTML = emptyCard(all.length ? 'No trips in this range' : 'No trips yet', 'Drive with Bamnun and Ollie keeps count.', IMG.driving); return; }
       $('#tList').innerHTML = list.map((t) => {
         const s = t.summary || {}, open = openId === String(t.id), n = s.alerts || 0;
-        const detail = open ? `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:12px 16px 16px;border-top:1px solid rgba(255,255,255,.08)">
-            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(([k, v]) => `<div><span style="display:block;font-size:12px;color:#B3A6B4">${esc(T(k))}</span><b style="font-size:15px">${esc(v)}</b></div>`).join('')}</div>` : '';
-        return `<section data-trip="${esc(t.id)}" role="button" aria-expanded="${open}" style="${GLASS};border-radius:22px;overflow:hidden;cursor:pointer">
-          <div style="padding:14px 16px">
-            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12.5px;color:#B3A6B4">${esc(when(t.started_at))}</span>${t.open ? `<span style="font-size:11px;font-weight:700;color:#241A26;background:#F48FB1;padding:3px 8px;border-radius:99px">${esc(T('Now'))}</span>` : ''}</div>
-            <h2 style="margin:2px 0 0;${HEAD_FONT};font-size:21px">${esc(tripTitle(t))}</h2>
-            <div style="display:flex;gap:16px;margin-top:8px;font-size:14px;flex-wrap:wrap"><span><b>${esc(dur(s.duration_s))}</b></span><span style="color:${n ? '#C4B5FD' : '#F8C4A4'}"><b>${esc(alertsText(n))}</b></span><span style="color:#B3A6B4">${esc(breaksText(s.breaks || 0))}</span></div>
+        const stat = ([k, v]) => `<div><span style="display:block;font-size:12.5px;color:#9A93A0">${esc(T(k))}</span><b style="display:block;margin-top:2px;font-size:15px;font-weight:600">${esc(v)}</b></div>`;
+        const V = window.BN_VISIT;
+        const detail = open ? `<div style="padding:0 18px 18px">
+            <p style="margin:2px 0 0;font-size:17px;font-weight:600;line-height:1.45;color:#F2EEE8">${esc(tripSentence(t))}</p>
+            ${V ? V.mapSvg(t) + V.curveSvg(t) + V.caughtHtml(t) : ''}
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 10px;margin-top:16px;padding-top:14px;border-top:1px solid #2E2A33">
+            ${[['Alert-free', s.alert_free == null ? '–' : Math.round(s.alert_free * 100) + '%'], ['Longest alert-free', dur(s.longest_calm_s)], ['Highest step', s.max_stage ? T(['', 'Blue light', 'Mint mist', 'Chime and voice', 'Rising alarm'][s.max_stage]) : T('None')], ['Microsleeps', s.microsleeps || 0], ['Break time', dur(s.break_s)], ['Distance', t.route && t.route.distance_km ? t.route.distance_km + ' km' : '–']].map(stat).join('')}</div></div>` : '';
+        return `<section data-trip="${esc(t.id)}" role="button" aria-expanded="${open}" style="background:#1F1C24;border-radius:20px;overflow:hidden;cursor:pointer">
+          <div style="padding:16px 18px">
+            <span style="display:block;font-size:13px;color:#9A93A0">${esc(when(t.started_at))}${t.open ? ' · ' + esc(T('Now')) : ''}</span>
+            <h2 style="margin:4px 0 0;${HEAD_FONT};font-size:18px">${esc(tripTitle(t))}</h2>
+            <div style="margin-top:6px;font-size:14px;color:#9A93A0">${esc(dur(s.duration_s))} · <span style="color:${n ? '#E8D7AE' : '#9A93A0'}">${esc(alertsText(n))}</span> · ${esc(breaksText(s.breaks || 0))}</div>
           </div>${detail}</section>`;
       }).join('');
     }
@@ -366,6 +419,7 @@ const DYN = {
     async function load() { try { all = await SYNC_TRIPS(500); } catch (e) {} if (root.isConnected) draw(); }
     API().on('trip', load, root);
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(); load();
   },
 
@@ -373,46 +427,60 @@ const DYN = {
     let range = 'week';
     const $ = (s) => root.querySelector(s);
     $('#iBadge').hidden = !API().demo;
-    const card = (inner) => `<section style="${GLASS};border-radius:22px;padding:16px">${inner}</section>`;
-    const h2 = (t, right) => `<div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;${HEAD_FONT};font-size:20px">${esc(T(t))}</h2>${right ? `<span style="font-size:13px;color:#B3A6B4">${esc(right)}</span>` : ''}</div>`;
-    const note = (t) => `<p style="margin:10px 0 0;font-size:13.5px;color:#B3A6B4;line-height:1.4">${esc(t)}</p>`;
+    const card = (inner) => `<section style="background:#1F1C24;border-radius:20px;padding:18px">${inner}</section>`;
+    const h2 = (t, right) => `<div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;${HEAD_FONT};font-size:16px">${esc(T(t))}</h2>${right ? `<span style="font-size:13px;color:#9A93A0">${esc(right)}</span>` : ''}</div>`;
+    const note = (t) => `<p style="margin:10px 0 0;font-size:13.5px;color:#9A93A0;line-height:1.45">${esc(t)}</p>`;
+    const ko = () => BN_LANG() === 'ko';
+    const hourName = (h) => (ko() ? koClock(new Date(2000, 0, 1, h)) : hourLabel(h));
     function draw(d) {
       paintSeg(root, 'r', range);
       if (!d) { $('#iBody').innerHTML = emptyCard('Insights appear here', 'Connect your Bamnun to see your patterns.', IMG.thinking); return; }
       if (!d.trips) { $('#iBody').innerHTML = emptyCard('Nothing to show yet', 'After a few drives, Ollie shows when you get tired and what wakes you.', IMG.thinking); return; }
       const out = [];
-      // 1. Alert driving.
+      const period = ko() ? (range === 'week' ? '이번 주' : '이번 달') : (range === 'week' ? 'this week' : 'this month');
+      // 1. The one finding: the riskiest hour, and what to change.
+      if (d.alerts && d.peak_hour != null) {
+        const k = d.hours[d.peak_hour], ph = d.peak_hour, next = (ph + 1) % 24;
+        const head = ko() ? hourName(ph) + '가 가장 위험해요' : hourLabel(ph) + ' is your riskiest hour';
+        const sub = ko() ? `${period} 졸음 ${d.alerts}번 중 ${k}번이 ${hourName(ph)}~${hourName(next).replace(/^(새벽|오전|오후|밤) /, '')} 사이였어요. 그 전에 한 번 쉬어 가세요.`
+          : `${k} of your ${d.alerts} drowsy moments ${period} came between ${hourLabel(ph)} and ${hourLabel(next)}. Take a break before then.`;
+        const hmax = Math.max(1, ...d.hours);
+        const hb = d.hours.map((n, hr) => `<span title="${esc(hourLabel(hr))}" style="flex:1;height:${n ? 8 + 62 * n / hmax : 2}px;border-radius:2px;background:${hr === ph ? '#E8D7AE' : n ? '#5C5662' : '#2E2A33'}"></span>`).join('');
+        out.push(`<section style="background:#1F1C24;border-radius:20px;padding:22px 20px 18px">
+          <span style="display:block;font-size:13px;color:#9A93A0">${esc(T('When you got tired'))}</span>
+          <h2 style="margin:8px 0 0;${HEAD_FONT};font-size:26px;line-height:1.25;color:#F2EEE8">${esc(head)}</h2>
+          <p style="margin:8px 0 0;font-size:14.5px;color:#9A93A0;line-height:1.5">${esc(sub)}</p>
+          <div role="img" aria-label="${esc(T('Alerts by hour of the day'))}" style="display:flex;align-items:flex-end;gap:2px;height:72px;margin-top:20px">${hb}</div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#9A93A0"><span>${esc(hourLabel(0))}</span><span>${esc(hourLabel(6))}</span><span>${esc(hourLabel(12))}</span><span>${esc(hourLabel(18))}</span><span>${esc(hourLabel(0))}</span></div></section>`);
+      } else {
+        out.push(`<section style="background:#1F1C24;border-radius:20px;padding:22px 20px">
+          <h2 style="margin:0;${HEAD_FONT};font-size:26px;line-height:1.25">${esc(ko() ? period + '엔 한 번도 졸지 않았어요' : 'No drowsy moments ' + period)}</h2>${note(T('Ollie never had to wake you in this range. Keep it up.'))}</section>`);
+      }
+      // 2. Alert driving, as a sentence with its number.
       const pct = d.alert_free == null ? null : Math.round(d.alert_free * 100), prev = d.alert_free_prev == null ? null : Math.round(d.alert_free_prev * 100);
-      const period = T(range === 'week' ? 'last week' : 'last month');
-      const cmp = prev == null ? '' : pct > prev ? T('Up from {p}% {when}.', { p: prev, when: period }) : pct < prev ? T('Down from {p}% {when}.', { p: prev, when: period }) : T('Same as {when}.', { when: period });
-      out.push(card(`<div style="display:flex;gap:16px;align-items:center">
-        <div style="position:relative;width:96px;height:96px;flex-shrink:0"><svg viewBox="0 0 96 96" width="96" height="96" style="transform:rotate(-90deg)"><circle cx="48" cy="48" r="40" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="10"/><circle cx="48" cy="48" r="40" fill="none" stroke="#F8C4A4" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(251 * (pct || 0) / 100).toFixed(0)} 251"/></svg>
-          <b style="position:absolute;inset:0;display:grid;place-items:center;${HEAD_FONT};font-size:26px">${pct == null ? '–' : pct + '%'}</b></div>
-        <div><h2 style="margin:0;${HEAD_FONT};font-size:20px">${esc(T('Alert driving'))}</h2><p style="margin:6px 0 0;font-size:13.5px;color:#B3A6B4;line-height:1.4">${esc(T('Share of driving time with no drowsiness signs.'))} ${esc(cmp)}</p></div></div>`));
-      // 2. Alerts per night (or per week).
+      const lastP = T(range === 'week' ? 'last week' : 'last month');
+      const cmp = prev == null ? '' : pct > prev ? T('Up from {p}% {when}.', { p: prev, when: lastP }) : pct < prev ? T('Down from {p}% {when}.', { p: prev, when: lastP }) : T('Same as {when}.', { when: lastP });
+      out.push(card(`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">${h2('Alert driving')}<b style="${HEAD_FONT};font-size:24px">${pct == null ? '–' : pct + '%'}</b></div>
+        <div style="height:6px;margin-top:12px;border-radius:3px;background:#2E2A33;overflow:hidden"><div style="width:${pct || 0}%;height:100%;background:#9A93A0"></div></div>` +
+        note(T('Share of driving time with no drowsiness signs.') + (cmp ? ' ' + cmp : ''))));
+      // 3. Alerts per night (or per week).
       const per = d.per || [], max = Math.max(1, ...per.map((x) => x.alerts));
       const bars = per.map((x, i) => {
-        const hgt = x.alerts ? 14 + 70 * x.alerts / max : 4;
+        const hgt = x.alerts ? 12 + 60 * x.alerts / max : 3;
         const label = range === 'week' ? T(WEEKDAYS[x.weekday]).slice(0, BN_LANG() === 'ko' ? 1 : 3) : T('W{n}', { n: i + 1 });
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:12px;font-weight:700;color:${x.alerts ? '#F4EFE6' : 'transparent'}">${x.alerts}</span><div style="width:70%;height:${hgt}px;border-radius:7px;background:${x.alerts ? 'linear-gradient(#C4B5FD,#F9A8D4)' : x.drove ? 'rgba(248,196,164,.55)' : 'rgba(255,255,255,.1)'}"></div><span style="font-size:11.5px;color:#B3A6B4">${esc(label)}</span></div>`;
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px"><span style="font-size:12px;font-weight:600;color:${x.alerts ? '#F2EEE8' : 'transparent'}">${x.alerts}</span><div style="width:60%;height:${hgt}px;border-radius:3px;background:${x.alerts ? '#5C5662' : '#2E2A33'}"></div><span style="font-size:11.5px;color:#9A93A0">${esc(label)}</span></div>`;
       }).join('');
       const off = (API().profile().work || {}).days ? WEEKDAYS.filter((n, i) => !API().profile().work.days[i]).map((n) => T(n)) : [];
       out.push(card(h2(range === 'week' ? 'Alerts per night' : 'Alerts per week', T('{n} total', { n: d.alerts })) +
-        `<div style="display:flex;align-items:flex-end;height:118px;margin-top:12px">${bars}</div>` +
+        `<div style="display:flex;align-items:flex-end;height:104px;margin-top:12px">${bars}</div>` +
         (range === 'week' && off.length ? note(T('Off days in your work week: {days}.', { days: off.join(', ') })) : '')));
-      // 3. When you got tired.
+      // 4. What woke you up.
       if (d.alerts) {
-        const hmax = Math.max(1, ...d.hours);
-        const hb = d.hours.map((n, hr) => `<span title="${esc(hourLabel(hr))}" style="flex:1;height:${n ? 10 + 60 * n / hmax : 3}px;border-radius:3px;background:${hr === d.peak_hour ? '#F48FB1' : n ? '#C4B5FD' : 'rgba(255,255,255,.1)'}"></span>`).join('');
-        out.push(card(h2('When you got tired') + `<div role="img" aria-label="${esc(T('Alerts by hour of the day'))}" style="display:flex;align-items:flex-end;gap:2px;height:76px;margin-top:14px">${hb}</div>
-          <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:#B3A6B4"><span>${esc(hourLabel(0))}</span><span>${esc(hourLabel(6))}</span><span>${esc(hourLabel(12))}</span><span>${esc(hourLabel(18))}</span><span>${esc(hourLabel(0))}</span></div>` +
-          note(T('Most tired hour: {a} to {b}', { a: hourLabel(d.peak_hour), b: hourLabel((d.peak_hour + 1) % 24) }))));
-        // 4. What woke you up.
-        const names = ['Blue light', 'Mint mist', 'Voice', 'Alarm'], colours = ['#A99BF0', '#F5B5C8', '#C4B5FD', '#F48FB1'];
+        const names = ['Blue light', 'Mint mist', 'Voice', 'Alarm'];
         const wmax = Math.max(1, ...d.woke_by);
-        out.push(card(h2('What woke you up') + `<div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">${d.woke_by.map((n, i) => `<div style="display:flex;align-items:center;gap:10px"><span style="width:84px;font-size:13.5px;color:#B3A6B4">${esc(T(names[i]))}</span><div style="flex:1;height:10px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden"><div style="width:${100 * n / wmax}%;height:100%;border-radius:6px;background:${colours[i]}"></div></div><b style="width:22px;text-align:right">${n}</b></div>`).join('')}</div>` +
+        out.push(card(h2('What woke you up') + `<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">${d.woke_by.map((n, i) => `<div style="display:flex;align-items:center;gap:10px"><span style="width:84px;font-size:13.5px;color:#9A93A0">${esc(T(names[i]))}</span><div style="flex:1;height:6px;border-radius:3px;background:#2E2A33;overflow:hidden"><div style="width:${100 * n / wmax}%;height:100%;border-radius:3px;background:#9A93A0"></div></div><b style="width:22px;text-align:right;font-weight:600">${n}</b></div>`).join('')}</div>` +
           note(T('The first step was enough {a} out of {b} times.', { a: d.first_step_enough, b: d.alerts }))));
-      } else out.push(card(h2('No alerts') + note(T('Ollie never had to wake you in this range. Keep it up.'))));
+      }
       $('#iBody').innerHTML = out.join('');
     }
     async function load() {
@@ -424,6 +492,7 @@ const DYN = {
     }
     root.addEventListener('click', (e) => { const r = e.target.closest('[data-r]'); if (r) { range = r.dataset.r; load(); } });
     API().on('sync', (m) => m.status.state === 'done' && load(), root);
+    window.addEventListener('bn-visit', () => root.isConnected && load());
     draw(null); load();
   },
 
@@ -522,6 +591,94 @@ const DYN = {
 
   Welcome(root) {
     root.querySelectorAll('[data-go="Account"]').forEach((a) => a.addEventListener('click', () => { try { localStorage.removeItem('bn-acct-from'); } catch (e) {} }));
+    // Product demo opens Home without setup; remember it so Home offers the
+    // way back here.
+    root.querySelectorAll('[data-go="Home"],[data-go="Stages"]').forEach((a) => a.addEventListener('click', () => { try { localStorage.setItem('bn-showcase', '1'); } catch (e) {} }));
+  },
+
+  // Product control (the booth demo): swipe through the four wake-up stages
+  // and play one. With a Bamnun connected it plays on the real device, one
+  // phone at a time (the device answers 409 while another stage is playing,
+  // and tells every phone what's playing). Otherwise it's a preview here.
+  Stages(root) {
+    const $ = (q) => root.querySelector(q);
+    const track = $('#stTrack'), cards = [...root.querySelectorAll('.st-card')], dots = [...root.querySelectorAll('.st-dot')];
+    const play = $('#stPlay'), label = $('#stPlayLabel'), msg = $('#stMsg'), dev = $('#stDev');
+    const SOUND = { 1: 'on', 2: 'on', 3: 'chime', 4: 'alarm' };
+    let cur = 1, busyUntil = 0, busyStage = 0, mine = false, timer = null;
+    const live = () => !API().demo && API().online();
+    dev.textContent = T(live() ? 'Bamnun connected' : 'Preview on your phone');
+    if (live()) { dev.style.color = '#E8D7AE'; }
+
+    function select(n) {
+      if (n === cur && cards[n - 1].classList.contains('on')) return;
+      cur = n;
+      cards.forEach((c, i) => c.classList.toggle('on', i === n - 1));
+      dots.forEach((d, i) => d.classList.toggle('on', i === n - 1));
+      label.textContent = T('Play stage {n}', { n });
+      SFX.play('tick');
+    }
+    // A tap on a dot or card scrolls there; the cards passed on the way
+    // don't light up.
+    let steer = 0, steerUntil = 0;
+    const show = (n) => { const c = cards[n - 1]; steer = n; steerUntil = Date.now() + 900; track.scrollTo({ left: c.offsetLeft - (track.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); select(n); };
+    // The card that's mostly in view is the selected one.
+    const seen = new IntersectionObserver((entries) => {
+      for (const en of entries) {
+        if (!en.isIntersecting) continue;
+        const n = cards.indexOf(en.target) + 1;
+        if (steer && Date.now() < steerUntil) { if (n === steer) steer = 0; continue; }
+        steer = 0;
+        select(n);
+      }
+    }, { root: track, threshold: 0.6 });
+    cards.forEach((c) => seen.observe(c));
+    cards.forEach((c, i) => c.addEventListener('click', () => { if (i + 1 !== cur) show(i + 1); }));
+    dots.forEach((d, i) => d.addEventListener('click', () => show(i + 1)));
+
+    function glow(n, s) {
+      const c = cards[n - 1];
+      c.classList.add('playing');
+      setTimeout(() => c.classList.remove('playing'), s * 1000);
+    }
+    function tick() {
+      clearTimeout(timer);
+      const left = Math.ceil((busyUntil - Date.now()) / 1000);
+      if (left <= 0) { play.disabled = false; msg.textContent = ''; mine = false; return; }
+      play.disabled = true;
+      msg.textContent = mine ? T('Playing on Bamnun now…') : T('Someone is playing stage {n} on Bamnun. Your turn in {s} s.', { n: busyStage, s: left });
+      timer = setTimeout(tick, 250);
+    }
+    // Every phone hears what the device is playing, so the button waits.
+    API().on('showcase', (m) => {
+      if (!live()) return;
+      busyUntil = Date.now() + (m.hold_s || 4) * 1000; busyStage = m.stage;
+      if (!mine) glow(m.stage, m.hold_s || 4);
+      tick();
+    }, root);
+
+    play.addEventListener('click', async () => {
+      const n = cur;
+      if (!live()) {
+        SFX.play(SOUND[n]); glow(n, n >= 3 ? 3 : 2);
+        if (n >= 3) API().say('stage' + n);
+        msg.textContent = T('Preview on your phone. At the booth, this plays on the real Bamnun.');
+        return;
+      }
+      play.disabled = true; mine = true;
+      try {
+        const r = await API().post('/api/showcase/stage/' + n);
+        SFX.play(SOUND[n]); glow(n, r.hold_s || 4);
+        busyUntil = Math.max(busyUntil, Date.now() + (r.hold_s || 4) * 1000); busyStage = n;
+        tick();
+      } catch (e) {
+        mine = false;
+        if (/409/.test(e.message)) { if (busyUntil < Date.now()) busyUntil = Date.now() + 3000; tick(); }
+        else { play.disabled = false; msg.textContent = T("Couldn't reach Bamnun. Try again."); }
+      }
+    });
+    select(1);
+    requestAnimationFrame(() => show(1));
   },
 
   // Sign in with Google (account.js), then on through setup or straight home.
@@ -532,7 +689,7 @@ const DYN = {
     try { from = localStorage.getItem('bn-acct-from'); } catch (e) {}
     // From Settings the phone is already set up: no "Not now" into setup.
     if (from === 'Settings') { const sk = $('#aSkip'); sk.setAttribute('data-go', 'Settings'); sk.setAttribute('data-back', ''); sk.setAttribute('href', '#Settings'); }
-    const say = (t, err) => { msg.textContent = t; msg.style.color = err ? '#F49AC1' : '#B3A6B4'; };
+    const say = (t, err) => { msg.textContent = t; msg.style.color = err ? '#9A93A0' : '#9A93A0'; };
     function busy(on, label) {
       btn.disabled = on;
       $('#aLabel').textContent = T(label || 'Continue with Google');

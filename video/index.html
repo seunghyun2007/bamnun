@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>밤눈 product film v2</title>
+<style>
+  @font-face { font-family: Pretendard; src: url(../frontend/fonts/pretendard.woff2) format("woff2"); font-weight: 100 900; }
+  :root { --night:#141218; --panel:#1F1C24; --line:#2E2A33; --text:#F2EEE8; --muted:#9A93A0; --cream:#E8D7AE;
+          --blue:#4C7DFF; --mint:#8FE3C8; --amber:#F2B66D; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--night); }
+  body { font-family: Pretendard, "Apple SD Gothic Neo", sans-serif; color: var(--text); -webkit-font-smoothing: antialiased;
+         word-break: keep-all; }
+  .abs { position: absolute; }
+  .t { position: absolute; opacity: 0; white-space: nowrap; }
+  .en { color: var(--muted); font-weight: 450; letter-spacing: 0; }
+  .h { font-weight: 800; letter-spacing: -1.5px; line-height: 1.16; }
+  #box { position: absolute; overflow: hidden; border-style: solid; }
+  #box > * { position: absolute; opacity: 0; }
+  .fill { inset: 0; width: 100%; height: 100%; }
+  .tag { position: absolute; opacity: 0; padding: 9px 20px 10px; border-radius: 999px; background: rgba(20,18,24,.86);
+         font-size: 30px; font-weight: 700; white-space: nowrap; }
+  .tag small { font-size: 20px; font-weight: 450; color: var(--muted); margin-left: 10px; }
+  .dot { position: absolute; opacity: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
+         border: 3px solid var(--cream); }
+  .row { position: absolute; opacity: 0; left: 1200px; width: 600px; height: 104px; border-top: 2px solid var(--line); padding-top: 18px; }
+  .row b { font-size: 46px; font-weight: 750; letter-spacing: -.5px; display: block; line-height: 1.1; }
+  .row small { font-size: 23px; color: var(--muted); }
+  .row .viz { position: absolute; right: 0; top: 22px; width: 250px; height: 64px; }
+  .step { position: absolute; left: 1040px; width: 760px; height: 118px; opacity: 0; border-top: 2px solid var(--line); }
+  .step .n { position: absolute; left: 0; top: 30px; font-size: 40px; font-weight: 800; color: var(--muted); width: 60px; }
+  .step .bar { position: absolute; left: -28px; top: 20px; width: 8px; height: 80px; border-radius: 4px; opacity: 0; }
+  .step b { position: absolute; left: 70px; top: 16px; font-size: 56px; font-weight: 800; letter-spacing: -1px; transform-origin: left center; }
+  .step small { position: absolute; left: 72px; top: 84px; font-size: 22px; color: var(--muted); }
+  .call { position: absolute; opacity: 0; left: 140px; width: 960px; height: 122px; border-top: 2px solid var(--line); padding-top: 16px; }
+  .call b { font-size: 50px; font-weight: 800; letter-spacing: -1px; display: block; line-height: 1.15; }
+  .call span { font-size: 32px; font-weight: 600; color: var(--cream); margin-left: 18px; }
+  .call small { font-size: 23px; color: var(--muted); }
+  #subs { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; opacity: 0; }
+  #subs > div { display: inline-block; padding: 14px 34px 16px; border-radius: 22px; background: rgba(20,18,24,.88); max-width: 1700px; }
+  #subs .ko { font-size: 44px; font-weight: 650; letter-spacing: -.3px; line-height: 1.2; }
+  #subs .en { font-size: 26px; margin-top: 6px; }
+  /* SUBS=ko: Korean only, 1.5x larger, for a crowded booth and older viewers (two balanced lines at most) */
+  body.kosub #subs { bottom: 20px; }
+  body.kosub #subs > div { padding: 12px 40px 14px; border-radius: 26px; background: rgba(20,18,24,.92); max-width: 1760px; }
+  body.kosub #subs .ko { font-size: 66px; font-weight: 750; letter-spacing: -.8px; line-height: 1.18; text-wrap: balance; }
+  body.kosub #subs .en { display: none; }
+</style>
+</head>
+<body>
+
+<!-- the one container: its rectangle, corner radius and fill morph from scene to scene -->
+<div id="box">
+  <div id="tint" class="fill"></div>
+  <div id="bloom" class="abs" style="left:-10%;top:38%;width:120%;height:80%;border-radius:50%;background:radial-gradient(closest-side,#4C7DFF,rgba(76,125,255,0))"></div>
+  <img id="devImg" class="fill" src="assets/device.png" style="object-fit:cover;mix-blend-mode:multiply">
+  <img id="realImg" src="assets/device_real.jpg">
+  <svg id="ir" class="fill" viewBox="0 0 1000 780" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <radialGradient id="irFace" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="#9c97a1"/><stop offset=".7" stop-color="#76717c"/><stop offset="1" stop-color="#55505b"/></radialGradient>
+      <filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence id="turb" type="fractalNoise" baseFrequency="1.1" numOctaves="1" seed="1"/>
+        <feColorMatrix values="0 0 0 0 .8  0 0 0 0 .78  0 0 0 0 .82  .9 0 0 0 -.38"/></filter>
+      <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.2"/></filter>
+      <clipPath id="clipL"><path id="clipLp"/></clipPath><clipPath id="clipR"><path id="clipRp"/></clipPath>
+    </defs>
+    <rect width="1000" height="780" fill="#0d0c10"/>
+    <g id="irAll" transform="translate(500 470) scale(1.24) translate(-500 -440)"><g filter="url(#soft)"><rect x="336" y="120" width="328" height="400" rx="70" fill="#141217"/>
+    <path d="M150 780 C160 650 290 610 400 596 L600 596 C710 610 840 650 850 780 Z" fill="#2a2730"/>
+    </g><g id="head">
+      <g filter="url(#soft)"><path d="M430 520 L430 640 Q500 690 570 640 L570 520 Z" fill="#5a5560"/>
+      <ellipse cx="343" cy="385" rx="20" ry="42" fill="#69646f"/><ellipse cx="657" cy="385" rx="20" ry="42" fill="#69646f"/>
+      <path id="faceShape" d="M500 168 C612 168 662 250 658 372 C654 480 600 600 500 604 C400 600 346 480 342 372 C338 250 388 168 500 168 Z" fill="url(#irFace)"/>
+      <path d="M338 330 C322 190 420 140 500 140 C580 140 678 190 662 330 C650 262 612 228 560 222 C500 214 430 222 392 244 C362 262 346 290 338 330 Z" fill="#24212a"/>
+      <g id="feat">
+        <path id="browL" fill="none" stroke="#45414b" stroke-width="10" stroke-linecap="round"/>
+        <path id="browR" fill="none" stroke="#45414b" stroke-width="10" stroke-linecap="round"/>
+        <g id="eyeL"></g><g id="eyeR"></g>
+        <path d="M494 352 C488 400 476 430 470 444 C478 458 522 458 530 444" fill="none" stroke="#6c6772" stroke-width="5" stroke-linecap="round" opacity=".7"/>
+        <path d="M452 512 C478 504 490 508 500 510 C510 508 522 504 548 512 C526 530 474 530 452 512 Z" fill="#59545f"/>
+        <path d="M452 512 C480 516 520 516 548 512" fill="none" stroke="#3f3b45" stroke-width="3"/>
+      </g>
+      </g><g id="mesh"></g>
+    </g></g>
+    <rect width="1000" height="780" filter="url(#grain)" opacity=".5"/>
+    <text x="34" y="52" fill="#9A93A0" font-size="22" font-weight="600" font-family="Pretendard" letter-spacing="2">IR · 850 nm</text>
+    <circle id="recDot" cx="950" cy="44" r="7" fill="#F2EEE8"/>
+  </svg>
+  <img id="mistImg" src="assets/booth.jpg">
+  <svg id="rings" class="fill" viewBox="0 0 820 740" preserveAspectRatio="xMidYMid slice"></svg>
+  <img id="scrHome" src="assets/app_home.png" style="left:0;top:0;width:100%">
+  <img id="scrTrip" src="assets/app_trip.png" style="left:0;top:0;width:100%">
+  <img id="scrIns" src="assets/app_insights.png" style="left:0;top:0;width:100%">
+  <img id="qrImg" src="assets/qr_site.png" style="left:5%;top:5%;width:90%;height:90%;image-rendering:pixelated">
+</div>
+
+<!-- A: the night road through the windshield, eyes closing -->
+<div id="A" class="abs" style="inset:0;overflow:hidden;background:#000">
+  <svg id="road" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0;top:0">
+    <rect width="1920" height="1080" fill="#0b0a0e"/>
+    <g id="stars"></g>
+    <rect y="500" width="1920" height="580" fill="#100f14"/>
+    <polygon points="930,500 990,500 1760,1080 -260,1080" fill="#1e1c23"/>
+    <ellipse cx="960" cy="930" rx="700" ry="250" fill="#E8D7AE" opacity=".07"/>
+    <ellipse cx="960" cy="1000" rx="430" ry="170" fill="#E8D7AE" opacity=".07"/>
+    <polygon points="986,500 990,500 1760,1080 1716,1080" fill="#E8D7AE" opacity=".5"/>
+    <g id="dashes"></g><g id="posts"></g>
+    <path d="M0 1080 L0 968 Q960 884 1920 968 L1920 1080 Z" fill="#060508"/>
+    <circle cx="640" cy="1250" r="330" fill="none" stroke="#0d0c10" stroke-width="52"/>
+  </svg>
+  <svg class="abs" width="1920" height="1080" viewBox="0 0 1920 1080" style="left:0;top:0"><path id="lids" fill="#000" fill-rule="evenodd"/></svg>
+</div>
+<div id="oneSec" class="t" style="left:0;width:1920px;top:390px;text-align:center">
+  <div class="h" style="font-size:150px;color:var(--cream)">단 1초</div><div class="en" style="font-size:38px;margin-top:6px">just one second</div>
+</div>
+
+<!-- B: the statistic -->
+<div id="bNum" class="t h" style="left:230px;top:190px;font-size:400px;letter-spacing:-14px;color:var(--cream);line-height:1"><span id="pct">0</span><span style="font-size:230px;letter-spacing:0;margin-left:8px">%</span></div>
+<div id="bTop" class="t" style="left:1060px;top:262px;font-size:48px;font-weight:650;color:var(--muted)">고속도로 사망 사고 원인</div>
+<div id="bMain" class="t h" style="left:1056px;top:330px;font-size:104px">졸음 ·<br>주시 태만</div>
+<div id="bEn" class="t en" style="left:1060px;top:590px;font-size:30px">of fatal highway crashes:<br>drowsiness and inattention</div>
+<div id="bPills" class="t" style="left:250px;top:640px"></div>
+<div id="bSrc" class="t" style="left:250px;top:734px;font-size:28px;color:#a59eab">출처: 한국도로공사, 최근 5년간 고속도로 사망 사고 원인 69.8% (서울신문 2022.9.27)</div>
+
+<!-- C: meet Bamnun (the real case), then Ollie -->
+<div id="cName" class="t h" style="left:150px;top:96px;font-size:190px;color:var(--cream);letter-spacing:2px">밤눈</div>
+<div id="cSub" class="t" style="left:158px;top:330px;font-size:50px;font-weight:700">야간 운전 졸음 감지기</div>
+<div id="cEn" class="t en" style="left:160px;top:398px;font-size:28px">Bamnun · a drowsiness monitor for night drivers</div>
+<img id="cOllie" class="abs" src="assets/hello.webp" style="left:150px;top:500px;width:330px;opacity:0;transform-origin:50% 100%">
+<div id="cOl" class="t" style="left:520px;top:590px"><div class="h" style="font-size:96px;color:var(--cream)">올리</div>
+  <div style="font-size:42px;font-weight:700;margin-top:2px">밤눈의 운전 친구</div><div class="en" style="font-size:26px;margin-top:6px">Ollie, your night-driving companion</div></div>
+
+<!-- P: the real prototype -->
+<div id="pTags"></div>
+<div id="pHead" class="t" style="left:1200px;top:110px"><div style="font-size:26px;font-weight:700;color:var(--cream);letter-spacing:1px">실제 시제품 · THE WORKING PROTOTYPE</div>
+  <div class="h" style="font-size:84px;margin-top:14px">작은 케이스<br>하나에</div>
+  <div style="font-size:40px;font-weight:650;margin-top:26px;line-height:1.45;color:var(--text)">카메라 · 불빛 ·<br>미스트 · 스피커</div>
+  <div class="en" style="font-size:26px;margin-top:14px">camera, light, mist and speaker<br>around a Raspberry Pi 5</div></div>
+
+<!-- D: how it sees -->
+<div id="dHead" class="t" style="left:1200px;top:100px"><div style="font-size:26px;font-weight:700;color:var(--cream);letter-spacing:1px">적외선 카메라 · INFRARED</div>
+  <div class="h" style="font-size:80px;margin-top:14px">어둠 속에서도<br>눈을 읽어요</div></div>
+<div class="row" id="row0" style="top:400px"><b>눈 감김</b><small>how closed the eyes are</small><div class="viz" id="viz0"></div></div>
+<div class="row" id="row1" style="top:524px"><b>깜빡임</b><small>how often you blink</small><div class="viz" id="viz1"></div></div>
+<div class="row" id="row2" style="top:648px"><b>고개 떨굼</b><small>whether the head drops</small><div class="viz" id="viz2"></div></div>
+
+<!-- E: the live score -->
+<div id="eHead" class="t" style="left:860px;top:150px"><div class="h" style="font-size:88px">지금, 얼마나 졸린지</div><div class="en" style="font-size:30px;margin-top:8px">a live drowsiness score, from 1 to 9</div></div>
+<div id="eNum" class="t" style="left:850px;top:330px;line-height:1"><span id="eN" class="h" style="font-size:330px;color:var(--cream);letter-spacing:-8px">1</span><span class="h" style="font-size:120px;color:var(--muted);margin-left:26px">/ 9</span></div>
+<div id="eState" class="t h" style="left:1330px;top:420px;font-size:84px">깨어 있음</div>
+<div id="eStateEn" class="t en" style="left:1334px;top:526px;font-size:30px">awake</div>
+<div id="eStrip" class="t" style="left:860px;top:716px"></div>
+<div id="eLab" class="t" style="left:860px;top:770px;width:920px;font-size:30px;font-weight:650;color:var(--muted)"><span style="position:absolute;left:0">깨어 있음</span><span style="position:absolute;left:414px">졸림</span><span style="position:absolute;right:0">위험</span></div>
+
+<!-- F: the four stages -->
+<div id="fHead" class="t" style="left:1040px;top:96px"><div class="h" style="font-size:84px">필요한 만큼만,<br>네 단계로</div><div class="en" style="font-size:28px;margin-top:10px">four steps, only as far as needed</div></div>
+<div id="steps"></div>
+<div id="fCap" class="tag" style="left:176px;top:770px;font-size:26px">부스에서 찍은 실제 미스트<small>real mist, at our booth</small></div>
+<div id="bubble" class="abs" style="left:560px;top:150px;width:360px;height:120px;border-radius:60px;background:#141218;opacity:0">
+  <div id="bars" class="abs" style="left:44px;top:0;width:272px;height:120px"></div>
+  <div class="abs" style="left:70px;bottom:-22px;width:0;height:0;border-left:16px solid transparent;border-right:26px solid transparent;border-top:26px solid #141218"></div>
+</div>
+
+<!-- G: the phone app -->
+<div id="gHead" class="t" style="left:140px;top:100px"><div class="h" style="font-size:88px">운전 기록을<br>휴대폰에서</div><div class="en" style="font-size:28px;margin-top:10px">every drive, on your phone</div></div>
+<div class="call" id="call0" style="top:420px"><b>실제 경로 위의 운전<span>서울 → 강릉</span></b><small>each drive on its real route</small></div>
+<div class="call" id="call1" style="top:556px"><b>졸았던 순간<span>새벽 2시 43분 · 파란 불빛이 깨움</span></b><small>the moment you dozed, and what woke you</small></div>
+<div class="call" id="call2" style="top:692px"><b>가장 졸린 시간<span>밤 12시가 가장 위험해요</span></b><small>when you get sleepiest</small></div>
+<svg id="gLines" class="abs" width="1920" height="1080" style="left:0;top:0;pointer-events:none"></svg>
+
+<!-- H: the booth -->
+<div id="hPhoto" class="abs" style="left:140px;top:90px;width:1040px;height:780px;border-radius:40px;overflow:hidden;opacity:0;background:#0d0c10">
+  <img id="hWide" class="abs" src="assets/booth_wide.jpg"><img id="hClose" class="abs" src="assets/booth.jpg">
+</div>
+<div id="hHead" class="t" style="left:1250px;top:92px"><div class="h" style="font-size:68px">부스에서 직접<br>운전해 보세요</div><div class="en" style="font-size:26px;margin-top:8px">drive the truck at our booth</div></div>
+<img id="hOllie" class="abs" src="assets/driving.webp" style="left:1668px;top:96px;width:150px;opacity:0;transform-origin:50% 100%">
+<div id="hQr" class="t" style="left:1290px;top:776px;width:440px;text-align:center"><div style="font-size:42px;font-weight:800">밤눈 앱 바로 가기</div><div class="en" style="font-size:24px;margin-top:4px">scan to open the Bamnun app</div></div>
+
+<!-- I: end card -->
+<img id="iOllie" class="abs" src="assets/ollie_flat_M.svg" style="left:835px;top:120px;width:250px;opacity:0">
+<div id="iName" class="t h" style="left:0;width:1920px;top:372px;text-align:center;font-size:210px;color:var(--cream);letter-spacing:10px">밤눈</div>
+<div id="iTag" class="t" style="left:0;width:1920px;top:640px;text-align:center"><div style="font-size:64px;font-weight:750">밤길엔, 밤눈.</div><div class="en" style="font-size:30px;margin-top:10px">Bamnun · for night roads</div></div>
+<div id="iFoot" class="t" style="left:120px;top:960px;font-size:26px;color:var(--muted)">2026 창보고 전시회</div>
+<div id="iScan" class="t" style="left:1650px;top:970px;width:170px;text-align:center;font-size:22px;color:var(--muted)">앱 바로 가기</div>
+
+<div id="subs"><div><div class="ko"></div><div class="en"></div></div></div>
+
+<script>
+const TL = __TIMELINE__;
+const S = TL.scenes, C = TL.cues, END = TL.end;
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+const inout = (x) => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const lerp = (a, b, k) => a + (b - a) * k;
+const $ = (id) => document.getElementById(id);
+const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, k) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], k))).join(',')})`; };
+// fade in at tin (rising 24 px), fade out at tout
+function show(el, t, tin, tout = 1e9, d = 0.6, dy = 24) {
+  const k = ease((t - tin) / d) * (1 - ease((t - tout) / 0.4));
+  el.style.opacity = k; el.style.transform = `translateY(${(1 - ease((t - tin) / d)) * dy}px)`; return k;
+}
+const fade = (t, tin, tout, d = 0.5) => clamp((t - tin) / d) * (1 - clamp((t - tout) / d));
+// a smooth bump: rises from t0, holds, falls by t1
+const bump = (t, t0, t1, rise = 0.25, fall = 0.25) => inout((t - t0) / rise) * (1 - inout((t - (t1 - fall)) / fall));
+let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+// ---------------------------------------------------------------- the container
+const NIGHT = '#141218';
+const BOX = [   // t, x, y, w, h, radius, fill, border width, border colour
+  [0, 0, 0, 1920, 1080, 0, '#000000', 0, '#000000'],
+  [S.B, 160, 110, 1600, 700, 40, '#1F1C24', 2, '#2E2A33'],
+  [S.C, 1010, 90, 780, 780, 40, '#F2EEE8', 0, '#F2EEE8'],
+  [S.P, 140, 90, 1000, 780, 40, '#0d0c10', 0, '#0d0c10'],
+  [S.E, 140, 170, 640, 640, 40, '#0d0c10', 2, '#2E2A33'],
+  [S.F, 140, 110, 820, 740, 40, '#F2EEE8', 0, '#F2EEE8'],
+  [S.G, 1270, 46, 388, 836, 58, '#0c0b0f', 10, '#2a2730'],
+  [S.H, 1290, 320, 440, 440, 32, '#ffffff', 0, '#ffffff'],
+  [S.I, 1650, 790, 170, 170, 18, '#ffffff', 0, '#ffffff'],
+];
+const MORPH = 0.8;
+function boxAt(t) {
+  let i = 0; while (i < BOX.length - 1 && t >= BOX[i + 1][0]) i++;
+  const b = BOX[i], a = BOX[Math.max(0, i - 1)], k = i ? inout((t - b[0]) / MORPH) : 1;
+  const n = (j) => lerp(a[j], b[j], k);
+  const kc = i ? inout(((t - b[0]) / MORPH - 0.55) / 0.45) : 1;      // the fill changes late and fast, like a light coming on, not through a long grey
+  return { x: n(1), y: n(2), w: n(3), h: n(4), r: n(5), bg: mix(a[6], b[6], kc), bw: n(7), bc: mix(a[8], b[8], kc) };
+}
+// place a photo in the box so that the source point (cx, cy) sits at the centre and `w` source pixels span the box
+function crop(el, B, natW, cx, cy, w, zoom = 1) {
+  const s = (B.w / w) * zoom; el.style.width = natW * s + 'px'; el.style.left = (B.w / 2 - cx * s) + 'px'; el.style.top = (B.h / 2 - cy * s) + 'px';
+}
+
+// ---------------------------------------------------------------- static builds
+(function build() {
+  let g = ''; for (let i = 0; i < 12; i++) g += `<polygon class="dash" fill="#E8D7AE" opacity=".62"/>`; $('dashes').innerHTML = g;
+  g = ''; for (let i = 0; i < 9; i++) g += `<g class="post"><rect fill="#2a2730"/><rect fill="#E8D7AE" opacity=".8"/></g>`; $('posts').innerHTML = g;
+  g = ''; for (let i = 0; i < 46; i++) g += `<circle cx="${(rnd() * 1920).toFixed(0)}" cy="${(rnd() * 440).toFixed(0)}" r="${(0.8 + rnd() * 1.2).toFixed(1)}" fill="#F2EEE8" opacity="${(0.15 + rnd() * 0.35).toFixed(2)}"/>`;
+  $('stars').innerHTML = g;
+  $('bPills').innerHTML = Array.from({ length: 10 }, (_, i) => `<div class="pill" style="position:absolute;left:${i * 66}px;top:0;width:52px;height:52px;border-radius:14px;background:#2E2A33"></div>`).join('');
+  // the real prototype's parts (source pixels of device_real.jpg)
+  const TAGS = [['적외선 카메라', 'IR camera', 896, 825, -150, -112], ['적외선 LED', 'IR LEDs', 1025, 963, -150, 40],
+                ['민트 미스터', 'mint mister', 440, 690, -300, -150], ['스피커', 'speaker', 420, 1120, 34, 22]];
+  $('pTags').innerHTML = TAGS.map((g, i) => `<div class="dot" id="pd${i}"></div><div class="tag" id="pt${i}">${g[0]}<small>${g[1]}</small></div>`).join('');
+  window.TAGS = TAGS;
+  $('viz0').innerHTML = `<div style="position:absolute;left:0;top:26px;width:250px;height:14px;border-radius:7px;background:#2E2A33"></div><div id="v0bar" style="position:absolute;left:0;top:26px;width:0;height:14px;border-radius:7px;background:#E8D7AE"></div><div id="v0n" style="position:absolute;right:0;top:-14px;font-size:30px;font-weight:750">0%</div>`;
+  $('viz1').innerHTML = `<div id="v1n" style="position:absolute;right:0;top:-14px;font-size:30px;font-weight:750">0회</div>` + [0, 1, 2].map((i) => `<div class="bl" style="position:absolute;left:${150 + i * 36}px;top:26px;width:24px;height:14px;border-radius:7px;background:#2E2A33"></div>`).join('');
+  $('viz2').innerHTML = `<svg width="250" height="64" viewBox="0 0 250 64"><line x1="120" y1="18" x2="120" y2="62" stroke="#2E2A33" stroke-width="5" stroke-linecap="round"/><line id="v2l" x1="120" y1="18" x2="120" y2="62" stroke="#E8D7AE" stroke-width="6" stroke-linecap="round"/></svg><div id="v2n" style="position:absolute;right:0;top:-14px;font-size:30px;font-weight:750">0°</div>`;
+  $('eStrip').innerHTML = Array.from({ length: 9 }, (_, i) => `<div class="seg" style="position:absolute;left:${i * 103}px;top:0;width:96px;height:30px;border-radius:9px;background:#2E2A33"></div>`).join('');
+  const ST = [['파란 불빛', 'a soft blue light', '#4C7DFF'], ['민트 미스트', 'a cool mint mist', '#8FE3C8'],
+              ['차임과 목소리', "a chime, then Ollie's voice", '#E8D7AE'], ['알람', 'a rising alarm', '#F2B66D']];
+  $('steps').innerHTML = ST.map((s, i) => `<div class="step" style="top:${346 + i * 122}px"><div class="bar" style="background:${s[2]}"></div><div class="n">${i + 1}</div><b>${s[0]}</b><small>${s[1]}</small></div>`).join('');
+  window.ST = ST;
+  $('bars').innerHTML = Array.from({ length: 34 }, (_, j) => `<div style="position:absolute;left:${j * 8}px;width:5px;border-radius:3px;background:#E8D7AE"></div>`).join('');
+})();
+
+// ---------------------------------------------------------------- the face mesh (landmarks, Delaunay)
+const FX = 500, FY = 388;
+const P = [];             // {x, y, eye: 'L'|'R'|null, up: bool, k: index on the eye ring}
+(function landmarks() {
+  const add = (x, y, o = {}) => P.push(Object.assign({ x, y }, o));
+  for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2, yy = -Math.cos(a); add(152 * Math.sin(a) * (yy > 0 ? 1 - 0.30 * yy * yy : 1), yy > 0 ? 212 * yy : 150 * yy); }
+  for (const s of [-1, 1]) {
+    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; add(s * 64 + 36 * Math.cos(a), -34 - 14 * Math.sin(a), { eye: s < 0 ? 'L' : 'R', up: Math.sin(a) > 0.1, k }); }
+    [[22, -70], [44, -80], [68, -84], [92, -78], [110, -66]].forEach(([x, y]) => add(s * x, y));
+    [[26, 60], [15, 72], [48, 128], [26, 119], [26, 142], [20, 131], [40, 174], [112, -18], [100, 24], [86, 78], [64, 36], [104, 112], [128, -62],
+     [50, -116], [100, -108], [34, 12], [70, 150], [128, 52]].forEach(([x, y]) => add(s * x, y));
+  }
+  [[0, -44], [0, -2], [0, 34], [0, 58], [0, 80], [0, 121], [0, 131], [0, 148], [0, 184], [0, -112], [0, -78], [0, 100]].forEach(([x, y]) => add(x, y));
+})();
+const EDGES = (function delaunay() {
+  const pts = P.map((p) => [p.x, p.y]), n = pts.length;
+  pts.push([-2000, -2000], [2000, -2000], [0, 3000]);
+  let tris = [[n, n + 1, n + 2]];
+  const circ = (t) => { const [a, b, c] = t.map((i) => pts[i]); const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]));
+    const ux = ((a[0] ** 2 + a[1] ** 2) * (b[1] - c[1]) + (b[0] ** 2 + b[1] ** 2) * (c[1] - a[1]) + (c[0] ** 2 + c[1] ** 2) * (a[1] - b[1])) / d;
+    const uy = ((a[0] ** 2 + a[1] ** 2) * (c[0] - b[0]) + (b[0] ** 2 + b[1] ** 2) * (a[0] - c[0]) + (c[0] ** 2 + c[1] ** 2) * (b[0] - a[0])) / d;
+    return [ux, uy, (a[0] - ux) ** 2 + (a[1] - uy) ** 2]; };
+  for (let i = 0; i < n; i++) {
+    const bad = [], keep = [];
+    for (const t of tris) { const [ux, uy, r2] = circ(t); ((pts[i][0] - ux) ** 2 + (pts[i][1] - uy) ** 2 < r2 ? bad : keep).push(t); }
+    const cnt = {}; for (const t of bad) for (const [a, b] of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) { const key = a < b ? a + '_' + b : b + '_' + a; cnt[key] = (cnt[key] || 0) + 1; }
+    tris = keep; for (const key in cnt) if (cnt[key] === 1) { const [a, b] = key.split('_').map(Number); tris.push([a, b, i]); }
+  }
+  const E = {}; for (const t of tris) if (t.every((i) => i < n)) for (const [a, b] of [[t[0], t[1]], [t[1], t[2]], [t[2], t[0]]]) E[a < b ? a + '_' + b : b + '_' + a] = 1;
+  return Object.keys(E).map((k) => k.split('_').map(Number)).filter(([a, b]) => {
+    const A = P[a], B = P[b];
+    if (A.eye && A.eye === B.eye) { const d = Math.abs(A.k - B.k); return d === 1 || d === 7; }   // only the eye's outline, nothing across the opening
+    return Math.hypot(A.x - B.x, A.y - B.y) < 120;
+  });
+})();
+$('mesh').innerHTML = EDGES.map(() => `<line stroke="#E8D7AE" stroke-width="1.3"/>`).join('') + P.map(() => `<circle r="2.4" fill="#E8D7AE"/>`).join('');
+const meshLines = [...$('mesh').querySelectorAll('line')], meshDots = [...$('mesh').querySelectorAll('circle')];
+
+function drawFace(t, close, nod, reveal) {
+  // head: a nod tips the head forward (the features slide down the face, the whole head dips)
+  $('head').setAttribute('transform', `translate(0 ${nod * 34}) rotate(${Math.sin(t * 0.7) * 0.8} 500 600)`);
+  const pitch = nod * 30;
+  $('feat').setAttribute('transform', `translate(0 ${pitch})`);
+  const pos = P.map((p) => {
+    const r2 = Math.min(1, (p.x / 152) ** 2 + (p.y / 200) ** 2);
+    let y = p.y + pitch * (1 - r2 * 0.8);
+    if (p.eye && p.up) y = lerp(y, FY - FY + (-34 + 9) + pitch * (1 - r2 * 0.8), close);
+    return [FX + p.x, FY + y];
+  });
+  const R = reveal * 330;
+  EDGES.forEach(([a, b], i) => { const l = meshLines[i], d = Math.max(Math.hypot(P[a].x, P[a].y - 30), Math.hypot(P[b].x, P[b].y - 30));
+    l.setAttribute('x1', pos[a][0].toFixed(1)); l.setAttribute('y1', pos[a][1].toFixed(1)); l.setAttribute('x2', pos[b][0].toFixed(1)); l.setAttribute('y2', pos[b][1].toFixed(1));
+    const eye = P[a].eye && P[b].eye; l.setAttribute('opacity', (clamp((R - d) / 40) * (eye ? 1 : 0.42)).toFixed(2));
+    if (eye) { l.setAttribute('stroke', '#F2EEE8'); l.setAttribute('stroke-width', 2.6); } });
+  P.forEach((p, i) => { const c = meshDots[i]; c.setAttribute('cx', pos[i][0].toFixed(1)); c.setAttribute('cy', pos[i][1].toFixed(1));
+    c.setAttribute('opacity', (clamp((R - Math.hypot(p.x, p.y - 30)) / 40) * 0.9).toFixed(2)); });
+  // eyes: almond openings that really close
+  [['L', -1], ['R', 1]].forEach(([id, s]) => {
+    const cx = FX + s * 64, cy = FY - 34, o = 1 - close, up = cy - 30 * o + 9 * close, lo = cy + 15 - 6 * close;
+    const d = `M${cx - 36} ${cy + 2} Q${cx} ${up - 4 * o} ${cx + 36} ${cy + 2} Q${cx} ${lo + 4} ${cx - 36} ${cy + 2} Z`;
+    $('clip' + id + 'p').setAttribute('d', d);
+    $('eye' + id).innerHTML = `<path d="${d}" fill="#bdb9c2"/><g clip-path="url(#clip${id})"><circle cx="${cx}" cy="${cy - 1}" r="13.5" fill="#4a4651"/><circle cx="${cx}" cy="${cy - 1}" r="4.5" fill="#f4f1f6"/></g>
+      <path d="M${cx - 38} ${cy + 2} Q${cx} ${up - 4 * o} ${cx + 38} ${cy + 2}" fill="none" stroke="#2b2831" stroke-width="5" stroke-linecap="round"/>`;
+    const bx = s * 1, by = cy - 40 + close * 5;
+    $('brow' + id).setAttribute('d', `M${cx - s * 46} ${by + 6} Q${cx} ${by - 10} ${cx + s * 48} ${by + 4}`);
+  });
+  $('turb').setAttribute('seed', Math.floor(t * 30) % 97 + 1);
+  $('recDot').setAttribute('opacity', (t % 1.2) < 0.6 ? 0.9 : 0.25);
+}
+
+// eye closure (0 open .. 1 shut) and nod (0 .. 1) over the film
+function closure(t) {
+  let c = 0.06;
+  for (const b of [22.7]) c = Math.max(c, bump(t, b, b + 0.22, 0.09, 0.11));           // natural blinks
+  c = Math.max(c, 0.66 * bump(t, C.rows[0] + 0.3, C.rows[0] + 1.75, 0.7, 0.4));              // "how closed"
+  for (const b of C.blinks) c = Math.max(c, bump(t, b - 0.06, b + 0.2, 0.08, 0.12));          // "how often you blink"
+  c = Math.max(c, 0.35 * bump(t, C.rows[2] + 0.3, C.rows[2] + 1.9, 0.7, 0.5));               // lids sag with the nod
+  const d = inout((t - (S.E + 0.9)) / 4.2);                                                   // growing drowsy
+  c = Math.max(c, d * 0.5 + 0.12 * d * Math.sin(t * 1.3));
+  for (const b of [31.6, 33.2, 34.6]) c = Math.max(c, bump(t, b, b + 0.55, 0.2, 0.3));        // slow, heavy blinks
+  return clamp(c);
+}
+const nodAt = (t) => Math.max(bump(t, C.rows[2] + 0.3, C.rows[2] + 1.9, 0.8, 0.55), 0.22 * inout((t - 32.5) / 2.5));
+
+// ---------------------------------------------------------------- the frame
+window.render = function (t) {
+  const B = boxAt(t), box = $('box');
+  box.style.left = B.x + 'px'; box.style.top = B.y + 'px'; box.style.width = B.w + 'px'; box.style.height = B.h + 'px';
+  box.style.borderRadius = B.r + 'px'; box.style.background = B.bg; box.style.borderWidth = B.bw + 'px'; box.style.borderColor = B.bc;
+  const inner = { w: B.w - 2 * B.bw, h: B.h - 2 * B.bw };
+  const op = (id, v) => { $(id).style.opacity = v; return v; };
+
+  // ---- A: the road, the eyelids, "단 1초"
+  const A = $('A'); A.style.display = t < S.B ? 'block' : 'none';
+  if (t < S.B) {
+    const VP = [960, 500];
+    document.querySelectorAll('.dash').forEach((d, i) => {
+      const z0 = ((i / 12 + t * 0.42) % 1), z1 = Math.min(1, z0 + 0.03), p0 = z0 ** 2.4, p1 = z1 ** 2.4;
+      const pt = (p, off) => [lerp(VP[0] - 26, 360, p) + off, lerp(VP[1], 1080, p)];
+      const w0 = 3 + 30 * p0, w1 = 3 + 30 * p1, a = pt(p0, 0), b = pt(p1, 0);
+      d.setAttribute('points', `${a[0] - w0 / 2},${a[1]} ${a[0] + w0 / 2},${a[1]} ${b[0] + w1 / 2},${b[1]} ${b[0] - w1 / 2},${b[1]}`);
+      d.setAttribute('opacity', (0.35 + 0.6 * p0).toFixed(2));
+    });
+    document.querySelectorAll('.post').forEach((gp, i) => {
+      const z = ((i / 9 + t * 0.42) % 1), p = z ** 2.4, x = lerp(VP[0] + 40, 2060, p), y = lerp(VP[1], 1010, p), h = 6 + 120 * p, w = 2 + 14 * p;
+      const [a, b] = gp.children; a.setAttribute('x', x); a.setAttribute('y', y - h); a.setAttribute('width', w); a.setAttribute('height', h);
+      b.setAttribute('x', x); b.setAttribute('y', y - h); b.setAttribute('width', w); b.setAttribute('height', h * 0.22);
+    });
+    // a slow blink, a heavier one, then shut exactly on "단 1초"
+    const c = Math.max(0.72 * bump(t, 1.5, 2.5, 0.45, 0.4), 0.9 * bump(t, 2.75, 3.7, 0.5, 0.45), inout((t - (C.black - 0.75)) / 0.75), 0.3 * inout((t - 2.6) / 2));
+    const ry = 800 * Math.pow(1 - c, 1.5), rx = 1500;      // the eye's opening: an ellipse wider than the frame when awake
+    $('lids').setAttribute('d', `M-10 -10 H1930 V1090 H-10 Z M${960 - rx} 550 A${rx} ${ry} 0 1 0 ${960 + rx} 550 A${rx} ${ry} 0 1 0 ${960 - rx} 550 Z`);
+    $('road').style.filter = `blur(${(c * 5).toFixed(1)}px)`; $('road').style.transform = `scale(${1.02 + 0.01 * Math.sin(t * 0.9)})`;
+  }
+  show($('oneSec'), t, C.black + 0.05, S.B - 0.25, 0.35, 0);
+
+  // ---- B: the statistic
+  const bOut = S.C - 0.15;
+  show($('bNum'), t, S.B + 0.5, bOut); show($('bTop'), t, S.B + 0.7, bOut); show($('bMain'), t, S.B + 3.7, bOut); show($('bEn'), t, S.B + 4.0, bOut);
+  show($('bPills'), t, S.B + 0.9, bOut); show($('bSrc'), t, S.B + 0.9, bOut);
+  const last = C.pills[C.pills.length - 1];
+  $('pct').textContent = Math.round(70 * clamp((t - C.pills[0] + 0.25) / (last - C.pills[0] + 0.25)));
+  document.querySelectorAll('.pill').forEach((p, i) => { const k = i < 7 ? ease((t - C.pills[i]) / 0.25) : 0; p.style.background = mix('#2E2A33', '#E8D7AE', k); p.style.transform = `scale(${1 + 0.12 * Math.sin(Math.PI * clamp((t - (C.pills[i] || 1e9)) / 0.3))})`; });
+
+  // ---- C: the real case on its light table, then Ollie
+  const cOut = S.P - 0.1;
+  const dev = fade(t, S.C + 0.6, S.P + 0.15, 0.5) + fade(t, S.F + 0.4, C.st2 + 0.1, 0.5) + fade(t, C.st3 - 0.35, S.G + 0.1, 0.45);
+  op('devImg', clamp(dev));
+  const devZoom = t < S.E ? 1.0 + 0.045 * clamp((t - S.C) / (S.P - S.C)) : 1.0 + 0.03 * clamp((t - S.F) / (S.G - S.F));
+  $('devImg').style.transform = `scale(${devZoom})`;
+  show($('cName'), t, S.C + 0.5, cOut); show($('cSub'), t, S.C + 0.9, cOut); show($('cEn'), t, S.C + 1.1, cOut);
+  { const u = t - C.ollie, k = clamp(u / 0.45), hop = u > 0 && u < 0.9 ? Math.sin(Math.PI * clamp(u / 0.9)) : 0, o = $('cOllie');
+    o.style.opacity = k * (1 - clamp((t - cOut) / 0.35));
+    o.style.transform = `translateY(${(1 - ease(u / 0.5)) * 70 - hop * 46}px) rotate(${Math.sin(t * 1.7) * 3}deg) scale(${1 + 0.04 * Math.sin(Math.PI * clamp((u - 0.75) / 0.3))})`;
+    show($('cOl'), t, C.ollie + 0.5, cOut); }
+
+  // ---- P: the real prototype, then the push into its camera
+  const push = inout((t - C.pushIn) / 0.85);
+  const pVis = fade(t, S.P + 0.35, C.pushIn + 0.7, 0.45);
+  op('realImg', pVis);
+  if (pVis > 0) { const drift = clamp((t - S.P) / 3), z = 1 + 0.04 * drift + push * 7;   // slow push, then into the lens
+    crop($('realImg'), inner, 1290, lerp(645, 896, push), lerp(800, 825, push), 1290, z); }
+  TAGS.forEach((g, i) => {
+    const s = inner.w / 1290 * (1 + 0.04 * clamp((t - S.P) / 3)), x = B.x + inner.w / 2 + (g[2] - 645) * s, y = B.y + inner.h / 2 + (g[3] - 800) * s;
+    const k = fade(t, S.P + 0.9 + i * 0.22, C.pushIn - 0.1, 0.35);
+    const d = $('pd' + i), tg = $('pt' + i); d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.opacity = k; d.style.transform = `scale(${1.6 - 0.6 * k})`;
+    tg.style.left = (x + g[4]) + 'px'; tg.style.top = (y + g[5]) + 'px'; tg.style.opacity = k;
+  });
+  show($('pHead'), t, S.P + 0.6, C.pushIn - 0.05);
+
+  // ---- D + E: the infrared view, the mesh, three readouts, the score
+  const irVis = fade(t, C.pushIn + 0.45, S.F + 0.25, 0.45);
+  op('ir', irVis);
+  if (irVis > 0) {
+    const cl = closure(t), nd = nodAt(t);
+    drawFace(t, cl, nd, ease((t - (S.D + 0.5)) / 1.5));
+    $('ir').style.transform = `scale(${1 + 0.5 * (1 - inout((t - C.pushIn - 0.4) / 0.9))})`;
+    $('v0bar').style.width = (250 * cl) + 'px'; $('v0n').textContent = Math.round(cl * 100) + '%';
+    const nb = C.blinks.filter((b) => t >= b).length; $('v1n').textContent = nb + '회';
+    document.querySelectorAll('.bl').forEach((e, i) => { e.style.background = t >= C.blinks[i] ? '#E8D7AE' : '#2E2A33'; });
+    const ang = nd * 22; $('v2l').setAttribute('x2', 120 + 44 * Math.sin(ang * Math.PI / 180)); $('v2l').setAttribute('y2', 18 + 44 * Math.cos(ang * Math.PI / 180)); $('v2n').textContent = Math.round(ang) + '°';
+  }
+  show($('dHead'), t, S.D + 0.6, S.E - 0.1);
+  C.rows.forEach((r, i) => show($('row' + i), t, r, S.E - 0.1 + i * 0.05));
+  const eOut = S.F - 0.1;
+  show($('eHead'), t, S.E + 0.5, eOut); show($('eNum'), t, S.E + 0.7, eOut); show($('eState'), t, S.E + 0.8, eOut); show($('eStateEn'), t, S.E + 0.8, eOut);
+  show($('eStrip'), t, S.E + 0.9, eOut); show($('eLab'), t, S.E + 0.9, eOut);
+  { const sc = 1 + C.score.filter((x) => t >= x).length, lastStep = Math.max(0, ...C.score.filter((x) => t >= x));
+    $('eN').textContent = sc; $('eN').style.display = 'inline-block'; $('eN').style.transform = `translateY(${-14 * Math.sin(Math.PI * clamp((t - lastStep) / 0.3))}px)`;
+    $('eState').textContent = sc <= 2 ? '깨어 있음' : sc <= 6 ? '졸림' : '위험'; $('eStateEn').textContent = sc <= 2 ? 'awake' : sc <= 6 ? 'drowsy' : 'danger';
+    $('eState').style.left = $('eStateEn').style.left = '1330px';
+    document.querySelectorAll('.seg').forEach((e, i) => { e.style.background = i < sc ? '#E8D7AE' : '#2E2A33'; }); }
+
+  // ---- F: four stages, on the device
+  const fOut = S.G - 0.1, st = [C.st1, C.st2, C.st3, C.st4];
+  show($('fHead'), t, S.F + 0.5, fOut);
+  const active = t >= C.alarmEnd + 0.1 ? -1 : st.filter((x) => t >= x).length - 1;
+  document.querySelectorAll('.step').forEach((e, i) => {
+    show(e, t, C.ladder[i], fOut - 0.15 + i * 0.03, 0.5, 18);
+    const on = active === i ? ease((t - st[i]) / 0.3) : 0, done = t >= st[i];
+    e.querySelector('.bar').style.opacity = on; e.querySelector('b').style.transform = `scale(${1 + 0.2 * on})`;
+    e.querySelector('b').style.color = on ? mix('#F2EEE8', ST[i][2], on * 0.9) : done ? '#F2EEE8' : '#6f6875';
+    e.querySelector('.n').style.color = on ? ST[i][2] : '#6f6875'; e.querySelector('small').style.opacity = on ? 1 : 0.55;
+    e.querySelector('small').style.transform = `translateY(${8 * on}px)`;
+  });
+  // 1: the blue light ramps on over 0.3 s and stays (the real light is held for 30 minutes)
+  const blue = clamp((t - C.st1) / 0.3) * (1 - clamp((t - C.st4) / 0.4));
+  const amberBase = clamp((t - C.st4 - 0.1) / 0.3) * (1 - clamp((t - C.alarmEnd) / 0.5));
+  const amber = t >= C.alarm && t < C.alarmEnd + 0.6 ? (TL.env.alarm[Math.floor((t - C.alarm) * 30)] || 0) * (1 - clamp((t - C.alarmEnd) / 0.5)) : 0;
+  $('tint').style.background = t >= C.st4 + 0.2 ? '#F2B66D' : '#4C7DFF'; op('tint', t > S.F && t < S.G ? Math.max(blue * 0.2, t >= C.st4 + 0.2 ? amberBase * 0.14 + amber * 0.28 : 0) : 0);
+  op('bloom', t > S.F && t < S.G ? blue * (0.55 + 0.04 * Math.sin(t * 2)) : 0);
+  // 2: the real mist at the booth (photo; slow pan toward the mist)
+  const mist = fade(t, C.st2 - 0.05, C.st3 - 0.2, 0.5); op('mistImg', mist);
+  if (mist > 0) { const k = clamp((t - C.st2) / (C.st3 - C.st2)); crop($('mistImg'), inner, 1290, lerp(560, 470, inout(k)), lerp(1236, 1210, k), 700, 1 + 0.05 * k); }
+  $('fCap').style.opacity = fade(t, C.st2 + 0.5, C.st3 - 0.35, 0.3);
+  // 3: the chime (rings), then the device's own voice (waveform); 4: the alarm (3 Hz rings, growing)
+  { let h = '';
+    for (let k = 0; k < 3; k++) { const u = (t - C.chime - k * 0.55) / 2.4; if (u > 0 && u < 1 && t < C.st4) h += `<circle cx="400" cy="380" r="${130 + 330 * ease(u)}" fill="none" stroke="#8a6f35" stroke-width="${7 - 4 * u}" opacity="${(1 - u).toFixed(2)}"/>`; }
+    if (t >= C.alarm && t < C.alarmEnd + 0.4) for (let k = 0; k < 9; k++) { const born = C.alarm + k / 3, u = (t - born) / 0.9, lv = TL.env.alarm[Math.floor((born - C.alarm) * 30)] || 0;
+      if (u > 0 && u < 1 && born < C.alarmEnd) h += `<circle cx="400" cy="380" r="${150 + (120 + 300 * lv) * ease(u)}" fill="none" stroke="#D88B2A" stroke-width="${5 + 12 * lv}" opacity="${((0.55 + 0.45 * lv) * (1 - u)).toFixed(2)}"/>`; }
+    $('rings').innerHTML = h; op('rings', h ? 1 : 0); }
+  { const dv = TL.lines.find((l) => l.id === 'dv3'), k = fade(t, dv.start - 0.3, dv.start + dv.dur + 0.25, 0.25), bub = $('bubble');
+    bub.style.opacity = k; bub.style.transform = `scale(${0.9 + 0.1 * k})`;
+    if (k > 0) [...$('bars').children].forEach((b, j) => { const f = Math.floor((t - dv.start) * 30) - (33 - j) * 2, v = f >= 0 ? (TL.env.dv3[f] || 0) : 0, hh = 8 + 84 * Math.pow(v, 0.7); b.style.height = hh + 'px'; b.style.top = (60 - hh / 2) + 'px'; b.style.opacity = 0.35 + 0.65 * v; }); }
+
+  // ---- G: the phone app (real captures)
+  const gOut = S.H - 0.1;
+  show($('gHead'), t, S.G + 0.5, gOut);
+  { const k1 = inout((t - C.scrTrip) / 0.55), k2 = inout((t - C.scrIns) / 0.55), on = fade(t, S.G + 0.45, S.H + 0.15, 0.4);
+    const set = (id, x, o) => { $(id).style.opacity = on * o; $(id).style.transform = `translateX(${x * inner.w}px)`; };
+    set('scrHome', -k1, 1 - k1 * 0.999); set('scrTrip', (1 - k1) - k2, k1 > 0 ? 1 : 0); set('scrIns', 1 - k2, k2 > 0 ? 1 : 0);
+    const ys = [250, 482, 232], G = BOX[6]; let h = '';
+    C.calls.forEach((c, i) => { const k = show($('call' + i), t, c, gOut - 0.1 + i * 0.03); const y0 = [420, 556, 692][i] + 44, y1 = G[2] + ys[i];
+      const cur = (i === 0 && t < C.calls[1]) || (i === 1 && t >= C.calls[1] && t < C.scrIns + 0.3) || (i === 2 && t >= C.scrIns + 0.3);
+      const lit = cur || (i === 1 && t >= C.woke) ? 1 : 0.42, dim = ease((t - (i === 0 ? C.calls[1] : i === 1 ? C.scrIns + 0.3 : C.woke)) / 0.4);
+      const d = ease((t - c - 0.15) / 0.6) * (1 - clamp((t - gOut) / 0.3));
+      if (d > 0 && cur) { const len = 1160 - 1110 + Math.abs(y1 - y0) + (G[1] - 1160), dash = `stroke-dasharray="${len}" stroke-dashoffset="${len * (1 - d)}"`;
+        h += `<path d="M1110 ${y0} L1160 ${y0} L1160 ${y1} L${G[1] - 6} ${y1}" fill="none" stroke="#E8D7AE" stroke-width="3" ${dash}/><circle cx="${G[1] - 6}" cy="${y1}" r="${7 * clamp((d - 0.9) * 10)}" fill="#E8D7AE"/>`; }
+      $('call' + i).style.opacity = k * (i === 1 && t >= C.woke ? lerp(0.42, 1, ease((t - C.woke) / 0.4)) : cur ? 1 : lerp(1, 0.42, dim)); });
+    $('gLines').innerHTML = h; }
+
+  // ---- H: the booth (real photos) and the QR
+  const hOut = S.I - 0.05, hv = fade(t, S.H + 0.25, hOut + 0.1, 0.5);
+  op('hPhoto', hv); $('hPhoto').style.transform = `translateY(${(1 - ease((t - S.H - 0.25) / 0.7)) * 24}px)`;
+  if (hv > 0) { const HB = { w: 1040, h: 780 }, kw = clamp((t - S.H) / (C.photoB + 0.6 - S.H)), kc = clamp((t - C.photoB) / (S.I - C.photoB));
+    crop($('hWide'), HB, 2400, 955, lerp(1290, 1600, inout(kw)), 1050, 1 + 0.03 * kw); $('hWide').style.opacity = 1;
+    crop($('hClose'), HB, 1290, 645, lerp(1440, 1400, kc), 1290, 1 + 0.06 * kc); $('hClose').style.opacity = clamp((t - C.photoB) / 0.6); }
+  show($('hHead'), t, S.H + 0.6, hOut); show($('hQr'), t, C.qr + 0.5, hOut);
+  { const u = t - (S.H + 0.9), o = $('hOllie'); o.style.opacity = clamp(u / 0.4) * (1 - clamp((t - hOut) / 0.35)); o.style.transform = `rotate(${Math.sin(t * 2.1) * 4}deg) translateY(${(1 - ease(u / 0.5)) * 20}px)`; }
+  op('qrImg', fade(t, S.H + 0.45, 1e9, 0.4));
+
+  // ---- I: the end card
+  { const u = t - S.I, k = ease((u - 0.3) / 0.8), o = $('iOllie'); o.style.opacity = k; o.style.transform = `translateY(${(1 - k) * 40 + Math.sin(t * 1.6) * 5}px) rotate(${Math.sin(t * 1.2) * 2}deg)`;
+    const n = $('iName'), kn = ease((t - C.logo) / 0.5); n.style.opacity = clamp((t - C.logo + 0.1) / 0.25); n.style.transform = `scale(${1.08 - 0.08 * kn})`;
+    show($('iTag'), t, C.logo + 0.5); show($('iFoot'), t, S.I + 1.2); show($('iScan'), t, S.I + 1.0, 1e9, 0.5, 0); }
+
+  // ---- subtitles
+  const line = TL.lines.find((l) => l.id !== 's15' && t >= l.start - 0.12 && t <= l.start + l.dur + 0.4), sub = $('subs');
+  if (line) { sub.querySelector('.ko').textContent = line.ko; sub.querySelector('.en').textContent = line.en; sub.querySelector('.ko').style.color = line.device ? '#E8D7AE' : '#F2EEE8'; }
+  sub.style.opacity = line ? clamp((t - line.start + 0.12) / 0.2) * clamp((line.start + line.dur + 0.4 - t) / 0.25) : 0;
+};
+window.END = END;
+render(0);
+</script>
+</body>
+</html>

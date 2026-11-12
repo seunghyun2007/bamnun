@@ -4,17 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bamnun App</title>
+<!--__ICON__-->
+<meta name="theme-color" content="#15131A">
+<link rel="manifest" href="app.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon-192.png">
 <style>
-@font-face{font-family:"Bricolage Grotesque";src:url(fonts/bricolage-grotesque.woff2) format("woff2");font-weight:200 800;font-stretch:75% 100%;font-display:swap}
-@font-face{font-family:Figtree;src:url(fonts/figtree.woff2) format("woff2");font-weight:300 900;font-display:swap}
-:root{color-scheme:dark;--void:#110C12;--ink:#17111A;--text:#F4EFE6;--muted:#B3A6B4;--amber:#FFB547}
+@font-face{font-family:Pretendard;src:url(fonts/pretendard.woff2) format("woff2");font-weight:400 800;font-display:swap}
+:root{color-scheme:dark;--void:#15131A;--ink:#15131A;--text:#F2EEE8;--muted:#9A93A0;--amber:#F2B66D}
 html,body{height:100%}
-body{margin:0;background:radial-gradient(900px 600px at 30% 20%,rgba(168,132,232,0.34) 0%,rgba(168,132,232,0) 60%),radial-gradient(700px 500px at 80% 80%,rgba(236,140,172,0.24) 0%,rgba(236,140,172,0) 60%);background-color:var(--void);color:var(--text);font-family:Figtree,Arial,sans-serif;overflow:hidden}
+body{margin:0;background:var(--void);color:var(--text);font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 *{box-sizing:border-box}
 button{font:inherit;color:inherit;cursor:pointer}
 a,button{-webkit-tap-highlight-color:transparent}
 .stage{position:fixed;inset:0;overflow:hidden}
-.phone{position:absolute;left:50%;top:50%;width:390px;height:844px;border-radius:48px;overflow:hidden;background:var(--ink);box-shadow:0 40px 120px #000a,0 0 0 10px #110C12,0 0 0 11px rgba(255,255,255,.12);transform-origin:center center}
+.phone{position:absolute;left:50%;top:50%;width:390px;height:844px;border-radius:48px;overflow:hidden;background:var(--ink);box-shadow:0 40px 120px #000a,0 0 0 10px #15131A,0 0 0 11px rgba(255,255,255,.12);transform-origin:center center}
 .phone.full{left:0;top:0;transform-origin:0 0}
 .phone.full{border-radius:0;box-shadow:none}
 .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;background:var(--ink)}
@@ -32,11 +36,13 @@ a,button{-webkit-tap-highlight-color:transparent}
 .hint{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:var(--muted);font-size:12.5px;pointer-events:none}
 .phone.full~.hint{display:none}
 /* Map pins and the position dot: shared by Route, Drive and the Home card. */
-.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F4EFE6;color:#241A26;font:700 12px Figtree,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
-.mp-pin.pick{background:#C4B5FD}
+.mp-pin{transform:translateY(-50%);padding:4px 9px;border-radius:99px;background:#F2EEE8;color:#15131A;font:700 12px Pretendard,Arial,sans-serif;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.mp-pin.pick{background:#E8D7AE}
 .mp-me{width:18px;height:18px;border-radius:50%;background:#4C8DFF;border:3px solid #fff;box-shadow:0 0 0 7px rgba(76,141,255,.25)}
 @keyframes livePulse{0%,100%{opacity:1}50%{opacity:.35}}
 #s-Home,#s-Trips,#s-Insights{min-height:100%;display:flex;flex-direction:column}
+/* The flat Ollie has no painted eyelids to blink over. */
+#phone .ol-loop img[src^="data:image/svg"]~.ol-eye{display:none!important}
 /*__STYLES__*/
 </style>
 </head>
@@ -77,7 +83,11 @@ window.SFX=(function(){
     tick(){tone(1400,{d:.05,v:.03,type:"triangle"})},
     success(){[523,659,784,1047].forEach((f,i)=>{tone(f,{t:i*.09,d:.45,v:.06});tone(f*2,{t:i*.09,d:.2,v:.012})})},
     hoot(){tone(410,{d:.24,f2:370,v:.12,a:.05,vib:6});tone(460,{t:.32,d:.42,f2:390,v:.13,a:.06,vib:6})},
-    start(){tone(440,{d:.25,f2:880,v:.06,a:.02});[880,1109,1319].forEach((f,i)=>tone(f,{t:.2+i*.07,d:.35,v:.045}))}
+    start(){tone(440,{d:.25,f2:880,v:.06,a:.02});[880,1109,1319].forEach((f,i)=>tone(f,{t:.2+i*.07,d:.35,v:.045}))},
+    // Product control previews: stage 3's slow chime and stage 4's alarm,
+    // 3 beeps a second, getting louder rather than starting loud.
+    chime(){[0,1,2].forEach(i=>{tone(784,{t:i,d:.9,v:.07,a:.01});tone(1568,{t:i,d:.4,v:.015})})},
+    alarm(){for(let i=0;i<9;i++)tone(1046,{t:i/3,d:.16,v:.012+.011*i,type:"square"})}
   };
   S.play=n=>{if(S[n])S[n]()};
   S.enabled=()=>on;
@@ -92,7 +102,7 @@ const KO=/*__KO__*/;
 const DAYS=["M","T","W","T","F","S","S"],KDAYS=["월","화","수","목","금","토","일"];
 let LANG="en";try{LANG=localStorage.getItem("bn-lang")||"en"}catch(e){}
 window.BN_LANG=()=>LANG;
-window.BN_NAME=()=>{let n=window.BN_API?(BN_API.profile().name||""):"";if(!n)try{n=localStorage.getItem("bn-name")||""}catch(e){}n=n.trim();return n||BN_T("Driver");};
+window.BN_NAME=()=>{if(window.BN_VISIT&&BN_VISIT.name())return BN_VISIT.name();let n=window.BN_API?(BN_API.profile().name||""):"";if(!n)try{n=localStorage.getItem("bn-name")||""}catch(e){}n=n.trim();return n||BN_T("Driver");};
 function fillNames(node){const w=document.createTreeWalker(node,4);let t;const nm=BN_NAME();while(t=w.nextNode())if(t.data.includes("{name}"))t.data=t.data.split("{name}").join(nm);}
 window.BN_T=(s,v)=>{let o=LANG==="ko"&&KO.text[s]||s;if(v)for(const k in v)o=o.split("{"+k+"}").join(v[k]);return o;};
 const phone=document.getElementById("phone");
@@ -122,10 +132,55 @@ function setLang(l){LANG=l;try{localStorage.setItem("bn-lang",l)}catch(e){}phone
 setLang(LANG);
 function fit(){
   const w=innerWidth,h=innerHeight;
-  if(w<=500){ const s=w/390; phone.classList.add("full"); phone.style.height=(h/s)+"px"; phone.style.transform=`scale(${s})`; }
-  else { phone.classList.remove("full"); phone.style.height="844px"; const s=Math.min(1.15,(h-48)/844,(w-48)/390); phone.style.transform=`translate(-50%,-50%) scale(${s})`; }
+  // A phone, or any touch screen (an unfolded foldable, a tablet, a phone on
+  // its side): no phone frame. The screens are drawn 390 wide, so they're
+  // scaled to the width (at most 1.6x, past that they'd look blown up) and
+  // centred on the app's own background, with no visible edge.
+  const touch=matchMedia("(pointer: coarse)").matches||navigator.maxTouchPoints>0;
+  if(w<=500||touch){ const s=Math.min(w/390,1.6), ox=Math.max(0,(w-390*s)/2);
+    phone.classList.add("full"); phone.style.height=(h/s)+"px"; phone.style.transform=`translate(${ox}px,0) scale(${s})`;
+    document.body.style.background=getComputedStyle(phone).backgroundColor; }
+  else { phone.classList.remove("full"); document.body.style.background=""; phone.style.height="844px"; const s=Math.min(1.15,(h-48)/844,(w-48)/390); phone.style.transform=`translate(-50%,-50%) scale(${s})`; }
+  fitScreen(phone.querySelector(".screen:not(.leave)"));
+}
+// The setup screens are drawn 844 tall, with their buttons pinned to the
+// bottom. A phone browser is shorter than that once its bars are showing, which
+// left those buttons below the edge. So on a shorter phone a screen takes the
+// real height when its content still clears the pinned buttons, and otherwise
+// shrinks whole to fit.
+function fitScreen(sc){
+  const root=sc&&sc.firstElementChild, box=root&&root.firstElementChild;
+  if(!box||!/(^|;)\s*height:\s*844px/.test(box.getAttribute("style")||"")) return;
+  box.style.height="844px"; box.style.transform=""; root.style.height=""; root.style.overflow="";
+  const H=sc.clientHeight;
+  if(!phone.classList.contains("full")||H>=844) return;
+  box.style.height=H+"px";
+  const top=box.getBoundingClientRect().top, s=box.getBoundingClientRect().height/H||1;
+  let flow=0,pinned=Infinity;
+  (function walk(el){
+    for(const c of el.children){
+      const cs=getComputedStyle(c), r=c.getBoundingClientRect();
+      if(cs.position==="absolute"||cs.position==="fixed"){
+        if((r.bottom-top)/s>H-4&&(r.top-top)/s>H/3)
+          for(const b of c.matches("a,button")?[c]:c.querySelectorAll("a,button")){ const t=(b.getBoundingClientRect().top-top)/s; if(t>H/3) pinned=Math.min(pinned,t); }
+        continue;
+      }
+      if(r.height) flow=Math.max(flow,(r.bottom-top)/s);
+      walk(c);
+    }
+  })(box);
+  if(flow<=Math.min(pinned-12,H)) return;
+  box.style.height="844px"; box.style.transform=`scale(${H/844})`; box.style.transformOrigin="top center";
+  root.style.height=H+"px"; root.style.overflow="hidden";
 }
 addEventListener("resize",fit); fit();
+// The page, the stage and the phone frame never scroll; only a .screen does.
+// Something scrolling them anyway (scrollIntoView, a focused field, iOS)
+// pushed the whole app out of place: put it back.
+window.BN_UNSCROLL=()=>{for(const el of [document.scrollingElement,document.body,document.querySelector(".stage"),phone]){if(el&&(el.scrollTop||el.scrollLeft)){el.scrollTop=0;el.scrollLeft=0;}}};
+addEventListener("scroll",BN_UNSCROLL,{passive:true});
+for(const el of [document.querySelector(".stage"),phone]) if(el) el.addEventListener("scroll",BN_UNSCROLL,{passive:true});
+addEventListener("resize",()=>setTimeout(BN_UNSCROLL,50));
 function go(name,opts={}){
   if(!document.getElementById("t-"+name)) return;
   const back = opts.back || (cur && ORDER.indexOf(name) < ORDER.indexOf(cur));
@@ -142,6 +197,7 @@ function go(name,opts={}){
   try{ history.replaceState(null,"","#"+name); }catch(e){}
   if(DYN[name]) try{ DYN[name](root,{go,forward,setLang,rerender:()=>go(name,{instant:true,keepScroll:true})}); }catch(err){ console.error(name,err); }
   if(window.BN_LIVE) BN_LIVE.paint();
+  fitScreen(sc);
   if(name==="Plan"){ setTimeout(()=>SFX.play("success"),350); if(window.BN_SYNC) BN_SYNC.markOnboarded(); }
 }
 window.BN_GO=go;
@@ -162,7 +218,7 @@ phone.addEventListener("click",e=>{
   const owl=e.target.closest(".olw");
   if(owl&&!e.target.closest("a,button")){owl.classList.remove("poke");void owl.offsetWidth;owl.classList.add("poke");SFX.play("hoot");return;}
   const lang=e.target.closest("[data-lang]");
-  if(lang){ const changed=lang.dataset.lang!==LANG; setLang(lang.dataset.lang); SFX.play("select"); if(!lang.dataset.go){ if(changed) go(cur,{instant:true,keepScroll:true}); return; } }
+  if(lang){ const changed=lang.dataset.lang!==LANG; setLang(lang.dataset.lang); try{localStorage.setItem("bn-lang-chosen","1")}catch(e){} SFX.play("select"); if(!lang.dataset.go){ if(changed) go(cur,{instant:true,keepScroll:true}); return; } }
   const a=e.target.closest("[data-go]");
   if(a){
     e.preventDefault();
@@ -186,6 +242,15 @@ setTimeout(()=>{
   let first=ORDER.includes(start)?start:"Main";
   if(A&&A.pendingReturn())first="Account";
   else if(!start&&A&&A.user()&&S&&S.onboarded())first="Home";
+  // The public website (GitHub Pages, opened from the booth's QR code) has no
+  // Pi behind it: straight into the demo drive, in Korean (English only if
+  // the visitor picks it here; the exhibition audience is Korean).
+  else if(/\.github\.io$/i.test(location.hostname)&&(!start||start==="Main"||start==="Welcome")){
+    let saved=null;try{saved=localStorage.getItem("bn-lang")}catch(e){}
+    try{if(!localStorage.getItem("bn-lang-chosen"))setLang("ko")}catch(e){setLang("ko")}
+    try{localStorage.setItem("bn-showcase","1")}catch(e){}
+    first="Home";
+  }
   go(first,{instant:true});
 },0);
 // The app was restarted while Google's page was open, then signed in.

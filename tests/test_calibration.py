@@ -78,7 +78,7 @@ def test_a_camera_off_to_the_side_is_fine():
 
 
 @pytest.mark.parametrize("hint,kw", [("closer", {"iod_frac": 0.03}), ("dark", {"brightness": 20.0}),
-                                     ("face_camera", {"yaw": 40.0})])
+                                     ("face_camera", {"yaw": 60.0})])
 def test_live_hints(hint, kw):
     c = Calibrator(load_config()["calibration"])
     c.start(0.0)
